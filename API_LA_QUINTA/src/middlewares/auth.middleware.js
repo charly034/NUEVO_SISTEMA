@@ -84,7 +84,14 @@ export const requireAdminAuth = async (req, res, next) => {
     if (!usuario) {
       return res.status(401).json({ success: false, message: 'Sesión inválida' });
     }
-    req.adminUser = { ...payload, sub: usuario.id, rol: usuario.rol };
+    req.adminUser = {
+      ...payload,
+      sub: usuario.id,
+      rol: usuario.rol,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      email: usuario.email,
+    };
     next();
   } catch {
     return res.status(401).json({ success: false, message: 'Token inválido o expirado' });

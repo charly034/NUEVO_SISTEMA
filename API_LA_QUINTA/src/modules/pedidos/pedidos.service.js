@@ -11,6 +11,7 @@ const DIAS_LABORALES = {
   lunes_domingo: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
 };
 
+
 // Índice de día en la semana (lunes=0 ... domingo=6)
 const DIA_IDX = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4, sabado: 5, domingo: 6 };
 
@@ -214,7 +215,7 @@ export const getMiPedido = (empleadoId, semanaInicio) => {
   return repo.findPedidoByEmpleadoSemana(empleadoId, semanaInicio);
 };
 
-export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu_semanal_id, items, observaciones }) => {
+export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu_semanal_id, items, observaciones }, actor = {}) => {
   const diasUnicos = validarPedidoInput({ semana_inicio, menu_semanal_id, items });
 
   const menuActivo = await repo.menuActivoPorId(menu_semanal_id);
@@ -245,6 +246,7 @@ export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu
   const client = await getClient();
   try {
     await client.query('BEGIN');
+    const pedidoPrevio = await repo.findPedidoByEmpleadoSemana(empleadoId, semana_inicio, client);
 
     for (const item of items) {
       const plato = await repo.validateItemForMenu(menuActivo.id, item, client);
@@ -284,6 +286,22 @@ export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu
     for (const item of items) {
       itemsGuardados.push(await repo.upsertItem(pedido.id, item, client));
     }
+    await repo.registrarEvento({
+      pedido_id: pedido.id,
+      tipo: pedidoPrevio ? 'pedido_actualizado' : 'pedido_creado',
+      actor_tipo: actor.actor_tipo || 'empleado',
+      actor_id: actor.actor_id || empleadoId,
+      actor_nombre: actor.actor_nombre || null,
+      estado_anterior: pedidoPrevio?.estado || null,
+      estado_nuevo: pedido.estado,
+      resumen: pedidoPrevio
+        ? `Pedido actualizado (${itemsGuardados.length} día${itemsGuardados.length !== 1 ? 's' : ''})`
+        : `Pedido creado (${itemsGuardados.length} día${itemsGuardados.length !== 1 ? 's' : ''})`,
+      metadata: {
+        dias: itemsGuardados.map(item => item.dia),
+        total_items: itemsGuardados.length,
+      },
+    }, client);
 
     await client.query('COMMIT');
     return { ...pedido, items: itemsGuardados };
@@ -297,7 +315,7 @@ export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu
 
 export const getMiHistorial = (empleadoId) => repo.findHistorialByEmpleado(empleadoId);
 
-export const cancelarMiPedido = async (empleadoId, semanaInicio) => {
+export const cancelarMiPedido = async (empleadoId, semanaInicio, actor = {}) => {
   if (!semanaInicio) throw ApiError.badRequest('semana_inicio es requerido');
   const client = await getClient();
   try {
@@ -306,6 +324,17 @@ export const cancelarMiPedido = async (empleadoId, semanaInicio) => {
     if (!pedido) {
       throw ApiError.conflict('El pedido no existe o ya no se puede cancelar');
     }
+    await repo.registrarEvento({
+      pedido_id: pedido.id,
+      tipo: 'pedido_cancelado',
+      actor_tipo: actor.actor_tipo || 'empleado',
+      actor_id: actor.actor_id || empleadoId,
+      actor_nombre: actor.actor_nombre || null,
+      estado_anterior: pedido.estado_anterior || null,
+      estado_nuevo: pedido.estado,
+      resumen: 'Pedido cancelado por el usuario',
+      metadata: { semana_inicio: pedido.semana_inicio },
+    }, client);
     await client.query('COMMIT');
     return pedido;
   } catch (error) {
@@ -316,9 +345,33 @@ export const cancelarMiPedido = async (empleadoId, semanaInicio) => {
   }
 };
 
-export const cambiarEstado = async (id, estado) => {
-  if (!ESTADOS.includes(estado)) throw ApiError.badRequest(`Estado inválido. Opciones: ${ESTADOS.join(', ')}`);
-  const pedido = await repo.updateEstado(id, estado);
-  if (!pedido) throw ApiError.notFound(`Pedido ${id} no encontrado`);
-  return pedido;
+export const cambiarEstado = async (id, estado, actor = {}) => {
+  if (!ESTADOS.includes(estado)) throw ApiError.badRequest(`Estado invalido. Opciones: ${ESTADOS.join(', ')}`);
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const anterior = await repo.findPedidoCabeceraById(id, client);
+    if (!anterior) throw ApiError.notFound(`Pedido ${id} no encontrado`);
+
+    const pedido = await repo.updateEstado(id, estado, client);
+    await repo.registrarEvento({
+      pedido_id: pedido.id,
+      tipo: 'estado_cambiado',
+      actor_tipo: actor.actor_tipo || 'admin',
+      actor_id: actor.actor_id || null,
+      actor_nombre: actor.actor_nombre || null,
+      estado_anterior: anterior.estado,
+      estado_nuevo: estado,
+      resumen: `Estado cambiado de ${anterior.estado} a ${estado}`,
+      metadata: {},
+    }, client);
+
+    await client.query('COMMIT');
+    return pedido;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };

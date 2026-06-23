@@ -54,9 +54,7 @@ export default function HistorialPedidos({ empleado }) {
     );
   }
 
-  const pedidosActivos = pedidos.filter(p => p.estado !== 'cancelado');
-
-  if (pedidosActivos.length === 0) {
+  if (pedidos.length === 0) {
     return (
       <div style={s.wrap}>
         <h2 style={s.titulo}>Mis pedidos</h2>
@@ -72,11 +70,11 @@ export default function HistorialPedidos({ empleado }) {
     <div style={s.wrap}>
       <h2 style={s.titulo}>Mis pedidos</h2>
       <p style={{ color: 'var(--subtexto)', fontSize: 13, marginBottom: 16 }}>
-        {pedidosActivos.length} semana{pedidosActivos.length !== 1 ? 's' : ''} registrada{pedidosActivos.length !== 1 ? 's' : ''}
+        {pedidos.length} semana{pedidos.length !== 1 ? 's' : ''} registrada{pedidos.length !== 1 ? 's' : ''}
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 90 }}>
-        {pedidosActivos.map(p => {
+        {pedidos.map(p => {
           const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente;
           const esCurrent = esEstaSemana(p.semana_inicio);
           const abierto = expandido === p.id;

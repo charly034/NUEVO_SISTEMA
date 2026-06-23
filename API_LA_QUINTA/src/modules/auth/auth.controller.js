@@ -1,7 +1,6 @@
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess } from '../../utils/response.js';
 import * as authService from './auth.service.js';
-import { requireAuth } from '../../middlewares/auth.middleware.js';
 
 export const loginController = asyncHandler(async (req, res) => {
   const { email, password, remember = false } = req.body;

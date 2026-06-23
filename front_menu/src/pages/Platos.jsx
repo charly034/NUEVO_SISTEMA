@@ -153,6 +153,62 @@ function DetallePlatoModal({ plato, onClose, onEdit }) {
   );
 }
 
+function PlatoMobileCard({ plato, loading, onOpen, onToggleActivo, onEdit, onDelete }) {
+  const ultimoUso = plato.ultimo_uso ? (() => {
+    const d = diasDesde(plato.ultimo_uso.fecha_servicio);
+    const esFuturo = new Date(soloFecha(plato.ultimo_uso.fecha_servicio)) > new Date();
+    return `${formatCorto(plato.ultimo_uso.fecha_servicio)} · ${esFuturo ? 'próximo uso' : d === 0 ? 'hoy' : `hace ${d}d`}`;
+  })() : 'Nunca usado';
+
+  return (
+    <div className="p-4 bg-white">
+      <button onClick={onOpen} className="w-full text-left">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 leading-snug">{plato.nombre}</p>
+            {plato.descripcion && (
+              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{plato.descripcion}</p>
+            )}
+          </div>
+          <span className={`badge flex-shrink-0 ${plato.activo ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
+            {plato.activo ? 'Activo' : 'Inactivo'}
+          </span>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">Último uso: {ultimoUso}</p>
+        {(plato.tags ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {plato.tags.map((tag) => <TagBadge key={tag} tag={tag} />)}
+          </div>
+        )}
+      </button>
+
+      <div className="grid grid-cols-3 gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => onToggleActivo(plato)}
+          disabled={loading}
+          className={`min-h-[42px] rounded-xl text-xs font-bold transition-colors ${
+            plato.activo ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          {plato.activo ? 'Desactivar' : 'Activar'}
+        </button>
+        <button
+          onClick={() => onEdit(plato)}
+          className="min-h-[42px] rounded-xl text-xs font-bold bg-gray-50 text-gray-700"
+        >
+          Editar
+        </button>
+        <button
+          onClick={() => onDelete(plato)}
+          className="min-h-[42px] rounded-xl text-xs font-bold bg-red-50 text-red-600"
+        >
+          Eliminar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Página principal ─────────────────────────────────────────────
 export default function Platos() {
   const [search, setSearch]             = useState('');
@@ -200,7 +256,7 @@ export default function Platos() {
   }, [updateMutation, editando]);
 
   const handleToggleActivo = useCallback(async (plato, e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     try {
       await updateMutation.mutateAsync({ id: plato.id, data: { activo: !plato.activo } });
       toast.success(plato.activo ? 'Plato desactivado' : 'Plato activado');
@@ -307,7 +363,21 @@ export default function Platos() {
             )}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          <div className="md:hidden divide-y divide-gray-100">
+            {platos.map((plato) => (
+              <PlatoMobileCard
+                key={plato.id}
+                plato={plato}
+                loading={updateMutation.isPending}
+                onOpen={() => setDetalle(plato)}
+                onToggleActivo={handleToggleActivo}
+                onEdit={setEditando}
+                onDelete={setConfirmDelete}
+              />
+            ))}
+          </div>
+          <table className="hidden md:table w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 {[
@@ -408,6 +478,7 @@ export default function Platos() {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
 

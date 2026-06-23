@@ -206,7 +206,7 @@ export default function FormularioPedido({ empleado }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mi-pedido', empleado.id, semanaInicio] });
       setConfirmado(true);
-      toast.success('¡Pedido enviado correctamente!');
+      toast.success(pedidoExistente ? 'Pedido actualizado. La cocina ya ve tus cambios.' : 'Pedido enviado. La cocina ya lo recibió.');
     },
     onError: (e) => toast.error(e?.message || 'Error al enviar el pedido'),
   });
@@ -243,6 +243,16 @@ export default function FormularioPedido({ empleado }) {
         notas: selecciones[d].notas || null,
       }));
     if (items.length === 0) return;
+    const accion = pedidoExistente ? 'Actualizar pedido' : 'Enviar pedido';
+    const texto = pedidoExistente
+      ? `Vas a actualizar ${items.length} día${items.length !== 1 ? 's' : ''}. Los cambios recién se guardan al confirmar.`
+      : `Vas a enviar ${items.length} día${items.length !== 1 ? 's' : ''}. Después vas a poder modificarlo mientras el plazo siga abierto.`;
+    if (!await confirmar({
+      titulo: `${accion}?`,
+      texto,
+      botonConfirmar: pedidoExistente ? 'Sí, actualizar' : 'Sí, enviar',
+      color: '#276749',
+    })) return;
     mutation.mutate({ semana_inicio: semanaInicio, menu_semanal_id: menuSemana?.menu?.id || null, items });
   };
 
@@ -404,6 +414,7 @@ export default function FormularioPedido({ empleado }) {
   const diasCompletados = diasConFechaYBloqueo.filter(
     ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia] && selecciones[dia]?.plato_id
   ).length;
+  const diasPendientes = Math.max(0, diasActivos - diasCompletados);
 
   return (
     <Pantalla>
@@ -418,6 +429,15 @@ export default function FormularioPedido({ empleado }) {
             : menuSemana.limiteEmpresa.texto}
         </div>
       )}
+
+      <div style={s.estadoPedidoInfo}>
+        <strong>{pedidoExistente ? 'Pedido ya guardado' : 'Nuevo pedido'}</strong>
+        <span>
+          {pedidoExistente
+            ? 'Podés editarlo mientras el plazo esté abierto. Nada cambia hasta tocar “Actualizar pedido”.'
+            : 'Elegí los días que vas a pedir. Podés dejar días sin elegir si no vas a necesitar vianda.'}
+        </span>
+      </div>
 
       {/* Botón: repetir semana anterior */}
       {pedidoAnterior && !pedidoExistente && (
@@ -483,7 +503,7 @@ export default function FormularioPedido({ empleado }) {
       </div>
 
       <div style={s.footer}>
-        <StepperMini completados={diasCompletados} total={diasActivos} />
+        <StepperMini completados={diasCompletados} pendientes={diasPendientes} total={diasActivos} />
         <button
           style={{ ...s.btnEnviar, opacity: diasCompletados === 0 ? 0.5 : 1 }}
           onClick={handleEnviar}
@@ -535,9 +555,15 @@ function StepperProgreso({ dias, diasSinServicio, noAsiste, selecciones, diaActi
   );
 }
 
-function StepperMini({ completados, total }) {
+function StepperMini({ completados, pendientes, total }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'center' }}>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 13, color: '#374151', fontWeight: 700, marginBottom: 7 }}>
+        {pendientes === 0
+          ? 'Pedido completo'
+          : `Te falta elegir ${pendientes} día${pendientes !== 1 ? 's' : ''}`}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
       <div style={{ display: 'flex', gap: 4 }}>
         {Array.from({ length: total }).map((_, i) => (
           <div
@@ -555,6 +581,7 @@ function StepperMini({ completados, total }) {
       <span style={{ fontSize: 12, color: 'var(--subtexto)', fontWeight: 600 }}>
         {completados}/{total}
       </span>
+      </div>
     </div>
   );
 }
@@ -668,7 +695,7 @@ function ProximaSemanaCard({ menu, onIr }) {
 
 function DiaCard({
   dia, fecha, variablesDia, fijosDia, seleccion, guarniciones,
-  onElegir, onGuarnicion, onNotas, onAvanzar,
+  onElegir, onGuarnicion, onNotas,
   bloqueado, bloqueadoTexto, noAsiste, onToggleAsiste,
   expandido, onToggleExpand,
 }) {
@@ -888,13 +915,14 @@ const s = {
   selBadge:         { display: 'inline-block', fontSize: 13, background: 'var(--verde-bg)', color: 'var(--verde)', padding: '3px 10px', borderRadius: 20, fontWeight: 600 },
   selBadgeWarning:  { display: 'inline-block', fontSize: 13, background: '#fef3c7', color: '#92400e', padding: '3px 10px', borderRadius: 20, fontWeight: 700 },
   chipVerde:        { fontSize: 14, color: 'var(--verde)', background: 'var(--verde-bg)', border: '1.5px solid var(--verde)', borderRadius: 20, padding: '7px 14px', cursor: 'pointer', fontWeight: 700, flexShrink: 0 },
-  chipNoVoy:        { fontSize: 13, color: '#dc2626', background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 20, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
+  estadoPedidoInfo: { display: 'flex', flexDirection: 'column', gap: 3, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '11px 13px', fontSize: 13, color: '#475569', marginBottom: 12, lineHeight: 1.35 },
+  chipNoVoy:        { fontSize: 13, color: '#b91c1c', background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 20, padding: '8px 13px', minHeight: 36, cursor: 'pointer', fontWeight: 700, flexShrink: 0 },
   separadorFijos:   { display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0 10px' },
   separadorTexto:   { fontSize: 12, fontWeight: 700, color: 'var(--subtexto)', textTransform: 'uppercase', letterSpacing: 0.5, background: '#f8fafc', padding: '3px 10px', borderRadius: 6 },
-  opcionBtn:        { display: 'flex', flexDirection: 'column', gap: 4, padding: '13px 14px', borderRadius: 10, border: '1.5px solid var(--borde)', background: '#fff', textAlign: 'left', width: '100%', cursor: 'pointer' },
+  opcionBtn:        { display: 'flex', flexDirection: 'column', gap: 4, padding: '14px 14px', minHeight: 52, borderRadius: 10, border: '1.5px solid var(--borde)', background: '#fff', textAlign: 'left', width: '100%', cursor: 'pointer' },
   badge:            { fontSize: 12, background: 'var(--verde)', color: '#fff', padding: '3px 9px', borderRadius: 20, fontWeight: 700, whiteSpace: 'nowrap' },
   inputNotas:       { width: '100%', padding: '10px 13px', borderRadius: 9, border: '1.5px solid var(--borde)', fontSize: 15, boxSizing: 'border-box' },
-  footer:           { position: 'fixed', bottom: 60, left: 0, right: 0, background: '#fff', borderTop: '1px solid var(--borde)', padding: '10px 20px 12px', textAlign: 'center', zIndex: 10 },
+  footer:           { position: 'fixed', bottom: 60, left: 0, right: 0, background: '#fff', borderTop: '1px solid var(--borde)', padding: '10px 20px calc(12px + env(safe-area-inset-bottom))', textAlign: 'center', zIndex: 10, boxShadow: '0 -8px 24px rgba(15,23,42,0.06)' },
   btnEnviar:        { background: 'var(--verde)', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 32px', fontSize: 17, fontWeight: 700, width: '100%', maxWidth: 400, cursor: 'pointer' },
   btnSecundario:    { background: '#fff', color: 'var(--verde)', border: '2px solid var(--verde)', borderRadius: 12, padding: '12px 24px', fontSize: 16, fontWeight: 700, cursor: 'pointer' },
 };
@@ -902,7 +930,7 @@ const s = {
 const sHome = {
   heroOk:           { background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '2px solid #86efac', borderRadius: 18, padding: '18px 18px 14px', marginBottom: 14 },
   heroOkTitulo:     { fontSize: 18, fontWeight: 800, color: '#15803d', lineHeight: 1.2 },
-  heroOkSub:        { fontSize: 13, color: '#4ade80', marginTop: 2, color: '#166534' },
+  heroOkSub:        { fontSize: 13, marginTop: 2, color: '#166534' },
   diasResumen:      { marginTop: 14, display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid #bbf7d0', paddingTop: 12 },
   diaFila:          { display: 'flex', gap: 12, padding: '9px 0', borderBottom: '1px solid #dcfce7', alignItems: 'flex-start' },
   diaLabel:         { fontWeight: 700, fontSize: 14, color: '#15803d', minWidth: 72, flexShrink: 0 },

@@ -12,7 +12,7 @@ const PAGE_TITLES = {
   '/guarniciones': 'Guarniciones',
 };
 
-export default function MobileHeader({ admin, onLogout }) {
+export default function MobileHeader({ onLogout }) {
   const location = useLocation();
 
   // Semanas/:id tiene título dinámico — mostrar genérico

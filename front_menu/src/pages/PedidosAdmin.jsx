@@ -49,6 +49,23 @@ function fmtFull(iso) {
   const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`;
 }
 
+function fmtEvento(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+const EVENTO_LABELS = {
+  pedido_creado: 'Creado',
+  pedido_actualizado: 'Actualizado',
+  pedido_cancelado: 'Cancelado',
+  estado_cambiado: 'Cambio de estado',
+};
+
 function iniciales(nombre, apellido) {
   return `${(apellido||'')[0]||''}${(nombre||'')[0]||''}`.toUpperCase();
 }
@@ -57,14 +74,6 @@ function avatarColor(str) {
   let h = 0;
   for (const c of (str||'')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
-function formatItem(item) {
-  if (!item) return '—';
-  let s = item.plato_nombre;
-  if (item.opcion) s += ` (Op. ${item.opcion})`;
-  if (item.guarnicion_nombre) s += ` + ${item.guarnicion_nombre}`;
-  return s;
 }
 
 // ── Exportar Excel ────────────────────────────────────────────────────────────
@@ -96,7 +105,9 @@ function buildRows(pedidos, semana, { soloEmpresa = null, soloDia = null } = {})
     if (a.Principal !== b.Principal) return a.Principal.localeCompare(b.Principal);
     return a['Nombre y Apellido'].localeCompare(b['Nombre y Apellido']);
   });
-  return rows.map(({ _fechaISO: _, ...rest }) => rest);
+  return rows.map(row =>
+    Object.fromEntries(Object.entries(row).filter(([key]) => key !== '_fechaISO'))
+  );
 }
 
 function exportarExcel(pedidos, semana, filtros = {}) {
@@ -538,6 +549,31 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
               </div>
             );
           })}
+          {(pedido.eventos ?? []).length > 0 && (
+            <div className="px-4 py-3 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Historial del pedido</p>
+              <div className="space-y-2">
+                {pedido.eventos.slice().reverse().map((evento) => (
+                  <div key={evento.id} className="flex gap-2 text-xs">
+                    <span className="mt-1 w-2 h-2 rounded-full bg-green-600 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-700">
+                        {EVENTO_LABELS[evento.tipo] ?? evento.tipo}
+                        {evento.estado_anterior && evento.estado_nuevo && (
+                          <span className="font-normal text-slate-500"> · {evento.estado_anterior} → {evento.estado_nuevo}</span>
+                        )}
+                      </p>
+                      <p className="text-slate-500">
+                        {evento.resumen || 'Evento registrado'}
+                        {evento.actor_nombre && <span> · {evento.actor_nombre}</span>}
+                        <span> · {fmtEvento(evento.created_at)}</span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -651,17 +687,17 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
   const fechaDia = (dia) => { const idx = DIAS_ORDEN.indexOf(dia); return idx >= 0 ? addDias(semana, idx) : null; };
   const dia = diaActivo || diasConItems[0];
 
-  const itemsDia = useMemo(() => pedidos.flatMap(p =>
+  const itemsDia = pedidos.flatMap(p =>
     (p.items||[]).filter(i => i.dia === dia).map(i => ({
       ...i,
       empleado_nombre: p.empleado_nombre,
       empleado_apellido: p.empleado_apellido,
       empresa_nombre: p.empresa_nombre,
     }))
-  ), [pedidos, dia]);
+  );
 
   // Grupos para lista de cocina: plato + opcion + guarnicion → cantidad
-  const gruposCocina = useMemo(() => {
+  const gruposCocina = (() => {
     const map = {};
     for (const item of itemsDia) {
       const key = `${item.plato_id}__${item.opcion||''}__${item.guarnicion_id||''}`;
@@ -670,10 +706,10 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
       map[key].personas.push({ nombre: `${item.empleado_apellido}, ${item.empleado_nombre}`, empresa: item.empresa_nombre, notas: item.notas });
     }
     return Object.values(map).sort((a,b) => b.cantidad - a.cantidad);
-  }, [itemsDia]);
+  })();
 
   // Grupos para vista por empresa: empresa → persona → items
-  const gruposEmpresa = useMemo(() => {
+  const gruposEmpresa = (() => {
     const map = {};
     for (const p of pedidos) {
       const items = (p.items||[]).filter(i => i.dia === dia);
@@ -683,13 +719,13 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
       map[emp].push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items, notas: items.filter(i => i.notas) });
     }
     return Object.entries(map).sort(([a],[b]) => a.localeCompare(b));
-  }, [pedidos, dia]);
+  })();
 
-  const gruposCocinaFiltrados = useMemo(() => {
+  const gruposCocinaFiltrados = (() => {
     if (!filtroPlatoTxt.trim()) return gruposCocina;
     const q = filtroPlatoTxt.toLowerCase();
     return gruposCocina.filter(g => g.plato_nombre.toLowerCase().includes(q));
-  }, [gruposCocina, filtroPlatoTxt]);
+  })();
 
   const notasDia = itemsDia.filter(i => i.notas);
 
@@ -937,7 +973,7 @@ export default function PedidosAdmin() {
       await Promise.all([...selected].map(id => updateEstado.mutateAsync({ id, estado })));
       toast.success(`${selected.size} pedidos actualizados a "${ESTADO_MAP[estado]?.label}"`);
       setSelected(new Set());
-    } catch (e) {
+    } catch {
       toast.error('Error en actualización masiva');
     } finally { setBulkLoading(false); }
   };

@@ -27,8 +27,8 @@ function BottomNav({ vista, onChange }) {
           onClick={() => onChange(item.id)}
           style={{ ...sNav.btn, ...(vista === item.id ? sNav.btnActivo : {}) }}
         >
-          <span style={{ fontSize: 20 }}>{item.icon}</span>
-          <span style={{ fontSize: 11, fontWeight: vista === item.id ? 700 : 500 }}>{item.label}</span>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
+          <span style={{ fontSize: 12, fontWeight: vista === item.id ? 800 : 600 }}>{item.label}</span>
         </button>
       ))}
     </nav>
@@ -84,6 +84,6 @@ export default function App() {
 
 const sNav = {
   bar:      { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e5e5', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' },
-  btn:      { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '10px 4px 12px', border: 'none', background: 'none', color: '#aaa', cursor: 'pointer' },
+  btn:      { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 4px 12px', minHeight: 58, border: 'none', background: 'none', color: '#64748b', cursor: 'pointer' },
   btnActivo:{ color: 'var(--verde)' },
 };

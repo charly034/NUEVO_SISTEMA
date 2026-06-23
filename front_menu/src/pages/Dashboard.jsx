@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { usePlatos } from '../hooks/usePlatos.js';
 import { useMenusSemanales, useNoUsados } from '../hooks/useMenus.js';
+import { usePedidos } from '../hooks/usePedidos.js';
 import Spinner from '../components/ui/Spinner.jsx';
 
 const DIAS_ORDEN = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
@@ -288,6 +289,49 @@ function StatsRow({ totalPlatos, totalMenus, totalRotar, loading }) {
   );
 }
 
+// ── Prioridad operativa ──────────────────────────────────────────
+function PanelOperacion({ pedidos, loading }) {
+  const totalPedidos = pedidos.length;
+  const totalViandas = pedidos.reduce((sum, pedido) => sum + (pedido.items?.length ?? 0), 0);
+  const pendientes = pedidos.filter(p => p.estado === 'pendiente').length;
+  const enProceso = pedidos.filter(p => p.estado === 'en_proceso').length;
+  const listos = pedidos.filter(p => p.estado === 'listo' || p.estado === 'entregado').length;
+
+  const items = [
+    { label: 'Pedidos', value: totalPedidos, hint: 'personas', tone: 'text-gray-900' },
+    { label: 'Viandas', value: totalViandas, hint: 'a producir', tone: 'text-brand-700' },
+    { label: 'Pendientes', value: pendientes + enProceso, hint: `${pendientes} nuevos · ${enProceso} en proceso`, tone: pendientes ? 'text-amber-700' : 'text-green-700' },
+    { label: 'Listos', value: listos, hint: 'preparados/entregados', tone: 'text-blue-700' },
+  ];
+
+  return (
+    <div className="card p-4 md:p-5 border-l-4 border-l-brand-600">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700 mb-1">Prioridad operativa</p>
+          <h2 className="text-lg font-bold text-gray-900">Pedidos de esta semana</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Lo primero que necesita revisar cocina/operación.</p>
+        </div>
+        <Link to="/pedidos" className="btn-primary text-xs whitespace-nowrap">Ver pedidos</Link>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-5"><Spinner /></div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {items.map(item => (
+            <Link key={item.label} to="/pedidos" className="rounded-xl bg-gray-50 border border-gray-100 p-3 hover:bg-white hover:shadow-sm transition">
+              <p className={`text-2xl font-extrabold ${item.tone}`}>{item.value}</p>
+              <p className="text-xs font-semibold text-gray-700 mt-0.5">{item.label}</p>
+              <p className="text-[11px] text-gray-400 mt-1 leading-tight">{item.hint}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Página ───────────────────────────────────────────────────────
 export default function Dashboard() {
   const lunesEsta   = getLunes(0);
@@ -297,6 +341,7 @@ export default function Dashboard() {
   const menusQuery    = useMenusSemanales({ desde: lunesEsta, hasta: domingoProx, limit: 10 });
   const platosQuery   = usePlatos({ activo: 'true', limit: 1 });
   const noUsadosQuery = useNoUsados({ dias: 14 });
+  const pedidosQuery  = usePedidos({ semana_inicio: lunesEsta });
 
   const menus    = menusQuery.data?.menus ?? [];
   const menuEsta = menus.find((m) => m.fecha_inicio?.split('T')[0] === lunesEsta) ?? null;
@@ -304,9 +349,16 @@ export default function Dashboard() {
 
   const totalPlatos = platosQuery.data?.pagination?.total;
   const noUsados    = noUsadosQuery.data ?? [];
+  const pedidos      = pedidosQuery.data ?? [];
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
+      {/* Operación */}
+      <PanelOperacion pedidos={pedidos} loading={pedidosQuery.isLoading} />
+
+      {/* Hoy */}
+      <SeccionHoy menu={menuEsta} loading={menusQuery.isLoading} />
+
       {/* Stats */}
       <StatsRow
         totalPlatos={totalPlatos}
@@ -314,9 +366,6 @@ export default function Dashboard() {
         totalRotar={noUsadosQuery.isLoading ? undefined : noUsados.length}
         loading={platosQuery.isLoading || menusQuery.isLoading}
       />
-
-      {/* Hoy */}
-      <SeccionHoy menu={menuEsta} loading={menusQuery.isLoading} />
 
       {/* Semana: desktop = 2 col, mobile = apiladas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

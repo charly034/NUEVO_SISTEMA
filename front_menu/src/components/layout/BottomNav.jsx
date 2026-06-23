@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 const NAV_PRIMARY = [
@@ -30,7 +30,7 @@ const ICONS = {
   '/sugeridor':    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
 };
 
-function IconMas({ active }) {
+function IconMas() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
       <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
@@ -45,9 +45,6 @@ export default function BottomNav() {
   const location = useLocation();
 
   const inMore = ALL_MORE_PATHS.includes(location.pathname);
-
-  // Cerrar drawer al navegar
-  useEffect(() => { setMasOpen(false); }, [location.pathname]);
 
   return (
     <>
@@ -67,6 +64,7 @@ export default function BottomNav() {
             <NavLink
               key={to}
               to={to}
+              onClick={() => setMasOpen(false)}
               className={({ isActive }) =>
                 `flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl transition-colors ${
                   isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'

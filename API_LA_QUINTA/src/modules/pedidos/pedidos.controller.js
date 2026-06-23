@@ -28,7 +28,12 @@ export const guardarPedido = asyncHandler(async (req, res) => {
   const pedido = await service.guardarPedido(
     req.empleado.sub,
     req.empleado.empresa_id,
-    req.body
+    req.body,
+    {
+      actor_tipo: 'empleado',
+      actor_id: req.empleado.sub,
+      actor_nombre: `${req.empleado.nombre ?? ''} ${req.empleado.apellido ?? ''}`.trim(),
+    }
   );
   sendCreated(res, pedido, 'Pedido guardado exitosamente');
 });
@@ -39,7 +44,12 @@ export const getPedidos = asyncHandler(async (req, res) => {
 });
 
 export const updateEstado = asyncHandler(async (req, res) => {
-  sendSuccess(res, await service.cambiarEstado(req.params.id, req.body.estado), 'Estado actualizado');
+  const adminNombre = `${req.adminUser?.nombre ?? ''} ${req.adminUser?.apellido ?? ''}`.trim();
+  sendSuccess(res, await service.cambiarEstado(req.params.id, req.body.estado, {
+    actor_tipo: 'admin',
+    actor_id: req.adminUser?.sub,
+    actor_nombre: adminNombre || req.adminUser?.email || req.adminUser?.rol || 'Admin',
+  }), 'Estado actualizado');
 });
 
 export const getMiHistorial = asyncHandler(async (req, res) => {
@@ -47,6 +57,10 @@ export const getMiHistorial = asyncHandler(async (req, res) => {
 });
 
 export const cancelarMiPedido = asyncHandler(async (req, res) => {
-  const pedido = await service.cancelarMiPedido(req.empleado.sub, req.query.semana_inicio);
+  const pedido = await service.cancelarMiPedido(req.empleado.sub, req.query.semana_inicio, {
+    actor_tipo: 'empleado',
+    actor_id: req.empleado.sub,
+    actor_nombre: `${req.empleado.nombre ?? ''} ${req.empleado.apellido ?? ''}`.trim(),
+  });
   sendSuccess(res, pedido, 'Pedido cancelado');
 });

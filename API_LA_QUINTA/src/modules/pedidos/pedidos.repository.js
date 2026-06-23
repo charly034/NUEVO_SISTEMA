@@ -164,6 +164,67 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
   return r.rows[0] || null;
 };
 
+export const findPedidoCabeceraById = async (id, db = query) => {
+  const r = await execute(db,
+    `SELECT id, empleado_id, empresa_id, semana_inicio, estado
+     FROM pedidos
+     WHERE id = $1`,
+    [id]
+  );
+  return r.rows[0] || null;
+};
+
+export const registrarEvento = async ({
+  pedido_id,
+  tipo,
+  actor_tipo,
+  actor_id = null,
+  actor_nombre = null,
+  estado_anterior = null,
+  estado_nuevo = null,
+  resumen = null,
+  metadata = {},
+}, db = query) => {
+  const r = await execute(db,
+    `INSERT INTO pedido_eventos (
+       pedido_id, tipo, actor_tipo, actor_id, actor_nombre,
+       estado_anterior, estado_nuevo, resumen, metadata
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+     RETURNING id, pedido_id, tipo, actor_tipo, actor_id, actor_nombre,
+       estado_anterior, estado_nuevo, resumen, metadata, created_at`,
+    [
+      pedido_id,
+      tipo,
+      actor_tipo,
+      actor_id,
+      actor_nombre,
+      estado_anterior,
+      estado_nuevo,
+      resumen,
+      JSON.stringify(metadata || {}),
+    ]
+  );
+  return r.rows[0];
+};
+
+export const findEventosByPedidoIds = async (pedidoIds, db = query) => {
+  if (!pedidoIds.length) return {};
+  const r = await execute(db,
+    `SELECT id, pedido_id, tipo, actor_tipo, actor_id, actor_nombre,
+            estado_anterior, estado_nuevo, resumen, metadata, created_at
+     FROM pedido_eventos
+     WHERE pedido_id = ANY($1::int[])
+     ORDER BY created_at ASC, id ASC`,
+    [pedidoIds]
+  );
+  return r.rows.reduce((acc, evento) => {
+    if (!acc[evento.pedido_id]) acc[evento.pedido_id] = [];
+    acc[evento.pedido_id].push(evento);
+    return acc;
+  }, {});
+};
+
 export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, offset = 0 } = {}) => {
   const conds = [];
   const vals = [];
@@ -200,7 +261,8 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
      LIMIT $${vals.length - 1} OFFSET $${vals.length}`,
     vals
   );
-  return r.rows;
+  const eventosPorPedido = await findEventosByPedidoIds(r.rows.map(p => p.id));
+  return r.rows.map(p => ({ ...p, eventos: eventosPorPedido[p.id] ?? [] }));
 };
 
 export const upsertPedido = async ({ empleado_id, empresa_id, menu_semanal_id, semana_inicio, observaciones }, db = query) => {
@@ -296,10 +358,18 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
 
 export const cancelarPedidoByEmpleado = async (empleadoId, semanaInicio, db = query) => {
   const r = await execute(db,
-    `UPDATE pedidos SET estado = 'cancelado', updated_at = NOW()
-     WHERE empleado_id = $1 AND semana_inicio = $2
-       AND estado IN ('pendiente', 'en_proceso')
-     RETURNING id, estado, semana_inicio`,
+    `WITH anterior AS (
+       SELECT id, estado AS estado_anterior
+       FROM pedidos
+       WHERE empleado_id = $1 AND semana_inicio = $2
+         AND estado IN ('pendiente', 'en_proceso')
+       FOR UPDATE
+     )
+     UPDATE pedidos p
+     SET estado = 'cancelado', updated_at = NOW()
+     FROM anterior a
+     WHERE p.id = a.id
+     RETURNING p.id, a.estado_anterior::text, p.estado, p.semana_inicio`,
     [empleadoId, semanaInicio]
   );
   if (!r.rows[0]) return null;
@@ -307,8 +377,8 @@ export const cancelarPedidoByEmpleado = async (empleadoId, semanaInicio, db = qu
   return r.rows[0];
 };
 
-export const updateEstado = async (id, estado) => {
-  const r = await query(
+export const updateEstado = async (id, estado, db = query) => {
+  const r = await execute(db,
     `UPDATE pedidos SET estado = $1, updated_at = NOW() WHERE id = $2
      RETURNING id, estado, semana_inicio, empleado_id, empresa_id`,
     [estado, id]
