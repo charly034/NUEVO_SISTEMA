@@ -15,8 +15,8 @@ import AdminLogin from './components/AdminLogin.jsx';
 import { adminAuth } from './auth.js';
 
 export default function App() {
-  const [admin, setAdmin] = useState(adminAuth.storedUser);
-  const [checking, setChecking] = useState(() => !!sessionStorage.getItem('admin_token'));
+  const [admin, setAdmin] = useState(() => adminAuth.storedUser());
+  const [checking, setChecking] = useState(() => !!(localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token')));
 
   useEffect(() => {
     const unauthorized = () => setAdmin(null);
@@ -25,7 +25,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!sessionStorage.getItem('admin_token')) return;
+    if (!localStorage.getItem('admin_token') && !sessionStorage.getItem('admin_token')) return;
     adminAuth.me()
       .then(setAdmin)
       .catch(() => {
@@ -35,7 +35,7 @@ export default function App() {
       .finally(() => setChecking(false));
   }, []);
 
-  const login = async (email, password) => setAdmin(await adminAuth.login(email, password));
+  const login = async (email, password, remember) => setAdmin(await adminAuth.login(email, password, remember));
   const logout = () => {
     adminAuth.logout();
     setAdmin(null);

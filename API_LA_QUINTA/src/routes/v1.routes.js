@@ -7,6 +7,7 @@ import estadisticasRoutes from '../modules/estadisticas/estadisticas.routes.js';
 import sugerenciasRoutes from '../modules/sugerencias/sugerencias.routes.js';
 import pedidosRoutes from '../modules/pedidos/pedidos.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
+import adminAuthRoutes from '../modules/admin-auth/admin-auth.routes.js';
 import guarnicionesRoutes from '../modules/guarniciones/guarniciones.routes.js';
 import empresasRoutes from '../modules/empresas/empresas.routes.js';
 import empleadosRoutes from '../modules/empleados/empleados.routes.js';
@@ -15,6 +16,7 @@ const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
+router.use('/admin/auth', adminAuthRoutes);
 router.use('/users', usersRoutes);
 router.use('/platos', platosRoutes);
 router.use('/menus-semanales', menusSemanalesRoutes);

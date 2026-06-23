@@ -32,3 +32,8 @@ export const useDeleteEmpleado = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 };
+
+export const useGenerarResetCode = () =>
+  useMutation({
+    mutationFn: (id) => api.post(`/empleados/${id}/reset-code`).then(r => r.data),
+  });

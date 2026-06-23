@@ -26,7 +26,7 @@ const ICONS = {
 
 export default function Sidebar({ admin, onLogout }) {
   return (
-    <aside className="hidden md:flex w-44 flex-shrink-0 bg-white border-r border-gray-200 flex-col">
+    <aside className="hidden md:flex w-52 flex-shrink-0 bg-white border-r border-gray-200 flex-col">
       <div className="px-5 py-5 border-b border-gray-100">
         <span className="text-lg font-bold text-brand-700">🌿 La Quinta</span>
         <p className="text-xs text-gray-400 mt-0.5">Sistema de menús</p>

@@ -49,17 +49,18 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: 60 * 60 * 1000,  // ventana de 1 hora
+  max: 50,                    // 50 intentos por IP por hora
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Demasiados intentos de acceso. Intentá nuevamente en 15 minutos.',
+    message: 'Demasiados intentos de acceso. Intentá nuevamente en una hora.',
     errors: [],
   },
 });
 app.use('/api/v1/auth/login', loginLimiter);
+app.use('/api/v1/admin/auth/login', loginLimiter);
 
 // Rutas versionadas
 app.use('/api', routes);

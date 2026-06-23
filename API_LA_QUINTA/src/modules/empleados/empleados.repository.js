@@ -31,12 +31,12 @@ export const findByEmail = async (email) => {
   return r.rows[0] || null;
 };
 
-export const create = async ({ empresa_id, nombre, apellido, email, password_hash, rol = 'cliente' }) => {
+export const create = async ({ empresa_id, nombre, apellido, email, password_hash, rol = 'cliente', telefono = null, fecha_nacimiento = null }) => {
   const r = await query(
-    `INSERT INTO empleados (empresa_id, nombre, apellido, email, password_hash, rol)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, empresa_id, nombre, apellido, email, activo, rol, created_at`,
-    [empresa_id, nombre, apellido, email, password_hash, rol]
+    `INSERT INTO empleados (empresa_id, nombre, apellido, email, password_hash, rol, telefono, fecha_nacimiento)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, empresa_id, nombre, apellido, email, activo, rol, telefono, fecha_nacimiento, created_at`,
+    [empresa_id, nombre, apellido, email, password_hash, rol, telefono, fecha_nacimiento]
   );
   return r.rows[0];
 };
@@ -56,5 +56,45 @@ export const update = async (id, fields) => {
 
 export const remove = async (id) => {
   const r = await query('DELETE FROM empleados WHERE id = $1 RETURNING id', [id]);
+  return r.rows[0] || null;
+};
+
+export const setResetCode = async (id, code, expiresAt) => {
+  await query(
+    `UPDATE empleados SET reset_code = $1, reset_code_expires_at = $2 WHERE id = $3`,
+    [code, expiresAt, id]
+  );
+};
+
+export const clearResetCode = async (id) => {
+  await query(
+    `UPDATE empleados SET reset_code = NULL, reset_code_expires_at = NULL WHERE id = $1`,
+    [id]
+  );
+};
+
+export const findByResetCode = async (code) => {
+  const r = await query(
+    `SELECT e.id, e.email, e.nombre, e.activo, e.empresa_id,
+            e.reset_code_expires_at
+     FROM empleados e
+     WHERE e.reset_code = $1`,
+    [code.trim().toUpperCase()]
+  );
+  return r.rows[0] || null;
+};
+
+export const setPassword = async (id, password_hash) => {
+  await query(
+    `UPDATE empleados SET password_hash = $1 WHERE id = $2`,
+    [password_hash, id]
+  );
+};
+
+export const findWithPasswordById = async (id) => {
+  const r = await query(
+    `SELECT id, password_hash FROM empleados WHERE id = $1 AND activo = true`,
+    [id]
+  );
   return r.rows[0] || null;
 };

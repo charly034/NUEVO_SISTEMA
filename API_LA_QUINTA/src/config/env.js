@@ -23,6 +23,8 @@ export const env = {
 
   JWT_SECRET: process.env.JWT_SECRET || 'laquinta_secret_dev_2026',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  JWT_EXPIRES_IN_SHORT: process.env.JWT_EXPIRES_IN_SHORT || '8h',
+  JWT_EXPIRES_IN_REMEMBER: process.env.JWT_EXPIRES_IN_REMEMBER || '30d',
   APP_TIMEZONE,
   TRUST_PROXY_HOPS: parseInt(process.env.TRUST_PROXY_HOPS || '1', 10),
   CORS_ORIGINS: (process.env.CORS_ORIGINS || '')

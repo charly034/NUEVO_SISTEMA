@@ -102,3 +102,10 @@ export const cerrarOverride = asyncHandler(async (req, res) => {
   if (!e) throw ApiError.notFound('Empresa no encontrada');
   sendSuccess(res, e, 'Override de plazo eliminado');
 });
+
+export const regenerarCodigo = asyncHandler(async (req, res) => {
+  const e = await repo.findById(req.params.id);
+  if (!e) throw ApiError.notFound('Empresa no encontrada');
+  const updated = await repo.regenerarCodigo(req.params.id);
+  sendSuccess(res, { codigo_registro: updated.codigo_registro }, 'Código regenerado');
+});

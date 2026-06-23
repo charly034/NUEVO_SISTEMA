@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa, reabrirPlazo, cerrarOverride } from './empresas.controller.js';
+import { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa, reabrirPlazo, cerrarOverride, regenerarCodigo } from './empresas.controller.js';
 import { requireAdmin } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -11,4 +11,5 @@ router.patch('/:id', updateEmpresa);
 router.delete('/:id', deleteEmpresa);
 router.post('/:id/reabrir-plazo', reabrirPlazo);
 router.delete('/:id/reabrir-plazo', cerrarOverride);
+router.post('/:id/regenerar-codigo', regenerarCodigo);
 export default router;

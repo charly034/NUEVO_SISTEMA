@@ -1,17 +1,29 @@
 import { useState, useCallback, useEffect } from 'react';
-import { authApi } from './api.js';
+import { authApi, saveClientSession, clearClientSession } from './api.js';
+
+function readStoredEmpleado() {
+  try {
+    const json = localStorage.getItem('empleado') || sessionStorage.getItem('empleado');
+    return json ? JSON.parse(json) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasToken() {
+  return !!(localStorage.getItem('token') || sessionStorage.getItem('token'));
+}
+
+function isRemembered() {
+  return !!localStorage.getItem('token');
+}
 
 export function useAuth() {
-  const [empleado, setEmpleado] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('empleado')); } catch { return null; }
-  });
-  const [checking, setChecking] = useState(() => !!sessionStorage.getItem('token'));
+  const [empleado, setEmpleado] = useState(() => readStoredEmpleado());
+  const [checking, setChecking] = useState(() => hasToken());
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('empleado');
-    localStorage.removeItem('token');
-    localStorage.removeItem('empleado');
+    clearClientSession();
     setEmpleado(null);
   }, []);
 
@@ -22,23 +34,33 @@ export function useAuth() {
   }, [logout]);
 
   useEffect(() => {
-    if (!sessionStorage.getItem('token')) return;
+    if (!hasToken()) return;
     authApi.me()
       .then((data) => {
-        sessionStorage.setItem('empleado', JSON.stringify(data));
+        // Re-guardar actualizando datos pero manteniendo la preferencia de remember
+        const remember = isRemembered();
+        saveClientSession({ token: localStorage.getItem('token') || sessionStorage.getItem('token'), empleado: data }, remember);
         setEmpleado(data);
       })
       .catch(logout)
       .finally(() => setChecking(false));
   }, [logout]);
 
-  const login = useCallback(async (email, password) => {
-    const data = await authApi.login(email, password);
-    sessionStorage.setItem('token', data.token);
-    sessionStorage.setItem('empleado', JSON.stringify(data.empleado));
+  const login = useCallback(async (email, password, remember = false) => {
+    const data = await authApi.login(email, password, remember);
+    saveClientSession({ token: data.token, empleado: data.empleado }, remember);
     setEmpleado(data.empleado);
     return data.empleado;
   }, []);
 
-  return { empleado, login, logout, checking };
+  // Actualiza el empleado en memoria y en storage (registro, edición de perfil)
+  const setSession = useCallback((emp) => {
+    setEmpleado(emp);
+    // Actualizar storage preservando el token y el tipo de sesión
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const remember = isRemembered();
+    if (token) saveClientSession({ token, empleado: emp }, remember);
+  }, []);
+
+  return { empleado, login, logout, setSession, checking };
 }

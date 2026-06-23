@@ -61,6 +61,26 @@ export const updateEmpleado = asyncHandler(async (req, res) => {
   sendSuccess(res, await repo.update(req.params.id, fields), 'Empleado actualizado');
 });
 
+const CHARS_RESET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genResetCode() {
+  // Formato legible: XXX-XXX (6 chars con guión)
+  const parte = () => Array.from({ length: 3 }, () => CHARS_RESET[Math.floor(Math.random() * CHARS_RESET.length)]).join('');
+  return `${parte()}-${parte()}`;
+}
+
+export const generarResetCode = asyncHandler(async (req, res) => {
+  const e = await repo.findById(req.params.id);
+  if (!e) throw ApiError.notFound('Empleado no encontrado');
+  const code = genResetCode();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24hs
+  await repo.setResetCode(e.id, code, expiresAt);
+  sendSuccess(res, {
+    codigo: code,
+    expira: expiresAt.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }),
+    empleado: `${e.nombre} ${e.apellido}`,
+  }, 'Código generado');
+});
+
 export const deleteEmpleado = asyncHandler(async (req, res) => {
   if (Number(req.params.id) === Number(req.empleado.sub)) {
     throw ApiError.conflict('No podés eliminar tu propia cuenta');

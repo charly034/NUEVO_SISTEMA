@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './useAuth.js';
 import LoginScreen from './components/LoginScreen.jsx';
+import RegistroScreen from './components/RegistroScreen.jsx';
+import RecuperarPassword from './components/RecuperarPassword.jsx';
 import FormularioPedido from './components/FormularioPedido.jsx';
 import HistorialPedidos from './components/HistorialPedidos.jsx';
 import PerfilCliente from './components/PerfilCliente.jsx';
@@ -34,20 +36,39 @@ function BottomNav({ vista, onChange }) {
 }
 
 function Inner() {
-  const { empleado, login, logout, checking } = useAuth();
+  const { empleado, login, logout, setSession, checking } = useAuth();
   const qc = useQueryClient();
   const [vista, setVista] = useState('pedido');
+  const [pantalla, setPantalla] = useState('login'); // 'login' | 'registro' | 'recuperar'
 
   const cerrarSesion = () => { qc.clear(); logout(); };
 
   if (checking) return <div style={{ padding: 60, textAlign: 'center' }}>Verificando sesión…</div>;
-  if (!empleado) return <LoginScreen onLogin={login} />;
+  if (!empleado) {
+    if (pantalla === 'registro') {
+      return (
+        <RegistroScreen
+          onRegistrado={(emp) => { setSession(emp); setPantalla('login'); }}
+          onVolver={() => setPantalla('login')}
+        />
+      );
+    }
+    if (pantalla === 'recuperar') {
+      return (
+        <RecuperarPassword
+          onVolver={() => setPantalla('login')}
+          onExito={() => { setPantalla('login'); }}
+        />
+      );
+    }
+    return <LoginScreen onLogin={login} onRegistrar={() => setPantalla('registro')} onRecuperar={() => setPantalla('recuperar')} />;
+  }
 
   return (
     <>
       {vista === 'pedido'    && <FormularioPedido empleado={empleado} />}
       {vista === 'historial' && <HistorialPedidos empleado={empleado} />}
-      {vista === 'perfil'    && <PerfilCliente    empleado={empleado} onLogout={cerrarSesion} />}
+      {vista === 'perfil'    && <PerfilCliente    empleado={empleado} onLogout={cerrarSesion} onEmpleadoUpdate={setSession} />}
       <BottomNav vista={vista} onChange={setVista} />
     </>
   );

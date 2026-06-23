@@ -1,0 +1,66 @@
+import { asyncHandler } from '../../utils/asyncHandler.js';
+import { sendSuccess, sendCreated } from '../../utils/response.js';
+import { ApiError } from '../../utils/ApiError.js';
+import * as service from './admin-auth.service.js';
+import * as repo from '../usuarios-admin/usuarios-admin.repository.js';
+
+export const loginController = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ success: false, message: 'Email y contraseña requeridos' });
+  const data = await service.login(email, password);
+  sendSuccess(res, data, 'Login exitoso');
+});
+
+export const meController = asyncHandler(async (req, res) => {
+  const data = await service.getSession(req.adminUser.sub);
+  sendSuccess(res, data, 'Sesión vigente');
+});
+
+// ── Gestión de usuarios admin (solo superadmin) ──────────────────────────────
+
+export const listController = asyncHandler(async (req, res) => {
+  sendSuccess(res, await repo.findAll(), 'Usuarios obtenidos');
+});
+
+export const createController = asyncHandler(async (req, res) => {
+  const { nombre, apellido, email, password, rol = 'admin' } = req.body;
+  if (!nombre || !apellido || !email || !password)
+    throw ApiError.badRequest('Faltan campos obligatorios');
+  if (!['admin', 'superadmin'].includes(rol))
+    throw ApiError.badRequest('Rol inválido');
+  if (password.length < 8)
+    throw ApiError.badRequest('La contraseña debe tener al menos 8 caracteres');
+  const existe = await repo.findByEmail(email);
+  if (existe) throw ApiError.conflict('Ya existe un usuario con ese email');
+  const password_hash = await service.hashPassword(password);
+  const u = await repo.create({ nombre, apellido, email, password_hash, rol });
+  sendCreated(res, u, 'Usuario creado');
+});
+
+export const updateController = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const u = await repo.findById(id);
+  if (!u) throw ApiError.notFound('Usuario no encontrado');
+  const allowed = ['nombre', 'apellido', 'activo', 'rol'];
+  const fields = Object.fromEntries(
+    Object.entries(req.body).filter(([k]) => allowed.includes(k))
+  );
+  if (req.body.password) {
+    if (req.body.password.length < 8) throw ApiError.badRequest('Mínimo 8 caracteres');
+    fields.password_hash = await service.hashPassword(req.body.password);
+  }
+  if (Object.keys(fields).length === 0) throw ApiError.badRequest('Sin campos válidos');
+  const updated = await repo.update(id, fields);
+  sendSuccess(res, updated, 'Usuario actualizado');
+});
+
+export const deleteController = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (Number(id) === req.adminUser.sub)
+    throw ApiError.badRequest('No podés eliminar tu propio usuario');
+  const u = await repo.findById(id);
+  if (!u) throw ApiError.notFound('Usuario no encontrado');
+  await repo.remove(id);
+  res.status(204).end();
+});

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a4731"/>
+      <stop offset="100%" style="stop-color:#276749"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.12"/>
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.04"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Decoración círculos -->
+  <circle cx="1050" cy="100" r="200" fill="#ffffff" opacity="0.04"/>
+  <circle cx="150" cy="530" r="160" fill="#ffffff" opacity="0.04"/>
+  <circle cx="980" cy="520" r="120" fill="#34d399" opacity="0.08"/>
+
+  <!-- Card central -->
+  <rect x="80" y="80" width="1040" height="470" rx="32" fill="url(#card)" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1.5"/>
+
+  <!-- Emoji hoja -->
+  <text x="600" y="270" text-anchor="middle" font-size="120" font-family="Segoe UI Emoji,Apple Color Emoji,sans-serif">🌿</text>
+
+  <!-- Título -->
+  <text x="600" y="360" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="72" font-weight="800" fill="#ffffff" letter-spacing="-1">La Quinta</text>
+
+  <!-- Subtítulo -->
+  <text x="600" y="420" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="28" font-weight="400" fill="#86efac" letter-spacing="0.5">Sistema de pedidos de almuerzo</text>
+
+  <!-- URL / marca -->
+  <text x="600" y="510" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="20" fill="#ffffff" opacity="0.4">Pedí tu menú semanal fácil y rápido</text>
+</svg>

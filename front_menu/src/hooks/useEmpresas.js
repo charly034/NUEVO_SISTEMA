@@ -45,3 +45,11 @@ export const useClearOverride = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 };
+
+export const useRegenerarCodigo = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post(`/empresas/${id}/regenerar-codigo`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+};

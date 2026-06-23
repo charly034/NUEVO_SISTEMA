@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useEmpresas, useCreateEmpresa, useUpdateEmpresa, useDeleteEmpresa, useReopenPlazo, useClearOverride } from '../hooks/useEmpresas.js';
-import { useEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado } from '../hooks/useEmpleados.js';
+import { useEmpresas, useCreateEmpresa, useUpdateEmpresa, useDeleteEmpresa, useReopenPlazo, useClearOverride, useRegenerarCodigo } from '../hooks/useEmpresas.js';
+import { useEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado, useGenerarResetCode } from '../hooks/useEmpleados.js';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 
@@ -15,6 +15,7 @@ export default function Empresas() {
   const deleteEmpresa = useDeleteEmpresa();
   const reopenPlazo = useReopenPlazo();
   const clearOverride = useClearOverride();
+  const regenerarCodigo = useRegenerarCodigo();
 
   const [empresaActiva, setEmpresaActiva] = useState(null);
   const [modalEmpresa, setModalEmpresa] = useState(null); // null | 'nueva' | empresa
@@ -83,6 +84,37 @@ export default function Empresas() {
                     <p className="text-xs text-green-700 mt-0.5 font-medium">
                       🔓 Plazo reabierto hasta {new Date(e.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
                     </p>
+                  )}
+                  {/* Código de registro */}
+                  {e.codigo_registro ? (
+                    <div className="mt-2 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 w-fit" onClick={ev => ev.stopPropagation()}>
+                      <span className="text-xs text-indigo-500 font-medium">Código</span>
+                      <span className="font-mono font-bold text-indigo-800 tracking-widest text-sm">{e.codigo_registro}</span>
+                      <button
+                        type="button"
+                        title="Copiar"
+                        onClick={() => { navigator.clipboard.writeText(e.codigo_registro); toast.success('Código copiado'); }}
+                        className="text-indigo-400 hover:text-indigo-700 transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      </button>
+                      <button
+                        type="button"
+                        title="Regenerar código"
+                        onClick={async () => { if (await confirmar('¿Regenerar código? El código anterior dejará de funcionar y los empleados deberán usar el nuevo.')) { regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código regenerado') }); } }}
+                        className="text-indigo-300 hover:text-red-500 transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async (ev) => { ev.stopPropagation(); regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código generado') }); }}
+                      className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg font-medium transition-colors"
+                    >
+                      🔑 Generar código de registro
+                    </button>
                   )}
                 </div>
                 <div className="flex gap-2 items-center">
@@ -155,7 +187,9 @@ function EmpleadosPanel({ empresa }) {
   const empleados = todosEmpleados.filter(e => e.rol !== 'admin');
   const updateEmpleado = useUpdateEmpleado();
   const deleteEmpleado = useDeleteEmpleado();
+  const generarReset = useGenerarResetCode();
   const [modalEmpleado, setModalEmpleado] = useState(null);
+  const [modalReset, setModalReset] = useState(null); // { codigo, expira, empleado }
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -180,6 +214,16 @@ function EmpleadosPanel({ empresa }) {
               >
                 {emp.activo ? 'Activo' : 'Inactivo'}
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const data = await generarReset.mutateAsync(emp.id);
+                    setModalReset(data);
+                  } catch (e) { toast.error(e?.message || 'Error generando código'); }
+                }}
+                title="Generar código de recuperación de contraseña"
+                className="text-gray-400 hover:text-amber-600 text-sm"
+              >🔑</button>
               <button onClick={() => setModalEmpleado(emp)} className="text-gray-400 hover:text-gray-700 text-sm">✏️</button>
               <button
                 onClick={async () => {
@@ -203,6 +247,40 @@ function EmpleadosPanel({ empresa }) {
           empleado={modalEmpleado}
           onCerrar={() => setModalEmpleado(null)}
         />
+      )}
+
+      {/* Modal código de recuperación */}
+      {modalReset && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="text-4xl mb-3">🔑</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Código de recuperación</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Para <strong>{modalReset.empleado}</strong>. Compartíselo por WhatsApp o mensaje. Expira el <strong>{modalReset.expira}</strong>.
+            </p>
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+              <span className="font-mono font-bold text-2xl tracking-widest text-amber-800 flex-1 text-center">
+                {modalReset.codigo}
+              </span>
+              <button
+                onClick={() => { navigator.clipboard.writeText(modalReset.codigo); toast.success('Código copiado'); }}
+                className="text-amber-500 hover:text-amber-700 flex-shrink-0"
+                title="Copiar"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mb-5">
+              El empleado debe ir a "¿Olvidaste tu contraseña?" en la app e ingresar este código.
+            </p>
+            <button
+              onClick={() => setModalReset(null)}
+              className="w-full bg-gray-900 text-white font-semibold py-2.5 rounded-xl text-sm"
+            >
+              Listo
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

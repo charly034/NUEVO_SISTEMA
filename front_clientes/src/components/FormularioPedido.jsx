@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { menuApi, pedidoApi, guarnicionesApi } from '../api.js';
 import { DIAS_LABEL, getDiasSemana, formatFecha, addDias } from '../utils.js';
@@ -6,9 +6,10 @@ import { toast, confirmar, preguntarDiasIncompletos } from '../lib/swal.js';
 
 export default function FormularioPedido({ empleado }) {
   const queryClient = useQueryClient();
-
-  // Índice de la semana seleccionada (0 = esta semana, 1 = próxima semana)
   const [semanaSelIdx, setSemanaSelIdx] = useState(0);
+  // undefined = auto (primer día incompleto), null = todos cerrados, string = día específico
+  const [expandidoDia, setExpandidoDia] = useState(undefined);
+  const inicializadoRef = useRef(false);
 
   const { data: menuData, isLoading: loadingMenu } = useQuery({
     queryKey: ['menus-publicados'],
@@ -32,28 +33,33 @@ export default function FormularioPedido({ empleado }) {
     enabled: !!semanaInicio && menuSemana?.disponible,
   });
 
+  const { data: historial = [] } = useQuery({
+    queryKey: ['mi-historial', empleado.id],
+    queryFn: pedidoApi.miHistorial,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [selecciones, setSelecciones] = useState({});
   const [confirmado, setConfirmado] = useState(false);
   const [noAsiste, setNoAsiste] = useState({});
 
-  // Calcular defaults de noAsiste según días laborales
   function defaultNoAsiste(diasLaborales) {
     if (diasLaborales === 'lunes_sabado') return { sabado: true };
     if (diasLaborales === 'lunes_domingo') return { sabado: true, domingo: true };
     return {};
   }
 
-  // Resetear todo al cambiar de semana
   useEffect(() => {
     const timer = setTimeout(() => {
       setSelecciones({});
       setConfirmado(false);
       setNoAsiste(defaultNoAsiste(menuSemana?.dias_laborales));
+      setExpandidoDia(undefined);
+      inicializadoRef.current = false;
     }, 0);
     return () => clearTimeout(timer);
   }, [semanaSelIdx, menuSemana?.menu?.id, menuSemana?.dias_laborales]);
 
-  // Cargar pedido existente — si tiene ítem en un día, ese día se trabaja
   useEffect(() => {
     if (pedidoExistente?.items?.length) {
       const map = {};
@@ -67,21 +73,131 @@ export default function FormularioPedido({ empleado }) {
           guarnicion_id: item.guarnicion_id,
           notas: item.notas || '',
         };
-        trabajaDias[item.dia] = false; // tiene pedido → sí asiste
+        trabajaDias[item.dia] = false;
       }
       const timer = setTimeout(() => {
         setSelecciones(map);
         setNoAsiste(prev => ({ ...prev, ...trabajaDias }));
+        // Con pedido existente, empezar colapsado
+        if (!inicializadoRef.current) {
+          inicializadoRef.current = true;
+          setExpandidoDia(null);
+        }
       }, 0);
       return () => clearTimeout(timer);
+    } else if (pedidoExistente !== undefined && !inicializadoRef.current) {
+      // Pedido resuelto como vacío → marcar inicializado, auto-expand queda en undefined
+      inicializadoRef.current = true;
     }
   }, [pedidoExistente]);
 
+  const diasSemana = getDiasSemana(menuSemana?.dias_laborales);
+  const diasCerrados = new Set(menuSemana?.limiteEmpresa?.diasCerrados ?? []);
+  const diasConFechaYBloqueo = semanaInicio
+    ? diasSemana.map((dia, i) => ({ dia, fecha: addDias(semanaInicio, i), bloqueado: diasCerrados.has(dia) }))
+    : [];
+
+  const menu = menuSemana?.disponible ? menuSemana.menu : null;
+  const diasSinServicio = new Map((menu?.sin_servicio || []).map(item => [item.dia, item.motivo]));
+
+  // Día efectivamente expandido: si undefined → auto al primer incompleto
+  const primerIncompleto = diasConFechaYBloqueo.find(
+    ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia] && !selecciones[dia]?.plato_id
+  )?.dia ?? null;
+  const diaEfectivo = expandidoDia === undefined ? primerIncompleto : expandidoDia;
+
+  const avanzarAlSiguiente = (diaActual, seleccionesActuales) => {
+    const diasActivos = diasConFechaYBloqueo.filter(
+      ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia]
+    );
+    const idx = diasActivos.findIndex(x => x.dia === diaActual);
+    for (let i = idx + 1; i < diasActivos.length; i++) {
+      if (!seleccionesActuales[diasActivos[i].dia]?.plato_id) {
+        setExpandidoDia(diasActivos[i].dia);
+        return;
+      }
+    }
+    setExpandidoDia(null);
+  };
+
+  const toggleExpandido = (dia) => {
+    setExpandidoDia(diaEfectivo === dia ? null : dia);
+  };
+
   const toggleNoAsiste = (dia) => {
+    const marcandoNoAsiste = !noAsiste[dia];
     setNoAsiste(prev => ({ ...prev, [dia]: !prev[dia] }));
-    if (!noAsiste[dia]) {
-      // Al marcar "no asiste", limpiar selección del día
+    if (marcandoNoAsiste) {
       setSelecciones(prev => { const next = { ...prev }; delete next[dia]; return next; });
+      // Si el día colapsado era este, avanzar
+      if (diaEfectivo === dia) setExpandidoDia(null);
+    }
+  };
+
+  const elegirPlato = (dia, plato, opcion = null) => {
+    const nuevasSel = {
+      ...selecciones,
+      [dia]: {
+        plato_id: plato.plato_id,
+        opcion,
+        plato_nombre: plato.plato_nombre,
+        tiene_guarnicion: plato.tiene_guarnicion,
+        guarnicion_id: selecciones[dia]?.guarnicion_id ?? null,
+        notas: selecciones[dia]?.notas ?? '',
+      },
+    };
+    setSelecciones(nuevasSel);
+    if (!plato.tiene_guarnicion) {
+      avanzarAlSiguiente(dia, nuevasSel);
+    }
+  };
+
+  const setGuarnicion = (dia, guarnicion_id) => {
+    const nuevasSel = {
+      ...selecciones,
+      [dia]: { ...selecciones[dia], guarnicion_id: guarnicion_id ? parseInt(guarnicion_id) : null },
+    };
+    setSelecciones(nuevasSel);
+    avanzarAlSiguiente(dia, nuevasSel);
+  };
+
+  const setNotas = (dia, notas) => {
+    setSelecciones(prev => ({ ...prev, [dia]: { ...prev[dia], notas } }));
+  };
+
+  // Pedido anterior para "Repetir"
+  const pedidoAnterior = historial
+    .filter(p => p.estado !== 'cancelado' && p.semana_inicio !== semanaInicio)
+    .sort((a, b) => new Date(b.semana_inicio) - new Date(a.semana_inicio))[0] ?? null;
+
+  const aplicarPedidoAnterior = () => {
+    if (!pedidoAnterior || !menu) return;
+    const platosDisponibles = new Map();
+    for (const p of (menu.fijos || [])) platosDisponibles.set(p.plato_id, p);
+    for (const p of (menu.variables || [])) platosDisponibles.set(p.plato_id, p);
+
+    let aplicados = 0;
+    const nuevasSel = { ...selecciones };
+    for (const item of (pedidoAnterior.items || [])) {
+      const plato = platosDisponibles.get(item.plato_id);
+      if (plato && !noAsiste[item.dia]) {
+        nuevasSel[item.dia] = {
+          plato_id: item.plato_id,
+          opcion: item.opcion,
+          plato_nombre: item.plato_nombre,
+          tiene_guarnicion: item.tiene_guarnicion === true,
+          guarnicion_id: item.guarnicion_id ?? null,
+          notas: item.notas || '',
+        };
+        aplicados++;
+      }
+    }
+    setSelecciones(nuevasSel);
+    if (aplicados > 0) {
+      toast.success(`${aplicados} día${aplicados !== 1 ? 's' : ''} pre-cargados del pedido anterior`);
+      setExpandidoDia(null);
+    } else {
+      toast.warning('Los platos de la semana anterior no están en este menú');
     }
   };
 
@@ -101,46 +217,13 @@ export default function FormularioPedido({ empleado }) {
       queryClient.invalidateQueries({ queryKey: ['mi-pedido', empleado.id, semanaInicio] });
       setSelecciones({});
       setConfirmado(false);
+      setExpandidoDia(undefined);
       toast.success('Pedido cancelado');
     },
     onError: (e) => toast.error(e?.message || 'Error al cancelar'),
   });
 
-  const elegirPlato = (dia, plato, opcion = null) => {
-    setSelecciones(prev => ({
-      ...prev,
-      [dia]: {
-        plato_id: plato.plato_id,
-        opcion,
-        plato_nombre: plato.plato_nombre,
-        tiene_guarnicion: plato.tiene_guarnicion,
-        guarnicion_id: prev[dia]?.guarnicion_id ?? null,
-        notas: prev[dia]?.notas ?? '',
-      },
-    }));
-  };
-
-  const setGuarnicion = (dia, guarnicion_id) => {
-    setSelecciones(prev => ({ ...prev, [dia]: { ...prev[dia], guarnicion_id: parseInt(guarnicion_id) || null } }));
-  };
-
-  const setNotas = (dia, notas) => {
-    setSelecciones(prev => ({ ...prev, [dia]: { ...prev[dia], notas } }));
-  };
-
-  const diasSemana = getDiasSemana(menuSemana?.dias_laborales);
-  const diasCerrados = new Set(menuSemana?.limiteEmpresa?.diasCerrados ?? []);
-
-  const diasConFechaYBloqueo = semanaInicio
-    ? diasSemana.map((dia, i) => {
-        const fecha = addDias(semanaInicio, i);
-        return { dia, fecha, bloqueado: diasCerrados.has(dia) };
-      })
-    : [];
-
-  // handleEnviar accede a diasSinServicio y diasConFechaYBloqueo vía closure —
-  // funciona correctamente porque se llama desde un click (después del render completo)
-  const handleEnviar = async (diasSinServicio) => {
+  const handleEnviar = async () => {
     const faltanDias = diasConFechaYBloqueo.filter(
       ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia] && !selecciones[dia]?.plato_id
     ).length;
@@ -149,7 +232,7 @@ export default function FormularioPedido({ empleado }) {
     const items = diasSemana
       .filter(d => {
         const bloqueado = diasConFechaYBloqueo.find(x => x.dia === d)?.bloqueado;
-        if (bloqueado) return !!selecciones[d]?.plato_id; // preservar bloqueados con selección
+        if (bloqueado) return !!selecciones[d]?.plato_id;
         return !!selecciones[d]?.plato_id && !noAsiste[d];
       })
       .map(d => ({
@@ -160,14 +243,10 @@ export default function FormularioPedido({ empleado }) {
         notas: selecciones[d].notas || null,
       }));
     if (items.length === 0) return;
-    mutation.mutate({
-      semana_inicio: semanaInicio,
-      menu_semanal_id: menuSemana?.menu?.id || null,
-      items,
-    });
+    mutation.mutate({ semana_inicio: semanaInicio, menu_semanal_id: menuSemana?.menu?.id || null, items });
   };
 
-  // ── Pantallas de estado ───────────────────────────────────────────
+  // ── Pantallas de estado ───────────────────────────────────
 
   if (loadingMenu) {
     return <Pantalla><p style={{ textAlign: 'center', padding: 60, color: 'var(--subtexto)' }}>Cargando menú...</p></Pantalla>;
@@ -194,14 +273,19 @@ export default function FormularioPedido({ empleado }) {
                       + {guarniciones.find(g => g.id === selecciones[d].guarnicion_id)?.nombre}
                     </div>
                   )}
+                  {selecciones[d].notas && (
+                    <div style={{ fontSize: 12, color: 'var(--subtexto)', fontStyle: 'italic' }}>{selecciones[d].notas}</div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={() => setConfirmado(false)} style={s.btnSecundario}>Modificar pedido</button>
+          <button onClick={() => { setConfirmado(false); setExpandidoDia(null); }} style={s.btnSecundario}>
+            Modificar pedido
+          </button>
           <button
             onClick={async () => {
-              if (await confirmar({ titulo: '¿Cancelar el pedido?', texto: 'Se eliminará tu pedido de esta semana. Esta acción no se puede deshacer.', botonConfirmar: 'Sí, cancelar pedido' })) {
+              if (await confirmar({ titulo: '¿Cancelar el pedido?', texto: 'Se eliminará tu pedido de esta semana.', botonConfirmar: 'Sí, cancelar pedido' })) {
                 mutationCancelar.mutate();
               }
             }}
@@ -215,81 +299,103 @@ export default function FormularioPedido({ empleado }) {
     );
   }
 
-  // Sin menús publicados
+  // ── Pantalla sin menús publicados ───────────────────────────────────────────
   if (menusDisponibles.length === 0) {
     return (
       <Pantalla>
-        <HeaderUsuario empleado={empleado} semanaInicio={null} />
-        <div style={s.estadoBanner}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>⏳</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>Menú no disponible</h2>
-          <p style={{ color: 'var(--subtexto)', fontSize: 14, maxWidth: 300, margin: '0 auto' }}>
-            El menú de esta semana aún no está disponible.
-          </p>
+        <HeaderUsuario empleado={empleado} />
+        <div style={sHome.heroCerrado}>
+          <div style={{ fontSize: 44, marginBottom: 12 }}>⏳</div>
+          <h2 style={sHome.heroCerradoTitulo}>Menú no disponible</h2>
+          <p style={sHome.heroCerradoSub}>El menú de esta semana aún no fue publicado. Volvé a revisar más tarde.</p>
         </div>
       </Pantalla>
     );
   }
 
-  // Menú publicado pero límite de empresa vencido
+  // Primera semana abierta para pedir (para el CTA de "pedir próxima")
+  const proximaSemanaAbiertaIdx = menusDisponibles.findIndex(
+    (m, i) => i !== semanaSelIdx && m.disponible && !m.limiteEmpresa?.vencido
+  );
+
+  // ── Semana seleccionada CERRADA por límite de empresa ────────────────────────
   if (menuSemana?.disponible && limiteEmpresaVencido) {
-    const itemsExistentes = pedidoExistente?.items ?? [];
+    const ORDEN_DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+    const itemsExistentes = (pedidoExistente?.items ?? [])
+      .slice()
+      .sort((a, b) => ORDEN_DIAS.indexOf(a.dia) - ORDEN_DIAS.indexOf(b.dia));
+
     return (
       <Pantalla>
-        <HeaderUsuario empleado={empleado} semanaInicio={semanaInicio} />
-        {menusDisponibles.length > 1 && (
-          <SelectorSemana menus={menusDisponibles} selIdx={semanaSelIdx} onChange={setSemanaSelIdx} />
-        )}
-        <div style={s.estadoBanner}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>Plazo de pedido cerrado</h2>
-          <p style={{ color: 'var(--subtexto)', fontSize: 14, maxWidth: 300, margin: '0 auto' }}>
-            {menuSemana.limiteEmpresa.texto}
-          </p>
-        </div>
-        {itemsExistentes.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 16, padding: 20, margin: '0 0 24px' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--subtexto)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Tu pedido de esta semana
-            </p>
-            {itemsExistentes.map(item => (
-              <div key={item.dia} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--borde)' }}>
-                <span style={{ fontWeight: 700, minWidth: 90, color: 'var(--verde)' }}>{DIAS_LABEL[item.dia]}</span>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{item.plato_nombre}</div>
-                  {item.guarnicion_nombre && (
-                    <div style={{ fontSize: 13, color: 'var(--subtexto)' }}>+ {item.guarnicion_nombre}</div>
-                  )}
+        <HeaderUsuario empleado={empleado} />
+        <SelectorSemana menus={menusDisponibles} selIdx={semanaSelIdx} onChange={setSemanaSelIdx} />
+
+        {/* Hero: confirmado vs sin pedido */}
+        {itemsExistentes.length > 0 ? (
+          <div style={sHome.heroOk}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <span style={{ fontSize: 28 }}>✅</span>
+              <div>
+                <div style={sHome.heroOkTitulo}>Pedido confirmado</div>
+                <div style={sHome.heroOkSub}>
+                  {itemsExistentes.length} día{itemsExistentes.length !== 1 ? 's' : ''} · {menuSemana.limiteEmpresa.texto}
                 </div>
               </div>
-            ))}
+            </div>
+            <div style={sHome.diasResumen}>
+              {itemsExistentes.map(item => (
+                <div key={item.dia} style={sHome.diaFila}>
+                  <span style={sHome.diaLabel}>{DIAS_LABEL[item.dia]}</span>
+                  <div>
+                    <div style={sHome.diaPlato}>{item.plato_nombre}</div>
+                    {item.guarnicion_nombre && (
+                      <div style={sHome.diaGuarnicion}>+ {item.guarnicion_nombre}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+        ) : (
+          <div style={sHome.heroCerrado}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>😔</div>
+            <h2 style={sHome.heroCerradoTitulo}>Sin pedido esta semana</h2>
+            <p style={sHome.heroCerradoSub}>{menuSemana.limiteEmpresa.texto}</p>
+          </div>
+        )}
+
+        {/* CTA: pedir próxima semana disponible */}
+        {proximaSemanaAbiertaIdx >= 0 && (
+          <ProximaSemanaCard
+            menu={menusDisponibles[proximaSemanaAbiertaIdx]}
+            onIr={() => setSemanaSelIdx(proximaSemanaAbiertaIdx)}
+          />
         )}
       </Pantalla>
     );
   }
 
-  // Menú no disponible (límite del sistema vencido)
+  // ── Semana seleccionada CERRADA por límite del sistema ──────────────────────
   if (!menuSemana?.disponible) {
     return (
       <Pantalla>
-        <HeaderUsuario empleado={empleado} semanaInicio={semanaInicio} />
-        {menusDisponibles.length > 1 && (
-          <SelectorSemana menus={menusDisponibles} selIdx={semanaSelIdx} onChange={setSemanaSelIdx} />
-        )}
-        <div style={s.estadoBanner}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>Pedidos cerrados</h2>
-          <p style={{ color: 'var(--subtexto)', fontSize: 14, maxWidth: 300, margin: '0 auto' }}>
-            {menuSemana?.mensaje}
-          </p>
+        <HeaderUsuario empleado={empleado} />
+        <SelectorSemana menus={menusDisponibles} selIdx={semanaSelIdx} onChange={setSemanaSelIdx} />
+        <div style={sHome.heroCerrado}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>🔒</div>
+          <h2 style={sHome.heroCerradoTitulo}>Pedidos cerrados</h2>
+          <p style={sHome.heroCerradoSub}>{menuSemana?.mensaje || 'Esta semana ya no acepta pedidos.'}</p>
         </div>
+        {proximaSemanaAbiertaIdx >= 0 && (
+          <ProximaSemanaCard
+            menu={menusDisponibles[proximaSemanaAbiertaIdx]}
+            onIr={() => setSemanaSelIdx(proximaSemanaAbiertaIdx)}
+          />
+        )}
       </Pantalla>
     );
   }
 
-  const menu = menuSemana.menu;
-  const diasSinServicio = new Map((menu.sin_servicio || []).map(item => [item.dia, item.motivo]));
   const fechaLimite = menu.fecha_limite_pedidos ? new Date(menu.fecha_limite_pedidos) : null;
 
   const diasActivos = diasConFechaYBloqueo.filter(
@@ -301,34 +407,49 @@ export default function FormularioPedido({ empleado }) {
 
   return (
     <Pantalla>
-      <HeaderUsuario empleado={empleado} semanaInicio={semanaInicio} />
+      <HeaderUsuario empleado={empleado} />
 
-      {/* Selector de semana cuando hay múltiples menús publicados */}
-      {menusDisponibles.length > 1 && (
-        <SelectorSemana menus={menusDisponibles} selIdx={semanaSelIdx} onChange={setSemanaSelIdx} />
+      <SelectorSemana menus={menusDisponibles} selIdx={semanaSelIdx} onChange={setSemanaSelIdx} />
+
+      {(fechaLimite || menuSemana?.limiteEmpresa) && (
+        <div style={s.fechaLimiteChip}>
+          ⏰ {fechaLimite
+            ? `Pedidos hasta el ${fechaLimite.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} ${fechaLimite.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
+            : menuSemana.limiteEmpresa.texto}
+        </div>
       )}
 
-      {/* Info de la semana y fecha límite */}
-      <div style={s.infoSemana}>
-        <span style={{ fontWeight: 700, color: 'var(--verde)' }}>{menu.nombre}</span>
-        {fechaLimite && (
-          <span style={s.fechaLimiteChip}>
-            ⏰ Pedidos hasta el {fechaLimite.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} {fechaLimite.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        )}
-        {!fechaLimite && menuSemana?.limiteEmpresa && (
-          <span style={s.fechaLimiteChip}>⏰ {menuSemana.limiteEmpresa.texto}</span>
-        )}
-      </div>
-
-      {pedidoExistente && (
-        <div style={s.avisoExistente}>📋 Ya tenés un pedido esta semana. Podés modificarlo.</div>
+      {/* Botón: repetir semana anterior */}
+      {pedidoAnterior && !pedidoExistente && (
+        <button onClick={aplicarPedidoAnterior} style={s.btnRepetir}>
+          ↩ Repetir pedido semana anterior
+        </button>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 180 }}>
+      {/* Resumen compacto si ya tiene pedido */}
+      {pedidoExistente && Object.keys(selecciones).length > 0 && (
+        <ResumenPedido
+          selecciones={selecciones}
+          diasSemana={diasSemana}
+          guarniciones={guarniciones}
+          onEditar={(dia) => setExpandidoDia(dia)}
+        />
+      )}
+
+      {/* Stepper de progreso */}
+      <StepperProgreso
+        dias={diasConFechaYBloqueo}
+        diasSinServicio={diasSinServicio}
+        noAsiste={noAsiste}
+        selecciones={selecciones}
+        diaActivo={diaEfectivo}
+        onDia={toggleExpandido}
+      />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 160 }}>
         {diasConFechaYBloqueo.map(({ dia, fecha, bloqueado }) => (
           diasSinServicio.has(dia) ? (
-            <div key={dia} style={s.diaCard}>
+            <div key={dia} style={{ ...s.diaCard, opacity: 0.6 }}>
               <div style={{ padding: '14px 16px' }}>
                 <strong>{DIAS_LABEL[dia]}</strong>
                 <span style={{ color: 'var(--subtexto)', fontSize: 13 }}> {formatFecha(fecha)}</span>
@@ -343,9 +464,7 @@ export default function FormularioPedido({ empleado }) {
               dia={dia}
               fecha={fecha}
               bloqueado={bloqueado}
-              bloqueadoTexto={menuSemana?.limiteEmpresa?.hora
-                ? `Cerrado ${menuSemana.limiteEmpresa.hora}`
-                : 'Plazo cerrado'}
+              bloqueadoTexto={menuSemana?.limiteEmpresa?.hora ? `Cerrado ${menuSemana.limiteEmpresa.hora}` : 'Plazo cerrado'}
               noAsiste={!!noAsiste[dia]}
               onToggleAsiste={() => toggleNoAsiste(dia)}
               variablesDia={(menu.variables || []).filter(p => p.dia === dia)}
@@ -355,29 +474,120 @@ export default function FormularioPedido({ empleado }) {
               onElegir={(plato, opcion) => elegirPlato(dia, plato, opcion)}
               onGuarnicion={(gId) => setGuarnicion(dia, gId)}
               onNotas={(n) => setNotas(dia, n)}
+              expandido={diaEfectivo === dia}
+              onToggleExpand={() => toggleExpandido(dia)}
+              onAvanzar={() => avanzarAlSiguiente(dia, selecciones)}
             />
           )
         ))}
       </div>
 
       <div style={s.footer}>
-        <p style={{ fontSize: 13, color: 'var(--subtexto)', marginBottom: 8 }}>
-          {diasCompletados} de {diasActivos} días completados
-        </p>
+        <StepperMini completados={diasCompletados} total={diasActivos} />
         <button
           style={{ ...s.btnEnviar, opacity: diasCompletados === 0 ? 0.5 : 1 }}
-          onClick={() => handleEnviar(diasSinServicio)}
+          onClick={handleEnviar}
           disabled={mutation.isPending || diasCompletados === 0}
         >
           {mutation.isPending ? 'Enviando...' : pedidoExistente ? 'Actualizar pedido' : 'Enviar pedido'}
         </button>
         {mutation.isError && (
-          <p style={{ color: 'var(--error)', fontSize: 13, marginTop: 8, textAlign: 'center' }}>
+          <p style={{ color: 'var(--error)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
             {mutation.error?.message || 'Error al enviar. Intentá de nuevo.'}
           </p>
         )}
       </div>
     </Pantalla>
+  );
+}
+
+// ── Stepper de progreso ────────────────────────────────────────────────────────
+
+function StepperProgreso({ dias, diasSinServicio, noAsiste, selecciones, diaActivo, onDia }) {
+  return (
+    <div style={sStep.wrap}>
+      {dias.map(({ dia, bloqueado }) => {
+        const sinServicio = diasSinServicio.has(dia);
+        const ausente = !!noAsiste[dia];
+        const completado = !bloqueado && !sinServicio && !ausente && !!selecciones[dia]?.plato_id;
+        const activo = diaActivo === dia;
+        const inactivo = bloqueado || sinServicio || ausente;
+
+        return (
+          <button
+            key={dia}
+            onClick={() => !inactivo && onDia(dia)}
+            style={{
+              ...sStep.chip,
+              ...(completado ? sStep.chipOk : {}),
+              ...(activo && !completado ? sStep.chipActivo : {}),
+              ...(inactivo ? sStep.chipInactivo : {}),
+            }}
+          >
+            <span style={sStep.label}>{DIAS_LABEL[dia].slice(0, 3)}</span>
+            <span style={sStep.icono}>
+              {sinServicio ? '—' : ausente ? '✕' : bloqueado ? '🔒' : completado ? '✓' : '·'}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StepperMini({ completados, total }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: 28,
+              height: 4,
+              borderRadius: 2,
+              background: i < completados ? 'var(--verde)' : '#e5e7eb',
+              transition: 'background 0.2s',
+            }}
+          />
+        ))}
+      </div>
+      <span style={{ fontSize: 12, color: 'var(--subtexto)', fontWeight: 600 }}>
+        {completados}/{total}
+      </span>
+    </div>
+  );
+}
+
+// ── Resumen compacto (cuando hay pedido existente) ─────────────────────────────
+
+function ResumenPedido({ selecciones, diasSemana, guarniciones, onEditar }) {
+  const diasConSel = diasSemana.filter(d => selecciones[d]?.plato_id);
+  if (diasConSel.length === 0) return null;
+  return (
+    <div style={sRes.wrap}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--subtexto)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Tu pedido actual
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {diasConSel.map(d => (
+          <button key={d} style={sRes.fila} onClick={() => onEditar(d)}>
+            <span style={sRes.dia}>{DIAS_LABEL[d].slice(0, 3)}</span>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{selecciones[d].plato_nombre}</div>
+              {selecciones[d].guarnicion_id && (
+                <div style={{ fontSize: 13, color: 'var(--subtexto)' }}>
+                  + {guarniciones.find(g => g.id === selecciones[d].guarnicion_id)?.nombre}
+                </div>
+              )}
+            </div>
+            <span style={{ fontSize: 13, color: 'var(--subtexto)' }}>editar</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -387,59 +597,86 @@ function SelectorSemana({ menus, selIdx, onChange }) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
-  const etiquetas = menus.map((m) => {
-    const fecha = m.menu?.fecha_inicio?.split('T')[0];
-    if (!fecha) return 'Semana';
-    const [y, mo, d] = fecha.split('-').map(Number);
-    const lunes = new Date(y, mo - 1, d);
-    const domingo = new Date(y, mo - 1, d + 6);
-    const esCurrent = hoy >= lunes && hoy <= domingo;
-    const rango = `${lunes.getDate()}/${lunes.getMonth() + 1} – ${domingo.getDate()}/${domingo.getMonth() + 1}`;
-    return esCurrent ? `Esta semana\n${rango}` : rango;
-  });
-
   return (
     <div style={s.selectorSemana}>
-      {menus.map((_, i) => (
-        <button
-          key={i}
-          style={{ ...s.selectorTab, ...(selIdx === i ? s.selectorTabActivo : {}) }}
-          onClick={() => onChange(i)}
-        >
-          {etiquetas[i].split('\n').map((linea, j) => (
-            <span key={j} style={{ display: 'block', fontSize: j === 0 ? 13 : 11, opacity: j === 1 ? 0.75 : 1 }}>
-              {linea}
+      {menus.map((m, i) => {
+        const fecha = m.menu?.fecha_inicio?.split('T')[0];
+        let rango = 'Sem.';
+        let esCurrent = false;
+        if (fecha) {
+          const [y, mo, d] = fecha.split('-').map(Number);
+          const lunes = new Date(y, mo - 1, d);
+          const domingo = new Date(y, mo - 1, d + 6);
+          esCurrent = hoy >= lunes && hoy <= domingo;
+          rango = `${lunes.getDate()}/${lunes.getMonth() + 1}–${domingo.getDate()}/${domingo.getMonth() + 1}`;
+        }
+        const abierta = m.disponible && !m.limiteEmpresa?.vencido;
+        const activo = selIdx === i;
+        return (
+          <button
+            key={i}
+            onClick={() => onChange(i)}
+            style={{ ...s.selectorTab, ...(activo ? s.selectorTabActivo : {}) }}
+          >
+            <span style={{ display: 'block', fontSize: 11, marginBottom: 2 }}>
+              {abierta ? '🟢 Abierta' : '🔒 Cerrada'}
             </span>
-          ))}
-        </button>
-      ))}
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>
+              {esCurrent ? 'Esta sem.' : rango}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-// ── Sub-componentes ────────────────────────────────────────────────────────────
+// ── HeaderUsuario ──────────────────────────────────────────────────────────────
 
-function HeaderUsuario({ empleado, semanaInicio }) {
+function HeaderUsuario({ empleado }) {
   return (
     <div style={{ marginBottom: 16, paddingTop: 8 }}>
-      <p style={{ fontSize: 13, color: 'var(--subtexto)' }}>{empleado.empresa.nombre}</p>
+      <p style={{ fontSize: 13, color: 'var(--subtexto)', marginBottom: 2 }}>{empleado.empresa.nombre}</p>
       <h1 style={s.titulo}>Hola, {empleado.nombre} 👋</h1>
-      {semanaInicio && (
-        <p style={{ color: 'var(--subtexto)', fontSize: 14 }}>
-          Semana del {formatFecha(semanaInicio)}
-        </p>
-      )}
     </div>
   );
 }
 
-function DiaCard({ dia, fecha, variablesDia, fijosDia, seleccion, guarniciones, onElegir, onGuarnicion, onNotas, bloqueado, bloqueadoTexto, noAsiste, onToggleAsiste }) {
-  const [expandido, setExpandido] = useState(!seleccion?.plato_id);
-  const [seccion, setSeccion] = useState('especiales');
+// ── ProximaSemanaCard ──────────────────────────────────────────────────────────
+
+function ProximaSemanaCard({ menu, onIr }) {
+  const fecha = menu?.menu?.fecha_inicio?.split('T')[0];
+  let rango = '';
+  if (fecha) {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const lunes = new Date(y, m - 1, d);
+    const viernes = new Date(y, m - 1, d + 4);
+    rango = `${lunes.getDate()}/${lunes.getMonth() + 1} al ${viernes.getDate()}/${viernes.getMonth() + 1}`;
+  }
+  return (
+    <button onClick={onIr} style={sHome.ctaProxima}>
+      <div style={{ flex: 1, textAlign: 'left' }}>
+        <div style={sHome.ctaProximaTitulo}>📅 Pedir próxima semana</div>
+        <div style={sHome.ctaProximaSub}>Semana del {rango} · Abierta</div>
+      </div>
+      <span style={sHome.ctaProximaArrow}>→</span>
+    </button>
+  );
+}
+
+// ── DiaCard ────────────────────────────────────────────────────────────────────
+
+function DiaCard({
+  dia, fecha, variablesDia, fijosDia, seleccion, guarniciones,
+  onElegir, onGuarnicion, onNotas, onAvanzar,
+  bloqueado, bloqueadoTexto, noAsiste, onToggleAsiste,
+  expandido, onToggleExpand,
+}) {
+  const [mostrarNota, setMostrarNota] = useState(false);
 
   if (bloqueado) {
     return (
-      <div style={{ ...s.diaCard, opacity: 0.55, background: '#f9f9f9' }}>
+      <div style={{ ...s.diaCard, opacity: 0.5, background: '#f9f9f9' }}>
         <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <span style={{ fontWeight: 700, fontSize: 16 }}>{DIAS_LABEL[dia]}</span>
@@ -458,136 +695,161 @@ function DiaCard({ dia, fecha, variablesDia, fijosDia, seleccion, guarniciones, 
 
   if (noAsiste) {
     return (
-      <div style={{ ...s.diaCard, opacity: 0.6, background: '#fafafa' }}>
+      <div style={{ ...s.diaCard, background: '#fff5f5', borderColor: '#fecaca' }}>
         <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <span style={{ fontWeight: 700, fontSize: 16 }}>{DIAS_LABEL[dia]}</span>
-            <span style={{ color: 'var(--subtexto)', fontSize: 13 }}> {formatFecha(fecha)}</span>
-            <p style={{ fontSize: 12, color: 'var(--subtexto)', marginTop: 3 }}>No trabajo este día</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 17 }}>{DIAS_LABEL[dia]}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', background: '#fee2e2', borderRadius: 20, padding: '2px 10px' }}>
+                No voy
+              </span>
+            </div>
+            <span style={{ color: '#9ca3af', fontSize: 13 }}>{formatFecha(fecha)}</span>
           </div>
-          <button
-            onClick={onToggleAsiste}
-            style={{ fontSize: 12, color: 'var(--verde)', background: 'var(--verde-bg)', border: 'none', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontWeight: 600 }}
-          >
-            Sí voy a ir
-          </button>
+          <button onClick={onToggleAsiste} style={s.chipVerde}>Sí voy →</button>
         </div>
       </div>
     );
   }
 
+  const platosOrdenados = [
+    ...variablesDia.map(p => ({ ...p, esEspecial: true })),
+    ...fijosDia.map(p => ({ ...p, esEspecial: false })),
+  ];
+
+  const hayGuarnicionPendiente = seleccion?.plato_id && seleccion?.tiene_guarnicion && !seleccion?.guarnicion_id;
+
   return (
-    <div style={{ ...s.diaCard, ...(seleccion?.plato_id ? { borderColor: 'var(--verde)' } : {}) }}>
-      <button style={s.diaHeader} onClick={() => setExpandido(e => !e)}>
-        <div>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>{DIAS_LABEL[dia]}</span>
-          <span style={{ color: 'var(--subtexto)', fontSize: 13 }}> {formatFecha(fecha)}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{
+      ...s.diaCard,
+      ...(seleccion?.plato_id && !hayGuarnicionPendiente ? { borderColor: 'var(--verde)' } : {}),
+      ...(hayGuarnicionPendiente ? { borderColor: '#f59e0b' } : {}),
+    }}>
+      <button style={s.diaHeader} onClick={onToggleExpand}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 17 }}>{DIAS_LABEL[dia]}</span>
+            <span style={{ color: 'var(--subtexto)', fontSize: 14 }}>{formatFecha(fecha)}</span>
+          </div>
           {seleccion?.plato_id && (
-            <span style={s.selBadge}>
-              ✓ {(seleccion.plato_nombre?.length ?? 0) > 22 ? seleccion.plato_nombre.slice(0, 22) + '…' : (seleccion.plato_nombre ?? '')}
+            <span style={hayGuarnicionPendiente ? s.selBadgeWarning : s.selBadge}>
+              {hayGuarnicionPendiente ? '⚠ Elegí la guarnición' : `✓ ${(seleccion.plato_nombre?.length ?? 0) > 22 ? seleccion.plato_nombre.slice(0, 22) + '…' : (seleccion.plato_nombre ?? '')}`}
             </span>
           )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleAsiste(); }}
+            style={s.chipNoVoy}
+          >
+            ✕ No voy
+          </button>
           <span style={{ color: 'var(--subtexto)', fontSize: 18 }}>{expandido ? '▲' : '▼'}</span>
         </div>
       </button>
 
       {expandido && (
-        <div style={{ padding: '0 16px 16px' }}>
-          <div style={s.tabs}>
-            <button
-              style={{ ...s.tab, ...(seccion === 'especiales' ? s.tabActivo : {}) }}
-              onClick={() => setSeccion('especiales')}
-            >Especiales del día</button>
-            <button
-              style={{ ...s.tab, ...(seccion === 'fijos' ? s.tabActivo : {}) }}
-              onClick={() => setSeccion('fijos')}
-            >Fijos</button>
-          </div>
-
+        <div style={{ padding: '0 14px 14px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {seccion === 'especiales' ? (
-              variablesDia.length > 0
-                ? variablesDia.map(p => (
-                  <OpcionBtn
-                    key={p.opcion}
-                    plato={p}
-                    badge={`Opción ${p.opcion}`}
-                    seleccionado={seleccion?.plato_id === p.plato_id}
-                    onElegir={() => onElegir(p, p.opcion)}
-                  />
-                ))
-                : <p style={{ color: 'var(--subtexto)', fontSize: 14, padding: '8px 0' }}>No hay especiales para este día.</p>
+            {platosOrdenados.length === 0 ? (
+              <p style={{ color: 'var(--subtexto)', fontSize: 14, padding: '8px 0' }}>No hay platos disponibles para este día.</p>
             ) : (
-              fijosDia.map(p => (
-                <OpcionBtn
-                  key={p.plato_id}
-                  plato={p}
-                  seleccionado={seleccion?.plato_id === p.plato_id}
-                  onElegir={() => onElegir(p, null)}
-                />
-              ))
+              platosOrdenados.map((p, i) => {
+                const key = p.esEspecial ? `esp-${p.opcion ?? i}` : `fijo-${p.plato_id}`;
+                const sepAntes = !p.esEspecial && i > 0 && platosOrdenados[i - 1]?.esEspecial;
+                const esteSeleccionado = seleccion?.plato_id === p.plato_id && seleccion?.opcion === (p.esEspecial ? (p.opcion ?? null) : null);
+                return (
+                  <div key={key}>
+                    {sepAntes && variablesDia.length > 0 && (
+                      <div style={s.separadorFijos}>
+                        <span style={s.separadorTexto}>Platos fijos</span>
+                      </div>
+                    )}
+                    <OpcionBtn
+                      plato={p}
+                      badge={p.esEspecial ? 'Especial del día' : null}
+                      seleccionado={esteSeleccionado}
+                      guarnicionId={esteSeleccionado ? seleccion?.guarnicion_id : null}
+                      guarniciones={p.tiene_guarnicion ? guarniciones : []}
+                      onElegir={() => onElegir(p, p.esEspecial ? (p.opcion ?? null) : null)}
+                      onGuarnicion={(gId) => onGuarnicion(gId)}
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
 
-          {seleccion?.plato_id && seleccion?.tiene_guarnicion && (
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 5 }}>
-                Elegí tu guarnición
-              </label>
-              <select
-                style={s.select}
-                value={seleccion.guarnicion_id || ''}
-                onChange={e => onGuarnicion(e.target.value)}
-              >
-                <option value="">-- Sin guarnición --</option>
-                {guarniciones.map(g => (
-                  <option key={g.id} value={g.id}>{g.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
+          {/* Nota opcional */}
           {seleccion?.plato_id && (
-            <div style={{ marginTop: 10 }}>
-              <label style={{ display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 5 }}>
-                Observaciones (opcional)
-              </label>
-              <input
-                style={s.inputNotas}
-                value={seleccion.notas || ''}
-                onChange={e => onNotas(e.target.value)}
-                placeholder="Sin sal, sin cebolla..."
-              />
+            <div style={{ marginTop: 12 }}>
+              {!mostrarNota && !seleccion.notas ? (
+                <button
+                  onClick={() => setMostrarNota(true)}
+                  style={{ fontSize: 14, color: 'var(--subtexto)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                >
+                  + Agregar nota (sin sal, sin cebolla…)
+                </button>
+              ) : (
+                <input
+                  autoFocus={mostrarNota && !seleccion.notas}
+                  style={s.inputNotas}
+                  value={seleccion.notas || ''}
+                  onChange={e => onNotas(e.target.value)}
+                  placeholder="Sin sal, sin cebolla..."
+                />
+              )}
             </div>
           )}
-
-          <button
-            onClick={onToggleAsiste}
-            style={{ marginTop: 14, fontSize: 12, color: '#999', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-          >
-            No voy a trabajar este día
-          </button>
         </div>
       )}
     </div>
   );
 }
 
-function OpcionBtn({ plato, badge, seleccionado, onElegir }) {
+function OpcionBtn({ plato, badge, seleccionado, guarnicionId, guarniciones, onElegir, onGuarnicion }) {
   return (
-    <button
-      style={{
-        ...s.opcionBtn,
-        ...(seleccionado ? { borderColor: 'var(--verde)', background: 'var(--verde-bg)' } : {}),
-      }}
-      onClick={onElegir}
-    >
-      {badge && <span style={s.badge}>{badge}</span>}
-      <span style={{ fontWeight: 600, fontSize: 15 }}>{plato.plato_nombre}</span>
-      {plato.tiene_guarnicion && <span style={{ fontSize: 12, color: 'var(--subtexto)', fontStyle: 'italic' }}>+ elegís guarnición</span>}
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <button
+        style={{
+          ...s.opcionBtn,
+          ...(seleccionado ? { borderColor: 'var(--verde)', background: 'var(--verde-bg)', borderBottomLeftRadius: seleccionado && plato.tiene_guarnicion ? 0 : undefined, borderBottomRightRadius: seleccionado && plato.tiene_guarnicion ? 0 : undefined, borderBottom: seleccionado && plato.tiene_guarnicion ? 'none' : undefined } : {}),
+        }}
+        onClick={onElegir}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {badge && <span style={s.badge}>{badge}</span>}
+          <span style={{ fontWeight: 600, fontSize: 16 }}>{plato.plato_nombre}</span>
+        </div>
+        {!seleccionado && plato.tiene_guarnicion && (
+          <span style={{ fontSize: 13, color: 'var(--subtexto)', fontStyle: 'italic' }}>+ elegís guarnición</span>
+        )}
+      </button>
+
+      {/* Chips de guarnición inline — solo cuando este plato está seleccionado */}
+      {seleccionado && plato.tiene_guarnicion && (
+        <div style={sG.panel}>
+          <span style={sG.label}>Guarnición:</span>
+          <div style={sG.chips}>
+            <button
+              style={{ ...sG.chip, ...(guarnicionId === null ? sG.chipSel : {}) }}
+              onClick={() => onGuarnicion(null)}
+            >
+              Sin guarnición
+            </button>
+            {guarniciones.map(g => (
+              <button
+                key={g.id}
+                style={{ ...sG.chip, ...(guarnicionId === g.id ? sG.chipSel : {}) }}
+                onClick={() => onGuarnicion(g.id)}
+              >
+                {g.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -595,28 +857,70 @@ function Pantalla({ children }) {
   return <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>{children}</div>;
 }
 
+// ── Estilos ────────────────────────────────────────────────────────────────────
+
+const sStep = {
+  wrap:        { display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', paddingBottom: 2 },
+  chip:        { flex: 1, minWidth: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '7px 4px', borderRadius: 10, border: '1.5px solid var(--borde)', background: '#fff', cursor: 'pointer' },
+  chipOk:      { border: '1.5px solid var(--verde)', background: 'var(--verde-bg)' },
+  chipActivo:  { border: '1.5px solid var(--verde)', background: '#fff', boxShadow: '0 0 0 2px var(--verde-bg)' },
+  chipInactivo:{ opacity: 0.4, cursor: 'default' },
+  label:       { fontSize: 12, fontWeight: 700, color: '#374151' },
+  icono:       { fontSize: 14, color: 'var(--verde)', fontWeight: 700 },
+};
+
+const sRes = {
+  wrap:  { background: '#fff', borderRadius: 14, border: '1.5px solid var(--borde)', padding: '14px', marginBottom: 14 },
+  fila:  { display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', padding: '7px 0', borderBottom: '1px solid var(--borde)', cursor: 'pointer', textAlign: 'left' },
+  dia:   { fontSize: 14, fontWeight: 700, color: 'var(--verde)', minWidth: 36 },
+};
+
 const s = {
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingTop: 8 },
-  titulo: { fontSize: 22, fontWeight: 800, color: 'var(--verde)', margin: '2px 0 4px' },
-  logoutBtn: { background: 'none', border: '1px solid var(--borde)', borderRadius: 8, padding: '6px 12px', fontSize: 13, color: 'var(--subtexto)' },
-  selectorSemana: { display: 'flex', gap: 8, marginBottom: 16, background: '#f5f5f5', borderRadius: 12, padding: 4 },
-  selectorTab: { flex: 1, padding: '8px 4px', borderRadius: 9, border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: 'var(--subtexto)', cursor: 'pointer', transition: 'all 0.15s' },
-  selectorTabActivo: { background: '#fff', color: 'var(--verde)', boxShadow: '0 1px 4px rgba(0,0,0,0.12)' },
-  infoSemana: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 },
-  fechaLimiteChip: { display: 'inline-block', background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#7a5800' },
-  estadoBanner: { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, margin: '24px 0' },
-  avisoExistente: { background: 'var(--verde-bg)', border: '1px solid #c3dfc0', borderRadius: 12, padding: '10px 14px', fontSize: 14, marginBottom: 16, color: '#2a5225' },
-  diaCard: { background: '#fff', borderRadius: 14, border: '2px solid var(--borde)', overflow: 'hidden' },
-  diaHeader: { width: '100%', background: 'none', border: 'none', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' },
-  selBadge: { fontSize: 12, background: 'var(--verde-bg)', color: 'var(--verde)', padding: '3px 8px', borderRadius: 20, fontWeight: 600 },
-  tabs: { display: 'flex', gap: 6, marginBottom: 12 },
-  tab: { flex: 1, padding: '7px', borderRadius: 8, border: '1.5px solid var(--borde)', background: '#fff', fontSize: 13, fontWeight: 600, color: 'var(--subtexto)' },
-  tabActivo: { background: 'var(--verde)', color: '#fff', borderColor: 'var(--verde)' },
-  opcionBtn: { display: 'flex', flexDirection: 'column', gap: 3, padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--borde)', background: '#fff', textAlign: 'left', width: '100%' },
-  badge: { fontSize: 11, background: 'var(--verde)', color: '#fff', padding: '2px 8px', borderRadius: 20, fontWeight: 700, width: 'fit-content' },
-  select: { width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--borde)', fontSize: 15, background: '#fff' },
-  inputNotas: { width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid var(--borde)', fontSize: 14 },
-  footer: { position: 'fixed', bottom: 60, left: 0, right: 0, background: '#fff', borderTop: '1px solid var(--borde)', padding: '12px 20px 14px', textAlign: 'center' },
-  btnEnviar: { background: 'var(--verde)', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 32px', fontSize: 16, fontWeight: 700, width: '100%', maxWidth: 400 },
-  btnSecundario: { background: '#fff', color: 'var(--verde)', border: '2px solid var(--verde)', borderRadius: 12, padding: '12px 24px', fontSize: 15, fontWeight: 700 },
+  titulo:           { fontSize: 24, fontWeight: 800, color: 'var(--verde)', margin: '2px 0 4px' },
+  selectorSemana:   { display: 'flex', gap: 6, marginBottom: 16, background: '#f1f5f9', borderRadius: 14, padding: 5 },
+  selectorTab:      { flex: 1, padding: '8px 4px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--subtexto)', cursor: 'pointer', textAlign: 'center' },
+  selectorTabActivo:{ background: '#fff', color: 'var(--verde)', boxShadow: '0 1px 6px rgba(0,0,0,0.10)' },
+  fechaLimiteChip:  { display: 'block', background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 10, padding: '9px 13px', fontSize: 14, color: '#7a5800', marginBottom: 12 },
+  btnRepetir:       { display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 12, padding: '12px 16px', fontSize: 15, fontWeight: 700, color: '#166534', cursor: 'pointer', marginBottom: 14 },
+  estadoBanner:     { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, margin: '24px 0' },
+  diaCard:          { background: '#fff', borderRadius: 14, border: '2px solid var(--borde)', overflow: 'hidden' },
+  diaHeader:        { width: '100%', background: 'none', border: 'none', padding: '14px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer', gap: 8 },
+  selBadge:         { display: 'inline-block', fontSize: 13, background: 'var(--verde-bg)', color: 'var(--verde)', padding: '3px 10px', borderRadius: 20, fontWeight: 600 },
+  selBadgeWarning:  { display: 'inline-block', fontSize: 13, background: '#fef3c7', color: '#92400e', padding: '3px 10px', borderRadius: 20, fontWeight: 700 },
+  chipVerde:        { fontSize: 14, color: 'var(--verde)', background: 'var(--verde-bg)', border: '1.5px solid var(--verde)', borderRadius: 20, padding: '7px 14px', cursor: 'pointer', fontWeight: 700, flexShrink: 0 },
+  chipNoVoy:        { fontSize: 13, color: '#dc2626', background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 20, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
+  separadorFijos:   { display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0 10px' },
+  separadorTexto:   { fontSize: 12, fontWeight: 700, color: 'var(--subtexto)', textTransform: 'uppercase', letterSpacing: 0.5, background: '#f8fafc', padding: '3px 10px', borderRadius: 6 },
+  opcionBtn:        { display: 'flex', flexDirection: 'column', gap: 4, padding: '13px 14px', borderRadius: 10, border: '1.5px solid var(--borde)', background: '#fff', textAlign: 'left', width: '100%', cursor: 'pointer' },
+  badge:            { fontSize: 12, background: 'var(--verde)', color: '#fff', padding: '3px 9px', borderRadius: 20, fontWeight: 700, whiteSpace: 'nowrap' },
+  inputNotas:       { width: '100%', padding: '10px 13px', borderRadius: 9, border: '1.5px solid var(--borde)', fontSize: 15, boxSizing: 'border-box' },
+  footer:           { position: 'fixed', bottom: 60, left: 0, right: 0, background: '#fff', borderTop: '1px solid var(--borde)', padding: '10px 20px 12px', textAlign: 'center', zIndex: 10 },
+  btnEnviar:        { background: 'var(--verde)', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 32px', fontSize: 17, fontWeight: 700, width: '100%', maxWidth: 400, cursor: 'pointer' },
+  btnSecundario:    { background: '#fff', color: 'var(--verde)', border: '2px solid var(--verde)', borderRadius: 12, padding: '12px 24px', fontSize: 16, fontWeight: 700, cursor: 'pointer' },
+};
+
+const sHome = {
+  heroOk:           { background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '2px solid #86efac', borderRadius: 18, padding: '18px 18px 14px', marginBottom: 14 },
+  heroOkTitulo:     { fontSize: 18, fontWeight: 800, color: '#15803d', lineHeight: 1.2 },
+  heroOkSub:        { fontSize: 13, color: '#4ade80', marginTop: 2, color: '#166534' },
+  diasResumen:      { marginTop: 14, display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid #bbf7d0', paddingTop: 12 },
+  diaFila:          { display: 'flex', gap: 12, padding: '9px 0', borderBottom: '1px solid #dcfce7', alignItems: 'flex-start' },
+  diaLabel:         { fontWeight: 700, fontSize: 14, color: '#15803d', minWidth: 72, flexShrink: 0 },
+  diaPlato:         { fontWeight: 600, fontSize: 15, color: '#1a1a1a' },
+  diaGuarnicion:    { fontSize: 13, color: '#4b7c5a', marginTop: 1 },
+  heroCerrado:      { background: '#f8fafc', border: '2px solid #e2e8f0', borderRadius: 18, padding: '32px 20px', textAlign: 'center', marginBottom: 14 },
+  heroCerradoTitulo:{ fontSize: 19, fontWeight: 800, color: '#1a1a1a', marginBottom: 8 },
+  heroCerradoSub:   { fontSize: 14, color: 'var(--subtexto)', maxWidth: 280, margin: '0 auto' },
+  ctaProxima:       { display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: 'var(--verde)', borderRadius: 16, padding: '16px 18px', border: 'none', cursor: 'pointer', marginBottom: 16, boxShadow: '0 4px 12px rgba(39,103,73,0.25)' },
+  ctaProximaTitulo: { fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 2 },
+  ctaProximaSub:    { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
+  ctaProximaArrow:  { fontSize: 22, color: '#fff', fontWeight: 700 },
+};
+
+const sG = {
+  panel:   { background: 'var(--verde-bg)', border: '1.5px solid var(--verde)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '10px 14px 12px' },
+  label:   { display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--verde)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
+  chips:   { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  chip:    { padding: '8px 16px', borderRadius: 20, border: '1.5px solid #c3dfc0', background: '#fff', fontSize: 15, fontWeight: 500, color: '#374151', cursor: 'pointer' },
+  chipSel: { background: 'var(--verde)', color: '#fff', border: '1.5px solid var(--verde)', fontWeight: 700 },
 };
