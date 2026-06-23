@@ -1,0 +1,31 @@
+# Dependencias y builds
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/.vite/
+**/.vite-temp/
+
+# Secretos y configuración local
+**/.env
+**/.env.*
+!**/.env.example
+!.env.docker.example
+.claude/
+
+# Logs y sistema operativo
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.idea/
+.vscode/
+*.swp
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp

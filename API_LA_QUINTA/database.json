@@ -1,0 +1,12 @@
+{
+  "defaultEnv": "default",
+  "default": {
+    "url": {
+      "ENV": "DATABASE_URL"
+    },
+    "dir": "src/database/migrations",
+    "driver": "pg",
+    "migrationsTable": "pgmigrations",
+    "checkOrder": true
+  }
+}
