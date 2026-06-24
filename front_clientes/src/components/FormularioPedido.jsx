@@ -4,6 +4,73 @@ import { menuApi, pedidoApi, guarnicionesApi } from '../api.js';
 import { DIAS_LABEL, getDiasSemana, formatFecha, addDias } from '../utils.js';
 import { toast, confirmar, preguntarDiasIncompletos } from '../lib/swal.js';
 
+function fechaLocalDesdeISO(fecha) {
+  if (!fecha) return null;
+  if (fecha instanceof Date) return fecha;
+  const soloFecha = String(fecha).split('T')[0];
+  const [y, m, d] = soloFecha.split('-').map(Number);
+  if (!y || !m || !d) return new Date(fecha);
+  return new Date(y, m - 1, d);
+}
+
+function fechaCorta(fecha) {
+  const date = fechaLocalDesdeISO(fecha);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function fechaConDiaYHora(fecha) {
+  const date = new Date(fecha);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  const dia = date.toLocaleDateString('es-AR', { weekday: 'long' });
+  const fechaTxt = fechaCorta(date);
+  const hora = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${dia} ${fechaTxt} a las ${hora} hs`;
+}
+
+function construirTextoResumenLimite({ semanaInicio, limiteEmpresa }) {
+  const semanaTxt = semanaInicio ? `Semana del lunes ${fechaCorta(semanaInicio)}` : 'Semana seleccionada';
+  if (!limiteEmpresa) return semanaTxt;
+  const hora = limiteEmpresa.hora || '';
+  const corte = limiteEmpresa.fechaCorte ? fechaConDiaYHora(limiteEmpresa.fechaCorte).replace(' a las ', ' ') : '';
+  if (limiteEmpresa.tipo === 'semanal') return `${semanaTxt} · Límite ${corte || limiteEmpresa.texto || ''}`.trim();
+  if (limiteEmpresa.tipo === 'diario') return `${semanaTxt} · Corte diario${hora ? ` ${hora} hs` : ''}`;
+  if (limiteEmpresa.tipo === 'ambos') return `${semanaTxt} · Corte semanal y diario${hora ? ` ${hora} hs` : ''}`;
+  return `${semanaTxt} · ${limiteEmpresa.texto || ''}`.trim();
+}
+
+function construirTextoLimitePedido({ semanaInicio, fechaLimite, limiteEmpresa }) {
+  const semanaTxt = semanaInicio ? `Semana del lunes ${fechaCorta(semanaInicio)}.` : '';
+
+  if (fechaLimite) {
+    const fecha = fechaLimite.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const hora = fechaLimite.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    return `${semanaTxt} Pedidos hasta el ${fecha} ${hora}.`.trim();
+  }
+
+  if (!limiteEmpresa) return semanaTxt;
+
+  if (limiteEmpresa.tipo === 'semanal') {
+    const corte = limiteEmpresa.fechaCorte ? fechaConDiaYHora(limiteEmpresa.fechaCorte) : '';
+    return `${semanaTxt} Pedido semanal: cargá la semana completa${corte ? ` hasta el ${corte}` : ''}.`.trim();
+  }
+
+  if (limiteEmpresa.tipo === 'diario') {
+    const hora = limiteEmpresa.hora || '';
+    const cuando = Number(limiteEmpresa.anticipacion_dias ?? 0) === 0 ? 'el mismo día' : 'el día anterior';
+    return `${semanaTxt} Pedido diario: podés cargar cada día hasta ${cuando}${hora ? ` a las ${hora} hs` : ''}.`.trim();
+  }
+
+  if (limiteEmpresa.tipo === 'ambos') {
+    const corte = limiteEmpresa.fechaCorte ? fechaConDiaYHora(limiteEmpresa.fechaCorte) : '';
+    const hora = limiteEmpresa.hora || '';
+    const anticipacion = Number(limiteEmpresa.anticipacion_dias ?? 0) === 0 ? 'el mismo día' : 'el día anterior';
+    return `${semanaTxt} Carga semanal${corte ? ` hasta el ${corte}` : ''}; después aplica corte diario hasta ${anticipacion}${hora ? ` a las ${hora} hs` : ''}.`.trim();
+  }
+
+  return `${semanaTxt} ${limiteEmpresa.texto || ''}`.trim();
+}
+
 export default function FormularioPedido({ empleado }) {
   const queryClient = useQueryClient();
   const [semanaSelIdx, setSemanaSelIdx] = useState(0);
@@ -42,6 +109,7 @@ export default function FormularioPedido({ empleado }) {
   const [selecciones, setSelecciones] = useState({});
   const [confirmado, setConfirmado] = useState(false);
   const [noAsiste, setNoAsiste] = useState({});
+  const tienePedidoGuardado = (pedidoExistente?.items?.length ?? 0) > 0;
 
   function defaultNoAsiste(diasLaborales) {
     if (diasLaborales === 'lunes_sabado') return { sabado: true };
@@ -100,19 +168,23 @@ export default function FormularioPedido({ empleado }) {
   const menu = menuSemana?.disponible ? menuSemana.menu : null;
   const diasSinServicio = new Map((menu?.sin_servicio || []).map(item => [item.dia, item.motivo]));
 
+  const diaActivoParaPedido = ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia];
+  const diaNecesitaGuarnicion = (dia, source = selecciones) =>
+    !!source[dia]?.plato_id && source[dia]?.tiene_guarnicion && !source[dia]?.guarnicion_id;
+  const diaTienePedidoCompleto = (dia, source = selecciones) =>
+    !!source[dia]?.plato_id && !diaNecesitaGuarnicion(dia, source);
+
   // Día efectivamente expandido: si undefined → auto al primer incompleto
   const primerIncompleto = diasConFechaYBloqueo.find(
-    ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia] && !selecciones[dia]?.plato_id
+    item => diaActivoParaPedido(item) && !diaTienePedidoCompleto(item.dia)
   )?.dia ?? null;
   const diaEfectivo = expandidoDia === undefined ? primerIncompleto : expandidoDia;
 
   const avanzarAlSiguiente = (diaActual, seleccionesActuales) => {
-    const diasActivos = diasConFechaYBloqueo.filter(
-      ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia]
-    );
+    const diasActivos = diasConFechaYBloqueo.filter(diaActivoParaPedido);
     const idx = diasActivos.findIndex(x => x.dia === diaActual);
     for (let i = idx + 1; i < diasActivos.length; i++) {
-      if (!seleccionesActuales[diasActivos[i].dia]?.plato_id) {
+      if (!diaTienePedidoCompleto(diasActivos[i].dia, seleccionesActuales)) {
         setExpandidoDia(diasActivos[i].dia);
         return;
       }
@@ -135,19 +207,24 @@ export default function FormularioPedido({ empleado }) {
   };
 
   const elegirPlato = (dia, plato, opcion = null) => {
+    const seleccionActual = selecciones[dia];
+    const mismoPlato = seleccionActual?.plato_id === plato.plato_id && seleccionActual?.opcion === opcion;
+    const requiereGuarnicion = plato.tiene_guarnicion === true;
     const nuevasSel = {
       ...selecciones,
       [dia]: {
         plato_id: plato.plato_id,
         opcion,
         plato_nombre: plato.plato_nombre,
-        tiene_guarnicion: plato.tiene_guarnicion,
-        guarnicion_id: selecciones[dia]?.guarnicion_id ?? null,
-        notas: selecciones[dia]?.notas ?? '',
+        tiene_guarnicion: requiereGuarnicion,
+        guarnicion_id: requiereGuarnicion && mismoPlato ? seleccionActual?.guarnicion_id ?? null : null,
+        notas: seleccionActual?.notas ?? '',
       },
     };
     setSelecciones(nuevasSel);
-    if (!plato.tiene_guarnicion) {
+    if (requiereGuarnicion) {
+      setExpandidoDia(dia);
+    } else {
       avanzarAlSiguiente(dia, nuevasSel);
     }
   };
@@ -206,7 +283,7 @@ export default function FormularioPedido({ empleado }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mi-pedido', empleado.id, semanaInicio] });
       setConfirmado(true);
-      toast.success(pedidoExistente ? 'Pedido actualizado. La cocina ya ve tus cambios.' : 'Pedido enviado. La cocina ya lo recibió.');
+      toast.success(tienePedidoGuardado ? 'Pedido actualizado. La cocina ya ve tus cambios.' : 'Pedido enviado. La cocina ya lo recibió.');
     },
     onError: (e) => toast.error(e?.message || 'Error al enviar el pedido'),
   });
@@ -224,9 +301,15 @@ export default function FormularioPedido({ empleado }) {
   });
 
   const handleEnviar = async () => {
-    const faltanDias = diasConFechaYBloqueo.filter(
-      ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia] && !selecciones[dia]?.plato_id
-    ).length;
+    const diasActivosLista = diasConFechaYBloqueo.filter(diaActivoParaPedido);
+    const diasSinGuarnicion = diasActivosLista.filter(({ dia }) => diaNecesitaGuarnicion(dia));
+    if (diasSinGuarnicion.length > 0) {
+      setExpandidoDia(diasSinGuarnicion[0].dia);
+      toast.warning(`Te falta elegir guarnición para ${DIAS_LABEL[diasSinGuarnicion[0].dia].toLowerCase()}.`);
+      return;
+    }
+
+    const faltanDias = diasActivosLista.filter(({ dia }) => !selecciones[dia]?.plato_id).length;
     if (faltanDias > 0 && !await preguntarDiasIncompletos(faltanDias)) return;
 
     const items = diasSemana
@@ -243,14 +326,14 @@ export default function FormularioPedido({ empleado }) {
         notas: selecciones[d].notas || null,
       }));
     if (items.length === 0) return;
-    const accion = pedidoExistente ? 'Actualizar pedido' : 'Enviar pedido';
-    const texto = pedidoExistente
+    const accion = tienePedidoGuardado ? 'Actualizar pedido' : 'Enviar pedido';
+    const texto = tienePedidoGuardado
       ? `Vas a actualizar ${items.length} día${items.length !== 1 ? 's' : ''}. Los cambios recién se guardan al confirmar.`
       : `Vas a enviar ${items.length} día${items.length !== 1 ? 's' : ''}. Después vas a poder modificarlo mientras el plazo siga abierto.`;
     if (!await confirmar({
       titulo: `${accion}?`,
       texto,
-      botonConfirmar: pedidoExistente ? 'Sí, actualizar' : 'Sí, enviar',
+      botonConfirmar: tienePedidoGuardado ? 'Sí, actualizar' : 'Sí, enviar',
       color: '#276749',
     })) return;
     mutation.mutate({ semana_inicio: semanaInicio, menu_semanal_id: menuSemana?.menu?.id || null, items });
@@ -334,6 +417,7 @@ export default function FormularioPedido({ empleado }) {
     const itemsExistentes = (pedidoExistente?.items ?? [])
       .slice()
       .sort((a, b) => ORDEN_DIAS.indexOf(a.dia) - ORDEN_DIAS.indexOf(b.dia));
+    const textoResumenLimite = construirTextoResumenLimite({ semanaInicio, limiteEmpresa: menuSemana.limiteEmpresa });
 
     return (
       <Pantalla>
@@ -348,7 +432,7 @@ export default function FormularioPedido({ empleado }) {
               <div>
                 <div style={sHome.heroOkTitulo}>Pedido confirmado</div>
                 <div style={sHome.heroOkSub}>
-                  {itemsExistentes.length} día{itemsExistentes.length !== 1 ? 's' : ''} · {menuSemana.limiteEmpresa.texto}
+                  {itemsExistentes.length} día{itemsExistentes.length !== 1 ? 's' : ''} · {textoResumenLimite}
                 </div>
               </div>
             </div>
@@ -370,7 +454,7 @@ export default function FormularioPedido({ empleado }) {
           <div style={sHome.heroCerrado}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>😔</div>
             <h2 style={sHome.heroCerradoTitulo}>Sin pedido esta semana</h2>
-            <p style={sHome.heroCerradoSub}>{menuSemana.limiteEmpresa.texto}</p>
+            <p style={sHome.heroCerradoSub}>{textoResumenLimite}</p>
           </div>
         )}
 
@@ -407,14 +491,26 @@ export default function FormularioPedido({ empleado }) {
   }
 
   const fechaLimite = menu.fecha_limite_pedidos ? new Date(menu.fecha_limite_pedidos) : null;
+  const textoLimitePedido = construirTextoLimitePedido({ semanaInicio, fechaLimite, limiteEmpresa: menuSemana?.limiteEmpresa });
 
-  const diasActivos = diasConFechaYBloqueo.filter(
-    ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia]
-  ).length;
-  const diasCompletados = diasConFechaYBloqueo.filter(
-    ({ dia, bloqueado }) => !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia] && selecciones[dia]?.plato_id
-  ).length;
-  const diasPendientes = Math.max(0, diasActivos - diasCompletados);
+  const diasActivosLista = diasConFechaYBloqueo.filter(diaActivoParaPedido);
+  const diasFaltanPlato = diasActivosLista.filter(({ dia }) => !selecciones[dia]?.plato_id);
+  const diasFaltanGuarnicion = diasActivosLista.filter(({ dia }) => diaNecesitaGuarnicion(dia));
+  const diasActivos = diasActivosLista.length;
+  const diasCompletados = diasActivosLista.filter(({ dia }) => diaTienePedidoCompleto(dia)).length;
+  const diasPendientes = diasFaltanPlato.length + diasFaltanGuarnicion.length;
+  const detallePendientes = [
+    diasFaltanPlato.length ? `Falta plato: ${diasFaltanPlato.map(({ dia }) => DIAS_LABEL[dia]).join(', ')}` : null,
+    diasFaltanGuarnicion.length ? `Falta guarnición: ${diasFaltanGuarnicion.map(({ dia }) => DIAS_LABEL[dia]).join(', ')}` : null,
+  ].filter(Boolean).join(' · ');
+  const envioBloqueado = mutation.isPending || diasCompletados === 0 || diasFaltanGuarnicion.length > 0;
+  const textoBotonEnviar = mutation.isPending
+    ? 'Enviando...'
+    : diasFaltanGuarnicion.length > 0
+      ? 'Completar guarnición'
+      : diasCompletados === 0
+        ? 'Elegí al menos un plato'
+        : tienePedidoGuardado ? 'Guardar cambios del pedido' : 'Confirmar pedido';
 
   return (
     <Pantalla>
@@ -424,37 +520,34 @@ export default function FormularioPedido({ empleado }) {
 
       {(fechaLimite || menuSemana?.limiteEmpresa) && (
         <div style={s.fechaLimiteChip}>
-          ⏰ {fechaLimite
-            ? `Pedidos hasta el ${fechaLimite.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} ${fechaLimite.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
-            : menuSemana.limiteEmpresa.texto}
+          ⏰ {textoLimitePedido}
         </div>
       )}
 
       <div style={s.estadoPedidoInfo}>
-        <strong>{pedidoExistente ? 'Pedido ya guardado' : 'Nuevo pedido'}</strong>
+        <strong>{tienePedidoGuardado ? 'Ya tenés un pedido para esta semana' : 'Armá tu pedido semanal'}</strong>
         <span>
-          {pedidoExistente
-            ? 'Podés editarlo mientras el plazo esté abierto. Nada cambia hasta tocar “Actualizar pedido”.'
-            : 'Elegí los días que vas a pedir. Podés dejar días sin elegir si no vas a necesitar vianda.'}
+          {tienePedidoGuardado
+            ? 'Podés editarlo mientras el plazo esté abierto. Los cambios se guardan recién al confirmar.'
+            : 'Elegí plato por día. Si un plato requiere guarnición, ese día queda pendiente hasta completarla.'}
         </span>
       </div>
 
       {/* Botón: repetir semana anterior */}
-      {pedidoAnterior && !pedidoExistente && (
+      {pedidoAnterior && !tienePedidoGuardado && (
         <button onClick={aplicarPedidoAnterior} style={s.btnRepetir}>
           ↩ Repetir pedido semana anterior
         </button>
       )}
 
-      {/* Resumen compacto si ya tiene pedido */}
-      {pedidoExistente && Object.keys(selecciones).length > 0 && (
-        <ResumenPedido
-          selecciones={selecciones}
-          diasSemana={diasSemana}
-          guarniciones={guarniciones}
-          onEditar={(dia) => setExpandidoDia(dia)}
-        />
-      )}
+      <ResumenPedido
+        dias={diasConFechaYBloqueo}
+        selecciones={selecciones}
+        guarniciones={guarniciones}
+        diasSinServicio={diasSinServicio}
+        noAsiste={noAsiste}
+        onEditar={(dia) => setExpandidoDia(dia)}
+      />
 
       {/* Stepper de progreso */}
       <StepperProgreso
@@ -503,13 +596,13 @@ export default function FormularioPedido({ empleado }) {
       </div>
 
       <div style={s.footer}>
-        <StepperMini completados={diasCompletados} pendientes={diasPendientes} total={diasActivos} />
+        <StepperMini completados={diasCompletados} pendientes={diasPendientes} total={diasActivos} detalle={detallePendientes} />
         <button
-          style={{ ...s.btnEnviar, opacity: diasCompletados === 0 ? 0.5 : 1 }}
+          style={{ ...s.btnEnviar, opacity: envioBloqueado ? 0.55 : 1 }}
           onClick={handleEnviar}
-          disabled={mutation.isPending || diasCompletados === 0}
+          disabled={envioBloqueado}
         >
-          {mutation.isPending ? 'Enviando...' : pedidoExistente ? 'Actualizar pedido' : 'Enviar pedido'}
+          {textoBotonEnviar}
         </button>
         {mutation.isError && (
           <p style={{ color: 'var(--error)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
@@ -529,7 +622,8 @@ function StepperProgreso({ dias, diasSinServicio, noAsiste, selecciones, diaActi
       {dias.map(({ dia, bloqueado }) => {
         const sinServicio = diasSinServicio.has(dia);
         const ausente = !!noAsiste[dia];
-        const completado = !bloqueado && !sinServicio && !ausente && !!selecciones[dia]?.plato_id;
+        const faltaGuarnicion = !!selecciones[dia]?.plato_id && selecciones[dia]?.tiene_guarnicion && !selecciones[dia]?.guarnicion_id;
+        const completado = !bloqueado && !sinServicio && !ausente && !!selecciones[dia]?.plato_id && !faltaGuarnicion;
         const activo = diaActivo === dia;
         const inactivo = bloqueado || sinServicio || ausente;
 
@@ -540,13 +634,14 @@ function StepperProgreso({ dias, diasSinServicio, noAsiste, selecciones, diaActi
             style={{
               ...sStep.chip,
               ...(completado ? sStep.chipOk : {}),
+              ...(faltaGuarnicion ? sStep.chipWarning : {}),
               ...(activo && !completado ? sStep.chipActivo : {}),
               ...(inactivo ? sStep.chipInactivo : {}),
             }}
           >
             <span style={sStep.label}>{DIAS_LABEL[dia].slice(0, 3)}</span>
             <span style={sStep.icono}>
-              {sinServicio ? '—' : ausente ? '✕' : bloqueado ? '🔒' : completado ? '✓' : '·'}
+              {sinServicio ? '—' : ausente ? '✕' : bloqueado ? '🔒' : faltaGuarnicion ? '!' : completado ? '✓' : '·'}
             </span>
           </button>
         );
@@ -555,13 +650,13 @@ function StepperProgreso({ dias, diasSinServicio, noAsiste, selecciones, diaActi
   );
 }
 
-function StepperMini({ completados, pendientes, total }) {
+function StepperMini({ completados, pendientes, total, detalle }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ fontSize: 13, color: '#374151', fontWeight: 700, marginBottom: 7 }}>
         {pendientes === 0
           ? 'Pedido completo'
-          : `Te falta elegir ${pendientes} día${pendientes !== 1 ? 's' : ''}`}
+          : detalle || `Te falta completar ${pendientes} día${pendientes !== 1 ? 's' : ''}`}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
       <div style={{ display: 'flex', gap: 4 }}>
@@ -588,31 +683,51 @@ function StepperMini({ completados, pendientes, total }) {
 
 // ── Resumen compacto (cuando hay pedido existente) ─────────────────────────────
 
-function ResumenPedido({ selecciones, diasSemana, guarniciones, onEditar }) {
-  const diasConSel = diasSemana.filter(d => selecciones[d]?.plato_id);
-  if (diasConSel.length === 0) return null;
+function ResumenPedido({ dias, selecciones, guarniciones, diasSinServicio, noAsiste, onEditar }) {
+  if (dias.length === 0) return null;
+
+  const getEstado = ({ dia, bloqueado }) => {
+    const seleccion = selecciones[dia];
+    if (diasSinServicio.has(dia)) return { texto: 'Sin servicio', estilo: sRes.estadoNeutro, detalle: diasSinServicio.get(dia) || '' };
+    if (bloqueado) return { texto: 'Cerrado', estilo: sRes.estadoNeutro, detalle: seleccion?.plato_nombre || 'Plazo cerrado' };
+    if (noAsiste[dia]) return { texto: 'No necesitás vianda', estilo: sRes.estadoNeutro, detalle: 'Marcado por vos' };
+    if (!seleccion?.plato_id) return { texto: 'Falta plato', estilo: sRes.estadoPendiente, detalle: 'Tocá para elegir' };
+    if (seleccion.tiene_guarnicion && !seleccion.guarnicion_id) {
+      return { texto: 'Falta guarnición', estilo: sRes.estadoWarning, detalle: seleccion.plato_nombre };
+    }
+    const guarnicion = guarniciones.find(g => g.id === seleccion.guarnicion_id)?.nombre;
+    return { texto: 'Listo', estilo: sRes.estadoOk, detalle: guarnicion ? `${seleccion.plato_nombre} + ${guarnicion}` : seleccion.plato_nombre };
+  };
+
   return (
     <div style={sRes.wrap}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--subtexto)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Tu pedido actual
+          Resumen del pedido
         </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {diasConSel.map(d => (
-          <button key={d} style={sRes.fila} onClick={() => onEditar(d)}>
-            <span style={sRes.dia}>{DIAS_LABEL[d].slice(0, 3)}</span>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>{selecciones[d].plato_nombre}</div>
-              {selecciones[d].guarnicion_id && (
-                <div style={{ fontSize: 13, color: 'var(--subtexto)' }}>
-                  + {guarniciones.find(g => g.id === selecciones[d].guarnicion_id)?.nombre}
-                </div>
-              )}
-            </div>
-            <span style={{ fontSize: 13, color: 'var(--subtexto)' }}>editar</span>
-          </button>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {dias.map(item => {
+          const estado = getEstado(item);
+          const editable = !item.bloqueado && !diasSinServicio.has(item.dia);
+          return (
+            <button
+              key={item.dia}
+              style={{ ...sRes.fila, ...(editable ? {} : sRes.filaInactiva) }}
+              onClick={() => editable && onEditar(item.dia)}
+              disabled={!editable}
+            >
+              <span style={sRes.dia}>{DIAS_LABEL[item.dia].slice(0, 3)}</span>
+              <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{estado.texto}</div>
+                {estado.detalle && (
+                  <div style={sRes.detalle}>{estado.detalle}</div>
+                )}
+              </div>
+              <span style={{ ...sRes.estado, ...estado.estilo }}>{editable ? 'editar' : 'info'}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -629,13 +744,14 @@ function SelectorSemana({ menus, selIdx, onChange }) {
       {menus.map((m, i) => {
         const fecha = m.menu?.fecha_inicio?.split('T')[0];
         let rango = 'Sem.';
-        let esCurrent = false;
+        let etiqueta = i === 0 ? 'Semana' : `Semana ${i + 1}`;
         if (fecha) {
           const [y, mo, d] = fecha.split('-').map(Number);
           const lunes = new Date(y, mo - 1, d);
           const domingo = new Date(y, mo - 1, d + 6);
-          esCurrent = hoy >= lunes && hoy <= domingo;
+          const esCurrent = hoy >= lunes && hoy <= domingo;
           rango = `${lunes.getDate()}/${lunes.getMonth() + 1}–${domingo.getDate()}/${domingo.getMonth() + 1}`;
+          etiqueta = esCurrent ? 'Semana actual' : i === 1 ? 'Próxima semana' : `Semana ${i + 1}`;
         }
         const abierta = m.disponible && !m.limiteEmpresa?.vencido;
         const activo = selIdx === i;
@@ -648,8 +764,11 @@ function SelectorSemana({ menus, selIdx, onChange }) {
             <span style={{ display: 'block', fontSize: 11, marginBottom: 2 }}>
               {abierta ? '🟢 Abierta' : '🔒 Cerrada'}
             </span>
-            <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>
-              {esCurrent ? 'Esta sem.' : rango}
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 800 }}>
+              {etiqueta}
+            </span>
+            <span style={{ display: 'block', fontSize: 11, fontWeight: 600, marginTop: 1, opacity: 0.8 }}>
+              {rango}
             </span>
           </button>
         );
@@ -728,12 +847,12 @@ function DiaCard({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 17 }}>{DIAS_LABEL[dia]}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', background: '#fee2e2', borderRadius: 20, padding: '2px 10px' }}>
-                No voy
+                No necesitás vianda
               </span>
             </div>
             <span style={{ color: '#9ca3af', fontSize: 13 }}>{formatFecha(fecha)}</span>
           </div>
-          <button onClick={onToggleAsiste} style={s.chipVerde}>Sí voy →</button>
+          <button onClick={onToggleAsiste} style={s.chipVerde}>Pedir vianda este día</button>
         </div>
       </div>
     );
@@ -769,7 +888,7 @@ function DiaCard({
             onClick={(e) => { e.stopPropagation(); onToggleAsiste(); }}
             style={s.chipNoVoy}
           >
-            ✕ No voy
+            ✕ No necesito
           </button>
           <span style={{ color: 'var(--subtexto)', fontSize: 18 }}>{expandido ? '▲' : '▼'}</span>
         </div>
@@ -794,7 +913,7 @@ function DiaCard({
                     )}
                     <OpcionBtn
                       plato={p}
-                      badge={p.esEspecial ? 'Especial del día' : null}
+                      badge={p.esEspecial ? `Opción ${p.opcion ?? ''}`.trim() : null}
                       seleccionado={esteSeleccionado}
                       guarnicionId={esteSeleccionado ? seleccion?.guarnicion_id : null}
                       guarniciones={p.tiene_guarnicion ? guarniciones : []}
@@ -849,21 +968,18 @@ function OpcionBtn({ plato, badge, seleccionado, guarnicionId, guarniciones, onE
           <span style={{ fontWeight: 600, fontSize: 16 }}>{plato.plato_nombre}</span>
         </div>
         {!seleccionado && plato.tiene_guarnicion && (
-          <span style={{ fontSize: 13, color: 'var(--subtexto)', fontStyle: 'italic' }}>+ elegís guarnición</span>
+          <span style={{ fontSize: 13, color: 'var(--subtexto)', fontStyle: 'italic' }}>Requiere guarnición</span>
         )}
       </button>
 
       {/* Chips de guarnición inline — solo cuando este plato está seleccionado */}
       {seleccionado && plato.tiene_guarnicion && (
         <div style={sG.panel}>
-          <span style={sG.label}>Guarnición:</span>
+          <span style={sG.label}>Elegí una guarnición para completar este día</span>
+          {!guarnicionId && (
+            <p style={sG.help}>Este plato necesita una guarnición antes de confirmar el pedido.</p>
+          )}
           <div style={sG.chips}>
-            <button
-              style={{ ...sG.chip, ...(guarnicionId === null ? sG.chipSel : {}) }}
-              onClick={() => onGuarnicion(null)}
-            >
-              Sin guarnición
-            </button>
             {guarniciones.map(g => (
               <button
                 key={g.id}
@@ -881,7 +997,7 @@ function OpcionBtn({ plato, badge, seleccionado, guarnicionId, guarniciones, onE
 }
 
 function Pantalla({ children }) {
-  return <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>{children}</div>;
+  return <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px 74px' }}>{children}</div>;
 }
 
 // ── Estilos ────────────────────────────────────────────────────────────────────
@@ -890,6 +1006,7 @@ const sStep = {
   wrap:        { display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', paddingBottom: 2 },
   chip:        { flex: 1, minWidth: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '7px 4px', borderRadius: 10, border: '1.5px solid var(--borde)', background: '#fff', cursor: 'pointer' },
   chipOk:      { border: '1.5px solid var(--verde)', background: 'var(--verde-bg)' },
+  chipWarning: { border: '1.5px solid #f59e0b', background: '#fffbeb' },
   chipActivo:  { border: '1.5px solid var(--verde)', background: '#fff', boxShadow: '0 0 0 2px var(--verde-bg)' },
   chipInactivo:{ opacity: 0.4, cursor: 'default' },
   label:       { fontSize: 12, fontWeight: 700, color: '#374151' },
@@ -899,7 +1016,14 @@ const sStep = {
 const sRes = {
   wrap:  { background: '#fff', borderRadius: 14, border: '1.5px solid var(--borde)', padding: '14px', marginBottom: 14 },
   fila:  { display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'none', border: 'none', padding: '7px 0', borderBottom: '1px solid var(--borde)', cursor: 'pointer', textAlign: 'left' },
+  filaInactiva: { cursor: 'default', opacity: 0.72 },
   dia:   { fontSize: 14, fontWeight: 700, color: 'var(--verde)', minWidth: 36 },
+  detalle: { fontSize: 12, color: 'var(--subtexto)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  estado: { fontSize: 12, borderRadius: 20, padding: '3px 8px', fontWeight: 800, whiteSpace: 'nowrap' },
+  estadoOk: { background: 'var(--verde-bg)', color: 'var(--verde)' },
+  estadoWarning: { background: '#fef3c7', color: '#92400e' },
+  estadoPendiente: { background: '#eff6ff', color: '#1d4ed8' },
+  estadoNeutro: { background: '#f1f5f9', color: '#64748b' },
 };
 
 const s = {
@@ -948,6 +1072,7 @@ const sHome = {
 const sG = {
   panel:   { background: 'var(--verde-bg)', border: '1.5px solid var(--verde)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '10px 14px 12px' },
   label:   { display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--verde)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 },
+  help:    { margin: '-2px 0 10px', color: '#7a5800', fontSize: 13, lineHeight: 1.35 },
   chips:   { display: 'flex', flexWrap: 'wrap', gap: 8 },
   chip:    { padding: '8px 16px', borderRadius: 20, border: '1.5px solid #c3dfc0', background: '#fff', fontSize: 15, fontWeight: 500, color: '#374151', cursor: 'pointer' },
   chipSel: { background: 'var(--verde)', color: '#fff', border: '1.5px solid var(--verde)', fontWeight: 700 },

@@ -1,14 +1,14 @@
 import * as platosRepository from './platos.repository.js';
 import { ApiError } from '../../utils/ApiError.js';
 
-export const getAllPlatos = async ({ page = 1, limit = 20, activo, search, tag, sort_by, sort_dir } = {}) => {
+export const getAllPlatos = async ({ page = 1, limit = 20, activo, search, tag, tipo, sort_by, sort_dir } = {}) => {
   const pageNum  = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
   const offset   = (pageNum - 1) * limitNum;
 
   const [platos, total] = await Promise.all([
-    platosRepository.findAll({ limit: limitNum, offset, activo, search, tag, sort_by, sort_dir }),
-    platosRepository.countAll({ activo, search, tag }),
+    platosRepository.findAll({ limit: limitNum, offset, activo, search, tag, tipo, sort_by, sort_dir }),
+    platosRepository.countAll({ activo, search, tag, tipo }),
   ]);
 
   return {

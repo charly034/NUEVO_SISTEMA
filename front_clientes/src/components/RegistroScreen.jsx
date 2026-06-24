@@ -17,6 +17,10 @@ function emailSugerido(nombre, apellido, empresa) {
   return a ? `${n}.${a}@${e}.com` : `${n}@${e}.com`;
 }
 
+function normalizarCodigo(value) {
+  return value.replace(/[\s-]/g, '').toUpperCase().slice(0, 8);
+}
+
 // ── Componente principal ────────────────────────────────────────────────────────
 
 export default function RegistroScreen({ onRegistrado, onVolver }) {
@@ -47,11 +51,11 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
     setErrorCodigo('');
     setLoadingCodigo(true);
     try {
-      const data = await authApi.verificarCodigo(codigo.trim().toUpperCase());
+      const data = await authApi.verificarCodigo(normalizarCodigo(codigo));
       setEmpresa(data);
       setPaso(2);
     } catch (err) {
-      setErrorCodigo(err?.message || 'Código no válido');
+      setErrorCodigo(err?.message || 'No encontramos ese código. Revisalo o pedí uno nuevo a tu empresa.');
     } finally {
       setLoadingCodigo(false);
     }
@@ -77,11 +81,11 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
     e.preventDefault();
     setError('');
     if (password !== password2) return setError('Las contraseñas no coinciden');
-    if (password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres');
+    if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres');
     setLoading(true);
     try {
       const data = await authApi.registro({
-        codigo: codigo.trim().toUpperCase(),
+        codigo: normalizarCodigo(codigo),
         nombre: nombre.trim(),
         apellido: apellido.trim(),
         email: email.trim(),
@@ -124,7 +128,7 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
         {paso === 1 && (
           <form onSubmit={handleCodigo} style={s.form}>
             <p style={s.instruccion}>
-              Ingresá el código de tu empresa para continuar.
+              Ingresá el código de tu empresa para continuar. Si no lo tenés, pedíselo al responsable de comedor o RR. HH.
             </p>
 
             <label style={s.label}>
@@ -133,7 +137,7 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
                 ref={codigoRef}
                 style={{ ...s.input, textTransform: 'uppercase', letterSpacing: 3, fontSize: 20, textAlign: 'center', fontWeight: 700 }}
                 value={codigo}
-                onChange={e => setCodigo(e.target.value.toUpperCase().slice(0, 8))}
+                onChange={e => setCodigo(normalizarCodigo(e.target.value))}
                 placeholder="ABC123"
                 autoFocus
                 autoComplete="off"
@@ -160,7 +164,7 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
           <form onSubmit={handleRegistro} style={s.form}>
             {/* Empresa confirmada */}
             <div style={s.empresaBanner}>
-              ✅ <strong>{empresa.nombre}</strong>
+              ✅ Empresa encontrada: <strong>{empresa.nombre}</strong>
             </div>
 
             <div style={s.fila2}>
@@ -208,8 +212,8 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  required minLength={6}
-                  placeholder="Mínimo 6 caracteres"
+                  required minLength={8}
+                  placeholder="Mínimo 8 caracteres"
                   autoComplete="new-password"
                 />
                 <button type="button" tabIndex={-1}
@@ -258,7 +262,7 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
                   </svg>
                   Creando cuenta…
                 </span>
-              ) : 'Crear cuenta'}
+              ) : 'Crear mi cuenta'}
             </button>
 
             <button type="button" onClick={() => setPaso(1)} style={s.linkBtn}>

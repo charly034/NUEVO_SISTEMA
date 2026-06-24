@@ -6,13 +6,18 @@ const developmentOrigins = [
   'http://localhost:5174',
   'http://localhost:5175',
   'http://localhost:4200',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
+  'http://127.0.0.1:4200',
 ];
 
 const allowedOrigins = env.CORS_ORIGINS.length
   ? env.CORS_ORIGINS
   : (env.isProduction ? [] : developmentOrigins);
 
-const isLocalhost = (origin) => /^https?:\/\/localhost(:\d+)?$/.test(origin);
+const isLocalhost = (origin) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
 export const corsOptions = {
   origin: (origin, callback) => {

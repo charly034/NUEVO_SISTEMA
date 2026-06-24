@@ -9,7 +9,7 @@ export const useGuarniciones = () =>
 export const useCreateGuarnicion = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (nombre) => api.post('/guarniciones', { nombre }).then(r => r.data),
+    mutationFn: ({ nombre, tipo }) => api.post('/guarniciones', { nombre, tipo }).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
 };

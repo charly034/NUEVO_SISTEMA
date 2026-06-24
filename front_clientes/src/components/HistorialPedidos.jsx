@@ -73,7 +73,7 @@ export default function HistorialPedidos({ empleado }) {
         {pedidos.length} semana{pedidos.length !== 1 ? 's' : ''} registrada{pedidos.length !== 1 ? 's' : ''}
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 90 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {pedidos.map(p => {
           const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente;
           const esCurrent = esEstaSemana(p.semana_inicio);
@@ -136,7 +136,7 @@ export default function HistorialPedidos({ empleado }) {
 }
 
 const s = {
-  wrap:       { maxWidth: 560, margin: '0 auto', padding: '20px 14px' },
+  wrap:       { maxWidth: 560, margin: '0 auto', padding: '20px 14px 74px' },
   titulo:     { fontSize: 22, fontWeight: 800, color: '#1a1a1a', marginBottom: 4 },
   empty:      { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, marginTop: 24 },
   card:       { background: '#fff', borderRadius: 14, border: '2px solid var(--borde)', overflow: 'hidden' },

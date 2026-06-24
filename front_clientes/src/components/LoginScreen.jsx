@@ -15,7 +15,7 @@ export default function LoginScreen({ onLogin, onRegistrar, onRecuperar }) {
     try {
       await onLogin(email.trim(), password, remember);
     } catch (err) {
-      setError(err?.message || 'Email o contraseña incorrectos');
+      setError(err?.message || 'No pudimos iniciar sesión. Revisá tu email y contraseña.');
     } finally {
       setLoading(false);
     }
@@ -27,6 +27,7 @@ export default function LoginScreen({ onLogin, onRegistrar, onRecuperar }) {
         <div style={s.logo}>🌿</div>
         <h1 style={s.titulo}>La Quinta</h1>
         <p style={s.sub}>Sistema de pedidos</p>
+        <p style={s.loginHint}>Entrá con el email registrado en tu empresa. Si es tu primera vez, usá el código que te dieron.</p>
 
         <form onSubmit={handleSubmit} style={s.form}>
 
@@ -120,7 +121,7 @@ export default function LoginScreen({ onLogin, onRegistrar, onRecuperar }) {
             <div style={s.registroRow}>
               <span style={{ color: 'var(--subtexto)', fontSize: 14 }}>¿Primera vez?</span>
               <button type="button" onClick={onRegistrar} style={s.registroLink}>
-                Crear cuenta
+                Crear cuenta con código
               </button>
             </div>
           )}
@@ -137,6 +138,7 @@ const s = {
   logo:       { fontSize: 52, marginBottom: 8 },
   titulo:     { fontSize: 26, fontWeight: 800, color: 'var(--verde)', marginBottom: 4 },
   sub:        { color: 'var(--subtexto)', marginBottom: 28, fontSize: 14 },
+  loginHint:  { color: '#64748b', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 12px', fontSize: 13, lineHeight: 1.4, margin: '-14px 0 18px' },
   form:       { display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' },
   label:      { display: 'flex', flexDirection: 'column', gap: 6, fontWeight: 600, fontSize: 14, color: '#374151' },
   input:      { padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 16, outline: 'none', transition: 'border-color 0.15s', width: '100%', boxSizing: 'border-box' },

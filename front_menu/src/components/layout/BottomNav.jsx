@@ -12,7 +12,6 @@ const NAV_MORE = [
   { to: '/empresas',     label: 'Empresas'     },
   { to: '/historial',    label: 'Historial'    },
   { to: '/estadisticas', label: 'Estadísticas' },
-  { to: '/guarniciones', label: 'Guarniciones' },
   { to: '/sugeridor',    label: 'Sugeridor'    },
   { to: '/administradores', label: 'Admins', superadminOnly: true },
 ];

@@ -1,6 +1,6 @@
 import { query } from '../../database/connection.js';
 
-const SELECT_COLS = 'id, nombre, descripcion, tags, activo, created_at, updated_at';
+const SELECT_COLS = 'id, nombre, descripcion, tags, tipo, tiene_guarnicion, activo, created_at, updated_at';
 
 const SORT_MAP = {
   nombre:     'p.nombre',
@@ -9,7 +9,7 @@ const SORT_MAP = {
   ultimo_uso: 'h.fecha_servicio',
 };
 
-export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, sort_by = 'nombre', sort_dir = 'asc' } = {}) => {
+export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, tipo, sort_by = 'nombre', sort_dir = 'asc' } = {}) => {
   const conditions = [];
   const values = [];
 
@@ -25,6 +25,10 @@ export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, sor
     values.push(tag);
     conditions.push(`$${values.length} = ANY(p.tags)`);
   }
+  if (tipo) {
+    values.push(tipo);
+    conditions.push(`p.tipo = $${values.length}`);
+  }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const col   = SORT_MAP[sort_by] ?? 'p.nombre';
@@ -35,16 +39,17 @@ export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, sor
 
   values.push(limit, offset);
   const result = await query(
-    `SELECT p.id, p.nombre, p.descripcion, p.tags, p.activo, p.created_at, p.updated_at,
+    `SELECT p.id, p.nombre, p.descripcion, p.tags, p.tipo, p.tiene_guarnicion,
+            p.activo, p.created_at, p.updated_at,
             h.fecha_servicio AS ultimo_uso_fecha,
             h.dia            AS ultimo_uso_dia,
             h.opcion         AS ultimo_uso_opcion,
-            h.nombre         AS ultimo_uso_menu
+            h.menu_nombre    AS ultimo_uso_menu
      FROM platos p
      LEFT JOIN LATERAL (
-       SELECT h2.fecha_servicio, h2.dia, h2.opcion, ms2.nombre
+       SELECT h2.fecha_servicio, h2.dia, h2.opcion, ms2.nombre AS menu_nombre
        FROM historial_uso_platos h2
-       JOIN menus_semanales ms2 ON ms2.id = h2.menu_semanal_id
+       LEFT JOIN menus_semanales ms2 ON ms2.id = h2.menu_semanal_id
        WHERE h2.plato_id = p.id
        ORDER BY h2.fecha_servicio DESC
        LIMIT 1
@@ -57,14 +62,15 @@ export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, sor
 
   return result.rows.map(r => ({
     id: r.id, nombre: r.nombre, descripcion: r.descripcion,
-    tags: r.tags, activo: r.activo, created_at: r.created_at, updated_at: r.updated_at,
+    tags: r.tags, tipo: r.tipo, tiene_guarnicion: r.tiene_guarnicion,
+    activo: r.activo, created_at: r.created_at, updated_at: r.updated_at,
     ultimo_uso: r.ultimo_uso_fecha
       ? { fecha_servicio: r.ultimo_uso_fecha, dia: r.ultimo_uso_dia, opcion: r.ultimo_uso_opcion, menu_semanal_nombre: r.ultimo_uso_menu }
       : null,
   }));
 };
 
-export const countAll = async ({ activo, search, tag } = {}) => {
+export const countAll = async ({ activo, search, tag, tipo } = {}) => {
   const conditions = [];
   const values = [];
 
@@ -79,6 +85,10 @@ export const countAll = async ({ activo, search, tag } = {}) => {
   if (tag) {
     values.push(tag);
     conditions.push(`$${values.length} = ANY(tags)`);
+  }
+  if (tipo) {
+    values.push(tipo);
+    conditions.push(`tipo = $${values.length}`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -101,12 +111,12 @@ export const findAllTags = async () => {
   return result.rows.map((r) => r.tag);
 };
 
-export const create = async ({ nombre, descripcion, tags = [] }) => {
+export const create = async ({ nombre, descripcion, tags = [], tipo = 'especial', tiene_guarnicion = false }) => {
   const result = await query(
-    `INSERT INTO platos (nombre, descripcion, tags)
-     VALUES ($1, $2, $3)
+    `INSERT INTO platos (nombre, descripcion, tags, tipo, tiene_guarnicion)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING ${SELECT_COLS}`,
-    [nombre, descripcion ?? null, tags]
+    [nombre, descripcion ?? null, tags, tipo, tiene_guarnicion]
   );
   return result.rows[0];
 };

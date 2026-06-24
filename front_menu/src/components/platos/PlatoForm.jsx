@@ -1,12 +1,41 @@
 import { useState, useRef } from 'react';
 import Spinner from '../ui/Spinner.jsx';
+import { useGuarniciones } from '../../hooks/useGuarniciones.js';
 
-const TAGS_SUGERIDOS = [
-  'Carnes', 'Pollo', 'Pescado', 'Vegetariano', 'Vegano',
-  'Pastas', 'Ensaladas', 'Sopas', 'Postres', 'Sandwiches',
-  'Sin TACC', 'Proteínas', 'Guisos', 'Pizzas',
+// ── Tipos de plato ────────────────────────────────────────────────
+const TIPOS = [
+  {
+    value: 'especial',
+    label: 'Especial',
+    desc: 'Solo aparece en menús semanales cuando lo elegís',
+    icon: '⭐',
+    sel: 'bg-amber-500 border-amber-500 text-white',
+    idle: 'bg-white border-gray-200 text-gray-600 hover:border-amber-300',
+  },
+  {
+    value: 'fijo',
+    label: 'Fijo',
+    desc: 'Siempre disponible, no rota',
+    icon: '📌',
+    sel: 'bg-blue-600 border-blue-600 text-white',
+    idle: 'bg-white border-gray-200 text-gray-600 hover:border-blue-300',
+  },
+  {
+    value: 'ambos',
+    label: 'Fijo + Especial',
+    desc: 'Siempre disponible y también puede rotar',
+    icon: '🔄',
+    sel: 'bg-purple-600 border-purple-600 text-white',
+    idle: 'bg-white border-gray-200 text-gray-600 hover:border-purple-300',
+  },
 ];
 
+const TAGS_SUGERIDOS = [
+  'Pollo', 'Carnes', 'Pescado', 'Vegetariano', 'Pasta',
+  'Tartas', 'Milanesas', 'Hamburguesas', 'Sin TACC', 'Vegano',
+];
+
+// ── TagInput ──────────────────────────────────────────────────────
 function TagInput({ value = [], onChange }) {
   const [input, setInput] = useState('');
   const inputRef = useRef(null);
@@ -72,11 +101,17 @@ function TagInput({ value = [], onChange }) {
   );
 }
 
+// ── Formulario principal ──────────────────────────────────────────
 export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
+  const { data: guarniciones = [] } = useGuarniciones();
+  const guarnicionesActivas = guarniciones.filter(g => g.activo).length;
+
   const [form, setForm] = useState(() => ({
-    nombre: initial?.nombre || '',
-    descripcion: initial?.descripcion ?? '',
-    tags: initial?.tags ?? [],
+    nombre:           initial?.nombre           ?? '',
+    descripcion:      initial?.descripcion      ?? '',
+    tipo:             initial?.tipo             ?? 'especial',
+    tiene_guarnicion: initial?.tiene_guarnicion ?? false,
+    tags:             initial?.tags             ?? [],
   }));
   const [errors, setErrors] = useState({});
 
@@ -97,14 +132,18 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
     const err = validate();
     if (Object.keys(err).length > 0) { setErrors(err); return; }
     onSubmit({
-      nombre: form.nombre.trim(),
-      descripcion: form.descripcion.trim() || undefined,
-      tags: form.tags,
+      nombre:           form.nombre.trim(),
+      descripcion:      form.descripcion.trim() || undefined,
+      tipo:             form.tipo,
+      tiene_guarnicion: form.tiene_guarnicion,
+      tags:             form.tags,
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+
+      {/* Nombre */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Nombre <span className="text-red-500">*</span>
@@ -113,7 +152,8 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
           type="text"
           value={form.nombre}
           onChange={set('nombre')}
-          placeholder="Ej: Milanesa napolitana"
+          placeholder="Ej: Milanesa de pollo"
+          autoFocus
           className={`w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors
             focus:ring-2 focus:ring-brand-500 focus:border-brand-500
             ${errors.nombre ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
@@ -121,6 +161,7 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
       </div>
 
+      {/* Descripción */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Descripción <span className="text-gray-400 font-normal">(opcional)</span>
@@ -129,25 +170,82 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
           value={form.descripcion}
           onChange={set('descripcion')}
           placeholder="Ingredientes, preparación, notas..."
-          rows={3}
+          rows={2}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none resize-none
             focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
         />
       </div>
 
+      {/* Guarnición */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">¿Incluye guarnición?</label>
+        <button
+          type="button"
+          onClick={() => setForm((f) => ({ ...f, tiene_guarnicion: !f.tiene_guarnicion }))}
+          className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all text-left
+            ${form.tiene_guarnicion
+              ? 'bg-green-50 border-green-400 text-green-800'
+              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
+            }`}
+        >
+          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors
+            ${form.tiene_guarnicion ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
+            {form.tiene_guarnicion && (
+              <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </span>
+          <div>
+            <p>{form.tiene_guarnicion ? 'Sí, el cliente elige guarnición' : 'No, se sirve solo'}</p>
+            <p className={`text-xs font-normal mt-0.5 ${form.tiene_guarnicion ? 'text-green-600' : 'text-gray-400'}`}>
+              {form.tiene_guarnicion
+                ? `El cliente elige entre ${guarnicionesActivas} guarnición${guarnicionesActivas !== 1 ? 'es' : ''} disponible${guarnicionesActivas !== 1 ? 's' : ''}`
+                : 'Se sirve sin opción de guarnición adicional'}
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* Tipo */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">¿Cómo se usa este plato?</label>
+        <div className="grid grid-cols-3 gap-2">
+          {TIPOS.map((t) => {
+            const sel = form.tipo === t.value;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, tipo: t.value }))}
+                className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl border-2 text-center transition-all
+                  ${sel ? t.sel : t.idle}`}
+              >
+                <span className="text-xl leading-none">{t.icon}</span>
+                <span className="text-xs font-bold">{t.label}</span>
+                <span className={`text-xs leading-tight ${sel ? 'opacity-80' : 'text-gray-400'}`}>
+                  {t.desc}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tags */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Categorías / Tags <span className="text-gray-400 font-normal">(opcional)</span>
+          Etiquetas <span className="text-gray-400 font-normal">(opcional, máx. 10)</span>
         </label>
         <TagInput value={form.tags} onChange={(tags) => setForm((f) => ({ ...f, tags }))} />
       </div>
 
-      <div className="flex justify-end gap-2 pt-1">
+      <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
         <button type="button" onClick={onCancel} className="btn-secondary">
           Cancelar
         </button>
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? <Spinner size="sm" /> : null}
+        <button type="submit" disabled={loading} className="btn-primary inline-flex items-center gap-2">
+          {loading && <Spinner size="sm" />}
           {initial ? 'Guardar cambios' : 'Crear plato'}
         </button>
       </div>

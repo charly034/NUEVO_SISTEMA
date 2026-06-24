@@ -8,10 +8,13 @@ export const getGuarniciones = asyncHandler(async (req, res) => {
   sendSuccess(res, await repo.findAll(soloActivas), 'Guarniciones obtenidas');
 });
 
+const TIPOS_VALIDOS = ['caliente', 'fria'];
+
 export const createGuarnicion = asyncHandler(async (req, res) => {
-  const { nombre } = req.body;
+  const { nombre, tipo } = req.body;
   if (!nombre?.trim()) throw ApiError.badRequest('El nombre es requerido');
-  sendCreated(res, await repo.create(nombre.trim()), 'Guarnición creada');
+  if (tipo && !TIPOS_VALIDOS.includes(tipo)) throw ApiError.badRequest('Tipo inválido');
+  sendCreated(res, await repo.create(nombre.trim(), tipo ?? null), 'Guarnición creada');
 });
 
 export const updateGuarnicion = asyncHandler(async (req, res) => {
@@ -20,6 +23,10 @@ export const updateGuarnicion = asyncHandler(async (req, res) => {
   const fields = {};
   if (typeof req.body.nombre === 'string' && req.body.nombre.trim()) fields.nombre = req.body.nombre.trim();
   if (typeof req.body.activo === 'boolean') fields.activo = req.body.activo;
+  if (req.body.tipo !== undefined) {
+    if (req.body.tipo !== null && !TIPOS_VALIDOS.includes(req.body.tipo)) throw ApiError.badRequest('Tipo inválido');
+    fields.tipo = req.body.tipo;
+  }
   if (Object.keys(fields).length === 0) throw ApiError.badRequest('No hay campos válidos para actualizar');
   sendSuccess(res, await repo.update(req.params.id, fields), 'Guarnición actualizada');
 });

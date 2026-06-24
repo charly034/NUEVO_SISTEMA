@@ -34,7 +34,7 @@ function CambiarPasswordForm({ onCerrar }) {
     e.preventDefault();
     setError('');
     if (nuevo !== nuevo2) return setError('Las contraseñas no coinciden');
-    if (nuevo.length < 6)  return setError('Mínimo 6 caracteres');
+    if (nuevo.length < 8)  return setError('Mínimo 8 caracteres');
     setLoading(true);
     try {
       await authApi.cambiarPassword(actual, nuevo);
@@ -68,8 +68,8 @@ function CambiarPasswordForm({ onCerrar }) {
         Nueva contraseña
         <div style={{ position: 'relative' }}>
           <input style={{ ...f.input, paddingRight: 44 }} type={showPass ? 'text' : 'password'}
-            value={nuevo} onChange={e => setNuevo(e.target.value)} required minLength={6}
-            placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+            value={nuevo} onChange={e => setNuevo(e.target.value)} required minLength={8}
+            placeholder="Mínimo 8 caracteres" autoComplete="new-password" />
           <PasswordVisibilityButton showPass={showPass} onToggle={() => setShowPass(v => !v)} />
         </div>
       </label>
@@ -84,7 +84,7 @@ function CambiarPasswordForm({ onCerrar }) {
       </label>
       {error && <p role="alert" style={f.error}>{error}</p>}
       <button type="submit" style={f.btnPrimary} disabled={loading}>
-        {loading ? 'Guardando…' : 'Guardar'}
+        {loading ? 'Guardando…' : 'Guardar nueva contraseña'}
       </button>
       <button type="button" onClick={onCerrar} style={f.btnLink}>Cancelar</button>
     </form>
@@ -232,7 +232,7 @@ export default function PerfilCliente({ empleado, onLogout, onEmpleadoUpdate }) 
       {/* Cerrar sesión */}
       <button onClick={onLogout} style={s.btnLogout}>Cerrar sesión</button>
 
-      <p style={{ textAlign: 'center', fontSize: 11, color: '#ccc', marginTop: 24, paddingBottom: 90 }}>
+      <p style={{ textAlign: 'center', fontSize: 11, color: '#ccc', marginTop: 24 }}>
         La Quinta · Sistema de pedidos
       </p>
     </div>
@@ -250,7 +250,7 @@ function Fila({ label, valor, last }) {
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
 const s = {
-  wrap:        { maxWidth: 520, margin: '0 auto', padding: '24px 14px', paddingBottom: 100 },
+  wrap:        { maxWidth: 520, margin: '0 auto', padding: '24px 14px 74px' },
   hero:        { display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '0 4px' },
   avatar:      { width: 64, height: 64, borderRadius: '50%', background: 'var(--verde)', color: '#fff', fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   nombre:      { fontSize: 20, fontWeight: 800, color: '#1a1a1a', margin: '0 0 3px' },

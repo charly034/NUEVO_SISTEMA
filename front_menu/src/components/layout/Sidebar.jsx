@@ -9,7 +9,6 @@ const NAV = [
   { to: '/estadisticas', label: 'Estadísticas'  },
   { to: '/pedidos',      label: 'Pedidos'       },
   { to: '/empresas',     label: 'Empresas'      },
-  { to: '/guarniciones', label: 'Guarniciones'  },
   { to: '/administradores', label: 'Administradores', superadminOnly: true },
 ];
 

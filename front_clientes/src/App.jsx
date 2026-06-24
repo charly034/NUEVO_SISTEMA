@@ -83,7 +83,7 @@ export default function App() {
 }
 
 const sNav = {
-  bar:      { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e5e5', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' },
+  bar:      { position: 'fixed', bottom: 0, left: 0, right: 0, maxWidth: 560, margin: '0 auto', background: '#fff', borderTop: '1px solid #e5e5e5', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -8px 24px rgba(15,23,42,0.05)' },
   btn:      { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 4px 12px', minHeight: 58, border: 'none', background: 'none', color: '#64748b', cursor: 'pointer' },
   btnActivo:{ color: 'var(--verde)' },
 };

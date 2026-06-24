@@ -21,13 +21,13 @@ export default function RecuperarPassword({ onVolver, onExito }) {
     e.preventDefault();
     setError('');
     if (password !== password2) return setError('Las contraseñas no coinciden');
-    if (password.length < 6) return setError('Mínimo 6 caracteres');
+    if (password.length < 8) return setError('Mínimo 8 caracteres');
     setLoading(true);
     try {
       await authApi.usarResetCode(codigo.trim().toUpperCase(), password);
       onExito();
     } catch (err) {
-      setError(err?.message || 'Código inválido o expirado');
+      setError(err?.message || 'El código no es válido o ya venció. Pedí uno nuevo a tu empresa.');
     } finally {
       setLoading(false);
     }
@@ -42,7 +42,7 @@ export default function RecuperarPassword({ onVolver, onExito }) {
         {paso === 1 && (
           <form onSubmit={handleCodigo} style={s.form}>
             <p style={s.info}>
-              Pedile al administrador que genere un código de recuperación y escribilo acá.
+              Pedí un código de recuperación a tu empresa y escribilo acá. Por seguridad, usalo apenas te lo entreguen.
             </p>
             <label style={s.label}>
               Código de recuperación
@@ -76,8 +76,8 @@ export default function RecuperarPassword({ onVolver, onExito }) {
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  required minLength={6}
-                  placeholder="Mínimo 6 caracteres"
+                  required minLength={8}
+                  placeholder="Mínimo 8 caracteres"
                   autoComplete="new-password"
                   autoFocus
                 />
