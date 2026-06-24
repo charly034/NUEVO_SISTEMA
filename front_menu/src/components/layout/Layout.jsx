@@ -13,7 +13,7 @@ export default function Layout({ admin, onLogout }) {
           <Outlet />
         </main>
       </div>
-      <BottomNav />
+      <BottomNav admin={admin} />
     </div>
   );
 }

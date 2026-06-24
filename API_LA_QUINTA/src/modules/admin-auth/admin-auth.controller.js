@@ -50,6 +50,18 @@ export const updateController = asyncHandler(async (req, res) => {
     if (req.body.password.length < 8) throw ApiError.badRequest('Mínimo 8 caracteres');
     fields.password_hash = await service.hashPassword(req.body.password);
   }
+  if (Number(id) === req.adminUser.sub) {
+    if (fields.activo === false) throw ApiError.badRequest('No podes desactivar tu propio usuario');
+    if (fields.rol && fields.rol !== 'superadmin') {
+      throw ApiError.badRequest('No podes quitarte tu propio rol superadmin');
+    }
+  }
+  if (u.rol === 'superadmin' && u.activo && (fields.activo === false || fields.rol === 'admin')) {
+    const totalSuperadmins = await repo.countActiveSuperAdmins();
+    if (totalSuperadmins <= 1) {
+      throw ApiError.badRequest('Debe quedar al menos un superadmin activo');
+    }
+  }
   if (Object.keys(fields).length === 0) throw ApiError.badRequest('Sin campos válidos');
   const updated = await repo.update(id, fields);
   sendSuccess(res, updated, 'Usuario actualizado');

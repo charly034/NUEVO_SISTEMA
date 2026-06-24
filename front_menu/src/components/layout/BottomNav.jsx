@@ -14,9 +14,8 @@ const NAV_MORE = [
   { to: '/estadisticas', label: 'Estadísticas' },
   { to: '/guarniciones', label: 'Guarniciones' },
   { to: '/sugeridor',    label: 'Sugeridor'    },
+  { to: '/administradores', label: 'Admins', superadminOnly: true },
 ];
-
-const ALL_MORE_PATHS = NAV_MORE.map(n => n.to);
 
 const ICONS = {
   '/':             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/></svg>,
@@ -27,6 +26,7 @@ const ICONS = {
   '/historial':    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 0 .5-3"/><path d="M3 4v4h4"/></svg>,
   '/estadisticas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
   '/guarniciones': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M12 2a7 7 0 0 1 7 7c0 4-3 6-7 13C8 15 5 13 5 9a7 7 0 0 1 7-7z"/></svg>,
+  '/administradores': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M16 21v-2a4 4 0 0 0-8 0v2"/><circle cx="12" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>,
   '/sugeridor':    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,
 };
 
@@ -40,11 +40,12 @@ function IconMas() {
   );
 }
 
-export default function BottomNav() {
+export default function BottomNav({ admin }) {
   const [masOpen, setMasOpen] = useState(false);
   const location = useLocation();
+  const navMore = NAV_MORE.filter(item => !item.superadminOnly || admin?.rol === 'superadmin');
 
-  const inMore = ALL_MORE_PATHS.includes(location.pathname);
+  const inMore = navMore.map(n => n.to).includes(location.pathname);
 
   return (
     <>
@@ -60,7 +61,7 @@ export default function BottomNav() {
       <div className={`fixed bottom-16 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-200 rounded-t-2xl shadow-2xl transition-transform duration-200 ${masOpen ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-2" />
         <div className="grid grid-cols-3 gap-1 p-3 pb-5">
-          {NAV_MORE.map(({ to, label }) => (
+          {navMore.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}

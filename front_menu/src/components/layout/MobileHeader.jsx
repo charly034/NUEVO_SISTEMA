@@ -10,6 +10,7 @@ const PAGE_TITLES = {
   '/pedidos':      'Pedidos',
   '/empresas':     'Empresas',
   '/guarniciones': 'Guarniciones',
+  '/administradores': 'Administradores',
 };
 
 export default function MobileHeader({ onLogout }) {

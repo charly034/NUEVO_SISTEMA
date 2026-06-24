@@ -11,6 +11,7 @@ import Sugeridor from './pages/Sugeridor.jsx';
 import Empresas from './pages/Empresas.jsx';
 import Guarniciones from './pages/Guarniciones.jsx';
 import PedidosAdmin from './pages/PedidosAdmin.jsx';
+import Administradores from './pages/Administradores.jsx';
 import AdminLogin from './components/AdminLogin.jsx';
 import { adminAuth } from './auth.js';
 
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="pedidos" element={<PedidosAdmin />} />
           <Route path="empresas" element={<Empresas />} />
           <Route path="guarniciones" element={<Guarniciones />} />
+          <Route path="administradores" element={<Administradores />} />
         </Route>
       </Routes>
     </BrowserRouter>

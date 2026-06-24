@@ -20,6 +20,13 @@ export const findByEmail = async (email) => {
   return r.rows[0] || null;
 };
 
+export const countActiveSuperAdmins = async () => {
+  const r = await query(
+    "SELECT COUNT(*)::int AS total FROM usuarios_admin WHERE rol = 'superadmin' AND activo = true"
+  );
+  return r.rows[0]?.total ?? 0;
+};
+
 export const create = async ({ nombre, apellido, email, password_hash, rol = 'admin' }) => {
   const r = await query(
     `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol)
