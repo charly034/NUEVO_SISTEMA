@@ -39,9 +39,15 @@ function Inner() {
   const { empleado, login, logout, setSession, checking } = useAuth();
   const qc = useQueryClient();
   const [vista, setVista] = useState('pedido');
+  const [pedidoKey, setPedidoKey] = useState(0);
   const [pantalla, setPantalla] = useState('login'); // 'login' | 'registro' | 'recuperar'
 
   const cerrarSesion = () => { qc.clear(); logout(); };
+
+  const handleNav = (id) => {
+    if (id === 'pedido' && vista === 'pedido') setPedidoKey(k => k + 1);
+    setVista(id);
+  };
 
   if (checking) return <div style={{ padding: 60, textAlign: 'center' }}>Verificando sesión…</div>;
   if (!empleado) {
@@ -66,10 +72,10 @@ function Inner() {
 
   return (
     <>
-      {vista === 'pedido'    && <FormularioPedido empleado={empleado} />}
+      {vista === 'pedido'    && <FormularioPedido key={pedidoKey} empleado={empleado} />}
       {vista === 'historial' && <HistorialPedidos empleado={empleado} />}
       {vista === 'perfil'    && <PerfilCliente    empleado={empleado} onLogout={cerrarSesion} onEmpleadoUpdate={setSession} />}
-      <BottomNav vista={vista} onChange={setVista} />
+      <BottomNav vista={vista} onChange={handleNav} />
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { menuApi, pedidoApi, guarnicionesApi } from '../api.js';
 import { DIAS_LABEL, getDiasSemana, formatFecha, addDias } from '../utils.js';
@@ -77,6 +77,7 @@ export default function FormularioPedido({ empleado }) {
   // undefined = auto (primer día incompleto), null = todos cerrados, string = día específico
   const [expandidoDia, setExpandidoDia] = useState(undefined);
   const inicializadoRef = useRef(false);
+  const diaRefs = useRef({});
 
   const { data: menuData, isLoading: loadingMenu } = useQuery({
     queryKey: ['menus-publicados'],
@@ -185,7 +186,12 @@ export default function FormularioPedido({ empleado }) {
     const idx = diasActivos.findIndex(x => x.dia === diaActual);
     for (let i = idx + 1; i < diasActivos.length; i++) {
       if (!diaTienePedidoCompleto(diasActivos[i].dia, seleccionesActuales)) {
-        setExpandidoDia(diasActivos[i].dia);
+        const siguienteDia = diasActivos[i].dia;
+        setExpandidoDia(siguienteDia);
+        setTimeout(() => {
+          const el = diaRefs.current[siguienteDia];
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
         return;
       }
     }
@@ -346,35 +352,63 @@ export default function FormularioPedido({ empleado }) {
   }
 
   if (confirmado) {
+    const diasConfirmados = getDiasSemana(menuSemana?.dias_laborales).filter(d => selecciones[d]?.plato_id);
     return (
       <Pantalla>
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--verde)', marginBottom: 8 }}>¡Pedido enviado!</h2>
-          <p style={{ color: 'var(--subtexto)', marginBottom: 4 }}>Semana del {formatFecha(semanaInicio)}</p>
-          <p style={{ color: 'var(--subtexto)', fontSize: 14, marginBottom: 28 }}>
-            {empleado.nombre} {empleado.apellido} — {empleado.empresa.nombre}
-          </p>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 20, marginBottom: 24, textAlign: 'left' }}>
-            {getDiasSemana(menuSemana?.dias_laborales).filter(d => selecciones[d]?.plato_id).map(d => (
-              <div key={d} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--borde)' }}>
-                <span style={{ fontWeight: 700, minWidth: 90, color: 'var(--verde)' }}>{DIAS_LABEL[d]}</span>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{selecciones[d].plato_nombre}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', paddingBottom: 90 }}>
+          {/* Hero */}
+          <div style={{ textAlign: 'center', padding: '36px 0 24px' }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'var(--verde)', display: 'inline-flex',
+              alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+            }}>
+              <span style={{ fontSize: 36, color: '#fff', lineHeight: 1 }}>✓</span>
+            </div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 4 }}>
+              ¡Pedido confirmado!
+            </h2>
+            <p style={{ color: 'var(--subtexto)', fontSize: 14 }}>
+              Semana del {formatFecha(semanaInicio)}
+            </p>
+            <p style={{ color: 'var(--subtexto)', fontSize: 13, marginTop: 2 }}>
+              {empleado.nombre} {empleado.apellido} · {empleado.empresa.nombre}
+            </p>
+          </div>
+
+          {/* Resumen */}
+          <div style={{ background: '#fff', borderRadius: 16, padding: '4px 0', marginBottom: 24, border: '1px solid var(--borde)' }}>
+            {diasConfirmados.map((d, i) => (
+              <div key={d} style={{
+                display: 'flex', gap: 12, padding: '13px 18px',
+                borderBottom: i < diasConfirmados.length - 1 ? '1px solid var(--borde)' : 'none',
+              }}>
+                <span style={{ fontWeight: 700, minWidth: 82, fontSize: 14, color: 'var(--verde)' }}>
+                  {DIAS_LABEL[d]}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{selecciones[d].plato_nombre}</div>
                   {selecciones[d].guarnicion_id && (
-                    <div style={{ fontSize: 13, color: 'var(--subtexto)' }}>
+                    <div style={{ fontSize: 13, color: 'var(--subtexto)', marginTop: 2 }}>
                       + {guarniciones.find(g => g.id === selecciones[d].guarnicion_id)?.nombre}
                     </div>
                   )}
                   {selecciones[d].notas && (
-                    <div style={{ fontSize: 12, color: 'var(--subtexto)', fontStyle: 'italic' }}>{selecciones[d].notas}</div>
+                    <div style={{ fontSize: 12, color: 'var(--subtexto)', fontStyle: 'italic', marginTop: 2 }}>
+                      "{selecciones[d].notas}"
+                    </div>
                   )}
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={() => { setConfirmado(false); setExpandidoDia(null); }} style={s.btnSecundario}>
-            Modificar pedido
+
+          {/* Acciones */}
+          <button
+            onClick={() => { setConfirmado(false); setExpandidoDia(null); }}
+            style={{ ...s.btnEnviar, marginBottom: 10 }}
+          >
+            Ver mi pedido
           </button>
           <button
             onClick={async () => {
@@ -383,7 +417,7 @@ export default function FormularioPedido({ empleado }) {
               }
             }}
             disabled={mutationCancelar.isPending}
-            style={{ ...s.btnSecundario, color: '#c0392b', borderColor: '#e74c3c', marginTop: 8 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 14, padding: '8px 0', textDecoration: 'underline' }}
           >
             {mutationCancelar.isPending ? 'Cancelando...' : 'Cancelar pedido'}
           </button>
@@ -524,30 +558,12 @@ export default function FormularioPedido({ empleado }) {
         </div>
       )}
 
-      <div style={s.estadoPedidoInfo}>
-        <strong>{tienePedidoGuardado ? 'Ya tenés un pedido para esta semana' : 'Armá tu pedido semanal'}</strong>
-        <span>
-          {tienePedidoGuardado
-            ? 'Podés editarlo mientras el plazo esté abierto. Los cambios se guardan recién al confirmar.'
-            : 'Elegí plato por día. Si un plato requiere guarnición, ese día queda pendiente hasta completarla.'}
-        </span>
-      </div>
-
       {/* Botón: repetir semana anterior */}
       {pedidoAnterior && !tienePedidoGuardado && (
         <button onClick={aplicarPedidoAnterior} style={s.btnRepetir}>
           ↩ Repetir pedido semana anterior
         </button>
       )}
-
-      <ResumenPedido
-        dias={diasConFechaYBloqueo}
-        selecciones={selecciones}
-        guarniciones={guarniciones}
-        diasSinServicio={diasSinServicio}
-        noAsiste={noAsiste}
-        onEditar={(dia) => setExpandidoDia(dia)}
-      />
 
       {/* Stepper de progreso */}
       <StepperProgreso
@@ -559,10 +575,10 @@ export default function FormularioPedido({ empleado }) {
         onDia={toggleExpandido}
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 160 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 100 }}>
         {diasConFechaYBloqueo.map(({ dia, fecha, bloqueado }) => (
           diasSinServicio.has(dia) ? (
-            <div key={dia} style={{ ...s.diaCard, opacity: 0.6 }}>
+            <div key={dia} ref={el => diaRefs.current[dia] = el} style={{ ...s.diaCard, opacity: 0.6 }}>
               <div style={{ padding: '14px 16px' }}>
                 <strong>{DIAS_LABEL[dia]}</strong>
                 <span style={{ color: 'var(--subtexto)', fontSize: 13 }}> {formatFecha(fecha)}</span>
@@ -574,6 +590,7 @@ export default function FormularioPedido({ empleado }) {
           ) : (
             <DiaCard
               key={dia}
+              ref={el => diaRefs.current[dia] = el}
               dia={dia}
               fecha={fecha}
               bloqueado={bloqueado}
@@ -812,17 +829,17 @@ function ProximaSemanaCard({ menu, onIr }) {
 
 // ── DiaCard ────────────────────────────────────────────────────────────────────
 
-function DiaCard({
+const DiaCard = forwardRef(function DiaCard({
   dia, fecha, variablesDia, fijosDia, seleccion, guarniciones,
   onElegir, onGuarnicion, onNotas,
   bloqueado, bloqueadoTexto, noAsiste, onToggleAsiste,
   expandido, onToggleExpand,
-}) {
+}, ref) {
   const [mostrarNota, setMostrarNota] = useState(false);
 
   if (bloqueado) {
     return (
-      <div style={{ ...s.diaCard, opacity: 0.5, background: '#f9f9f9' }}>
+      <div ref={ref} style={{ ...s.diaCard, opacity: 0.5, background: '#f9f9f9' }}>
         <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <span style={{ fontWeight: 700, fontSize: 16 }}>{DIAS_LABEL[dia]}</span>
@@ -841,7 +858,7 @@ function DiaCard({
 
   if (noAsiste) {
     return (
-      <div style={{ ...s.diaCard, background: '#fff5f5', borderColor: '#fecaca' }}>
+      <div ref={ref} style={{ ...s.diaCard, background: '#fff5f5', borderColor: '#fecaca' }}>
         <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -866,7 +883,7 @@ function DiaCard({
   const hayGuarnicionPendiente = seleccion?.plato_id && seleccion?.tiene_guarnicion && !seleccion?.guarnicion_id;
 
   return (
-    <div style={{
+    <div ref={ref} style={{
       ...s.diaCard,
       ...(seleccion?.plato_id && !hayGuarnicionPendiente ? { borderColor: 'var(--verde)' } : {}),
       ...(hayGuarnicionPendiente ? { borderColor: '#f59e0b' } : {}),
@@ -877,11 +894,22 @@ function DiaCard({
             <span style={{ fontWeight: 700, fontSize: 17 }}>{DIAS_LABEL[dia]}</span>
             <span style={{ color: 'var(--subtexto)', fontSize: 14 }}>{formatFecha(fecha)}</span>
           </div>
-          {seleccion?.plato_id && (
-            <span style={hayGuarnicionPendiente ? s.selBadgeWarning : s.selBadge}>
-              {hayGuarnicionPendiente ? '⚠ Elegí la guarnición' : `✓ ${(seleccion.plato_nombre?.length ?? 0) > 22 ? seleccion.plato_nombre.slice(0, 22) + '…' : (seleccion.plato_nombre ?? '')}`}
-            </span>
-          )}
+          {seleccion?.plato_id && (() => {
+            if (hayGuarnicionPendiente) {
+              return (
+                <span style={s.selBadgeWarning}>⚠ Falta elegir guarnición</span>
+              );
+            }
+            const nombrePlato = (seleccion.plato_nombre?.length ?? 0) > 26
+              ? seleccion.plato_nombre.slice(0, 26) + '…'
+              : (seleccion.plato_nombre ?? '');
+            const guarnicion = guarniciones?.find(g => g.id === seleccion.guarnicion_id);
+            return (
+              <span style={s.selBadge}>
+                ✓ {nombrePlato}{guarnicion ? ` · ${guarnicion.nombre}` : ''}
+              </span>
+            );
+          })()}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button
@@ -951,7 +979,7 @@ function DiaCard({
       )}
     </div>
   );
-}
+});
 
 function OpcionBtn({ plato, badge, seleccionado, guarnicionId, guarniciones, onElegir, onGuarnicion }) {
   return (
