@@ -49,7 +49,7 @@ export const updateEmpleado = asyncHandler(async (req, res) => {
   if (fields.rol && !['cliente', 'admin'].includes(fields.rol)) {
     throw ApiError.badRequest('rol inválido');
   }
-  if (Number(req.params.id) === Number(req.empleado.sub) && fields.rol === 'cliente') {
+  if (req.empleado?.sub && Number(req.params.id) === Number(req.empleado.sub) && fields.rol === 'cliente') {
     throw ApiError.conflict('No podés quitarte tu propio acceso administrador');
   }
   if (password) {
@@ -82,7 +82,7 @@ export const generarResetCode = asyncHandler(async (req, res) => {
 });
 
 export const deleteEmpleado = asyncHandler(async (req, res) => {
-  if (Number(req.params.id) === Number(req.empleado.sub)) {
+  if (req.empleado?.sub && Number(req.params.id) === Number(req.empleado.sub)) {
     throw ApiError.conflict('No podés eliminar tu propia cuenta');
   }
   const e = await repo.findById(req.params.id);

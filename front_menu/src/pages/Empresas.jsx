@@ -3,12 +3,15 @@ import { useEmpresas, useCreateEmpresa, useUpdateEmpresa, useDeleteEmpresa, useR
 import { useEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado, useGenerarResetCode } from '../hooks/useEmpleados.js';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
+import { adminAuth } from '../auth.js';
 
 const PLANES = { basico: 'Básico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
 const MODOS = { semanal: 'Semanal', diario: 'Diario', ambos: 'Ambos' };
 const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sábado', lunes_domingo: 'Lunes a domingo' };
 
 export default function Empresas() {
+  const adminUser = adminAuth.storedUser();
+  const esSuperAdmin = adminUser?.rol === 'superadmin';
   const { data: empresas = [], isLoading } = useEmpresas();
   const createEmpresa = useCreateEmpresa();
   const updateEmpresa = useUpdateEmpresa();
@@ -98,6 +101,7 @@ export default function Empresas() {
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                       </button>
+                      {esSuperAdmin && (
                       <button
                         type="button"
                         title="Regenerar código"
@@ -106,8 +110,10 @@ export default function Empresas() {
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                       </button>
+                      )}
                     </div>
                   ) : (
+                    esSuperAdmin && (
                     <button
                       type="button"
                       onClick={async (ev) => { ev.stopPropagation(); regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código generado') }); }}
@@ -115,6 +121,7 @@ export default function Empresas() {
                     >
                       🔑 Generar código de registro
                     </button>
+                    )
                   )}
                 </div>
                 <div className="flex gap-2 items-center">
@@ -128,7 +135,9 @@ export default function Empresas() {
                     </button>
                   )}
                   <button onClick={(ev) => { ev.stopPropagation(); setModalEmpresa(e); }} className="text-gray-400 hover:text-gray-700 text-sm">✏️</button>
+                  {esSuperAdmin && (
                   <button onClick={(ev) => { ev.stopPropagation(); handleEliminarEmpresa(e); }} className="text-gray-400 hover:text-red-600 text-sm">🗑️</button>
+                  )}
                 </div>
               </div>
               <div className={`mt-2 inline-block text-xs px-2 py-0.5 rounded-full font-medium ${e.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -141,7 +150,7 @@ export default function Empresas() {
 
         {/* Panel de empleados */}
         {empresaActiva && (
-          <EmpleadosPanel empresa={empresaActiva} />
+          <EmpleadosPanel empresa={empresaActiva} esSuperAdmin={esSuperAdmin} />
         )}
       </div>
 
@@ -182,7 +191,7 @@ export default function Empresas() {
   );
 }
 
-function EmpleadosPanel({ empresa }) {
+function EmpleadosPanel({ empresa, esSuperAdmin }) {
   const { data: todosEmpleados = [] } = useEmpleados(empresa.id);
   const empleados = todosEmpleados.filter(e => e.rol !== 'admin');
   const updateEmpleado = useUpdateEmpleado();
@@ -225,6 +234,7 @@ function EmpleadosPanel({ empresa }) {
                 className="text-gray-400 hover:text-amber-600 text-sm"
               >🔑</button>
               <button onClick={() => setModalEmpleado(emp)} className="text-gray-400 hover:text-gray-700 text-sm">✏️</button>
+              {esSuperAdmin && (
               <button
                 onClick={async () => {
                   if (!await confirmar({ titulo: `¿Eliminar a ${emp.nombre} ${emp.apellido}?`, texto: 'Esta acción no se puede deshacer.', botonConfirmar: 'Sí, eliminar' })) return;
@@ -235,6 +245,7 @@ function EmpleadosPanel({ empresa }) {
                 }}
                 className="text-gray-400 hover:text-red-600 text-sm"
               >🗑️</button>
+              )}
             </div>
           </div>
         ))}
