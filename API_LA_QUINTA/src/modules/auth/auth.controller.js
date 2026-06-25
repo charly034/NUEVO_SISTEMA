@@ -50,8 +50,8 @@ export const registroController = asyncHandler(async (req, res) => {
   if (!codigo || !nombre || !apellido || !email || !password) {
     return res.status(400).json({ success: false, message: 'Faltan campos obligatorios' });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 6 caracteres' });
+  if (password.length < 8) {
+    return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres' });
   }
   const data = await authService.registro({ codigo, nombre, apellido, email, password, telefono, fecha_nacimiento });
   res.status(201).json({ success: true, data, message: 'Cuenta creada exitosamente' });
