@@ -221,15 +221,13 @@ export function useFormularioPedidoEditor({
   };
 
   const setGuarnicion = (dia, guarnicionId) => {
-    const nuevasSel = {
-      ...selecciones,
+    setSelecciones((prev) => ({
+      ...prev,
       [dia]: {
-        ...selecciones[dia],
+        ...prev[dia],
         guarnicion_id: guarnicionId ? parseInt(guarnicionId) : null,
       },
-    };
-    setSelecciones(nuevasSel);
-    avanzarAlSiguiente(dia, nuevasSel);
+    }));
   };
 
   const setNotas = (dia, notas) => {

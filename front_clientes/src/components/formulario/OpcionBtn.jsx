@@ -1,6 +1,19 @@
+import { useState } from 'react';
 import { s, sG } from './styles.js';
 
 export default function OpcionBtn({ plato, badge, seleccionado, guarnicionId, guarniciones, onElegir, onGuarnicion, guarnicionRef }) {
+  // Comienza expandido si no hay guarnición elegida; colapsado si ya hay una
+  const [guarnicionExpanded, setGuarnicionExpanded] = useState(!guarnicionId);
+
+  const handleGuarnicion = (gId) => {
+    onGuarnicion(gId);
+    setGuarnicionExpanded(false);
+  };
+
+  const guarnicionElegida = guarnicionId
+    ? guarniciones?.find(g => g.id === guarnicionId)
+    : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <button
@@ -24,20 +37,32 @@ export default function OpcionBtn({ plato, badge, seleccionado, guarnicionId, gu
       </button>
 
       {seleccionado && plato.tiene_guarnicion && (
-        <div ref={guarnicionRef} style={sG.panel}>
-          <span style={sG.label}>Seleccioná tu guarnición</span>
-          <div style={sG.chips}>
-            {guarniciones.map(g => (
-              <button
-                key={g.id}
-                style={{ ...sG.chip, ...(guarnicionId === g.id ? sG.chipSel : {}) }}
-                onClick={() => onGuarnicion(g.id)}
-              >
-                {g.nombre}
-              </button>
-            ))}
+        guarnicionExpanded ? (
+          <div ref={guarnicionRef} style={sG.panel}>
+            <span style={sG.label}>Seleccioná tu guarnición</span>
+            <div style={sG.chips}>
+              {guarniciones.map(g => (
+                <button
+                  key={g.id}
+                  style={{ ...sG.chip, ...(guarnicionId === g.id ? sG.chipSel : {}) }}
+                  onClick={() => handleGuarnicion(g.id)}
+                >
+                  {g.nombre}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <button
+            onClick={() => setGuarnicionExpanded(true)}
+            style={sG.panelColapsado}
+          >
+            <span style={{ fontSize: 13, color: '#4a7c59', fontWeight: 500 }}>
+              🥗 {guarnicionElegida ? guarnicionElegida.nombre : 'Elegir guarnición'}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--subtexto)' }}>▼</span>
+          </button>
+        )
       )}
     </div>
   );
