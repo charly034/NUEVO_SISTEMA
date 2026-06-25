@@ -311,6 +311,8 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
     limite_hora: empresa?.limite_hora ? empresa.limite_hora.slice(0, 5) : '',
     limite_dia_semana: empresa?.limite_dia_semana || 'lunes',
     limite_anticipacion_dias: empresa?.limite_anticipacion_dias ?? 0,
+    email: empresa?.email || '',
+    telefono: empresa?.telefono || '',
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -393,6 +395,13 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
             <p className="text-xs text-gray-400">Sin límite: los empleados pueden pedir hasta que cerrés el menú manualmente.</p>
           )}
         </div>
+
+        <Campo label="Email de contacto (opcional)">
+          <input className={input} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="contacto@empresa.com" />
+        </Campo>
+        <Campo label="Teléfono de contacto (opcional)">
+          <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" />
+        </Campo>
 
         {empresa && (
           <label className="flex items-center gap-2 text-sm">

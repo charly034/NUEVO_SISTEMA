@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import FormularioPedido from '../components/formulario/index.jsx';
+import FormularioPedido from '../components/FormularioPedido.jsx';
 
 export default function PedidoPage({ empleado }) {
   const [pedidoKey, setPedidoKey] = useState(0);
