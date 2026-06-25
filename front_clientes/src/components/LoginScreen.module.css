@@ -1,0 +1,227 @@
+.wrap {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  padding: 40px 32px;
+  border: 1px solid #f1f5f9;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+  text-align: center;
+}
+
+.logo {
+  margin-bottom: 8px;
+  font-size: 52px;
+}
+
+.titulo {
+  margin-bottom: 4px;
+  color: var(--verde);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.sub {
+  margin-bottom: 28px;
+  color: var(--subtexto);
+  font-size: 14px;
+}
+
+.loginHint {
+  margin: -14px 0 18px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  font-size: 16px;
+}
+
+.input:focus {
+  border-color: var(--verde-light);
+}
+
+.inputConIcono {
+  padding-right: 44px;
+  margin-bottom: 0;
+}
+
+.passWrap {
+  position: relative;
+}
+
+.eyeBtn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.eyeIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  accent-color: var(--verde);
+  cursor: pointer;
+}
+
+.error {
+  padding: 8px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 14px;
+  text-align: center;
+}
+
+.btn {
+  margin-top: 4px;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: var(--verde);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinnerTrack {
+  opacity: 0.25;
+}
+
+.spinnerFill {
+  opacity: 0.75;
+}
+
+.recuperarLink,
+.registroLink {
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.recuperarLink {
+  padding: 2px 0;
+  color: var(--subtexto);
+  font-size: 13px;
+  text-align: center;
+}
+
+.registroRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.registroTexto {
+  color: var(--subtexto);
+  font-size: 14px;
+}
+
+.registroLink {
+  padding: 0;
+  color: var(--verde);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 32px 22px;
+  }
+
+  .registroRow {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

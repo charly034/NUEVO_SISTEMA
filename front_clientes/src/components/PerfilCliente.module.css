@@ -1,0 +1,326 @@
+.wrap {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px 14px 74px;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--verde);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nombre {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a1a1a;
+  margin: 0 0 3px;
+}
+
+.empresa {
+  font-size: 13px;
+  color: var(--subtexto);
+  margin: 0;
+}
+
+.toast {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #15803d;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--borde);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.cardLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--subtexto);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.editBtn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--verde);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.fila2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.opcional {
+  font-weight: 400;
+  color: var(--subtexto);
+  font-size: 12px;
+}
+
+.input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #e5e7eb;
+  font-size: 15px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+}
+
+.errorMsg {
+  color: #dc2626;
+  font-size: 13px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.btnPrimary {
+  flex: 1;
+  background: var(--verde);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnCancel {
+  flex: 1;
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecundario {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--borde);
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnLogout {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: 2px solid #fee2e2;
+  background: #fff;
+  color: #dc2626;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.footerNote {
+  margin-top: 24px;
+  color: #ccc;
+  font-size: 11px;
+  text-align: center;
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--borde);
+}
+
+.filaLast {
+  border-bottom: none;
+}
+
+.filaLabel {
+  color: var(--subtexto);
+  font-size: 14px;
+}
+
+.filaValor {
+  max-width: 60%;
+  color: #1a1a1a;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-all;
+}
+
+.passwordOk {
+  padding: 8px 0;
+  text-align: center;
+}
+
+.passwordOkIcon {
+  margin-bottom: 8px;
+  font-size: 36px;
+}
+
+.passwordOkText {
+  margin-bottom: 12px;
+  color: var(--verde);
+  font-weight: 700;
+}
+
+.passwordForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.passwordLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.passwordFieldWrap {
+  position: relative;
+}
+
+.passwordInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  outline: none;
+  font-size: 15px;
+}
+
+.passwordInputWithIcon {
+  padding-right: 44px;
+}
+
+.passwordInputError {
+  border-color: #dc2626;
+}
+
+.eyeBtn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.eyeIco {
+  width: 18px;
+  height: 18px;
+}
+
+.passwordError {
+  padding: 8px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  text-align: center;
+}
+
+.passwordBtnOk,
+.passwordBtnPrimary {
+  width: 100%;
+  padding: 11px;
+  border: none;
+  border-radius: 10px;
+  background: var(--verde);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.passwordBtnLink {
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--subtexto);
+  font-size: 13px;
+  text-align: center;
+  text-decoration: underline;
+  cursor: pointer;
+}

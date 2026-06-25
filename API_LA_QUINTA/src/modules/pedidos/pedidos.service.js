@@ -93,6 +93,10 @@ export const getMenuActivo = async (empresaId = null) => {
   if (empresaId) empresa = await empresasRepo.findById(empresaId);
 
   const menus_disponibles = menus.map(menu => {
+    if (menu.fecha_fin && new Date(menu.fecha_fin) < ahora) {
+      return { disponible: false, cerrado: true, mensaje: 'Esta semana ya finalizó.', menu };
+    }
+
     if (menu.fecha_limite_pedidos && new Date(menu.fecha_limite_pedidos) < ahora) {
       return { disponible: false, cerrado: true, mensaje: 'El período de pedidos para esta semana ya cerró.', menu };
     }

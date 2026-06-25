@@ -64,7 +64,8 @@ export const menusPublicadosList = async () => {
               WHERE ss.menu_semanal_id = menus_semanales.id
             ), '[]'::json) AS sin_servicio
      FROM menus_semanales
-     WHERE estado = 'publicado' AND fecha_fin >= CURRENT_DATE
+     WHERE estado IN ('publicado', 'cerrado')
+       AND fecha_inicio >= date_trunc('week', CURRENT_DATE)::date - INTERVAL '2 weeks'
      ORDER BY fecha_inicio ASC`
   );
   // Cargar platos de todos los menús en paralelo

@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { pedidoApi } from '../api.js';
-import { DIAS_LABEL } from '../utils.js';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { menuApi, pedidoApi } from '../services/api.js';
+import { DIAS_LABEL, getDiasSemana } from '../utils/dias.js';
+import { confirmar, toast } from '../lib/swal.js';
+import styles from './HistorialPedidos.module.css';
 
 const ESTADO_CONFIG = {
   pendiente:   { label: 'Confirmado',  color: '#2e7d32', bg: '#e8f5e9' },
@@ -23,7 +25,7 @@ function formatSemana(fechaISO) {
 function lunesDeHoy() {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const dia = hoy.getDay(); // 0=dom, 1=lun, ...
+  const dia = hoy.getDay();
   const diff = dia === 0 ? -6 : 1 - dia;
   hoy.setDate(hoy.getDate() + diff);
   return hoy;
@@ -37,7 +39,19 @@ function esEstaSemana(fechaISO) {
   return semana.getTime() === lunes.getTime();
 }
 
+function fechaKey(fechaISO) {
+  return String(fechaISO || '').split('T')[0];
+}
+
+function construirDiasPedido(pedido, menuSemana) {
+  const items = pedido.items ?? [];
+  const porDia = new Map(items.map(item => [item.dia, item]));
+  const dias = menuSemana ? getDiasSemana(menuSemana.dias_laborales) : items.map(item => item.dia);
+  return dias.map(dia => ({ dia, item: porDia.get(dia) || null }));
+}
+
 export default function HistorialPedidos({ empleado }) {
+  const queryClient = useQueryClient();
   const [expandido, setExpandido] = useState(null);
 
   const { data: pedidos = [], isLoading } = useQuery({
@@ -46,19 +60,53 @@ export default function HistorialPedidos({ empleado }) {
     staleTime: 60 * 1000,
   });
 
+  const { data: menuData } = useQuery({
+    queryKey: ['menus-publicados'],
+    queryFn: menuApi.activo,
+    staleTime: 60 * 1000,
+  });
+
+  const menusPorSemana = new Map(
+    (menuData?.menus_disponibles ?? []).map(menuSemana => [fechaKey(menuSemana.menu?.fecha_inicio), menuSemana])
+  );
+
+  const pedidosVisibles = pedidos.filter(p => p.estado !== 'cancelado');
+
+  const mutationCancelar = useMutation({
+    mutationFn: pedidoApi.cancelar,
+    onSuccess: (_data, semanaInicio) => {
+      queryClient.invalidateQueries({ queryKey: ['mi-historial', empleado.id] });
+      queryClient.invalidateQueries({ queryKey: ['mi-pedido', empleado.id, semanaInicio] });
+      queryClient.invalidateQueries({ queryKey: ['menus-publicados'] });
+      setExpandido(null);
+      toast.success('Pedido eliminado. Podés volver a cargarlo mientras siga abierto.');
+    },
+    onError: (e) => toast.error(e?.message || 'No se pudo eliminar el pedido'),
+  });
+
+  const eliminarPedido = async (pedido) => {
+    if (!await confirmar({
+      titulo: '¿Eliminar pedido?',
+      texto: 'Se eliminará el pedido completo de esa semana. Si el plazo sigue abierto, vas a poder cargarlo de nuevo.',
+      botonConfirmar: 'Sí, eliminar',
+      color: '#dc2626',
+    })) return;
+    mutationCancelar.mutate(fechaKey(pedido.semana_inicio));
+  };
+
   if (isLoading) {
     return (
-      <div style={s.wrap}>
-        <p style={{ textAlign: 'center', padding: 60, color: 'var(--subtexto)' }}>Cargando historial...</p>
+      <div className={styles.wrap}>
+        <p style={{ textAlign: 'center', padding: 60, color: 'var(--subtexto)' }}>Cargando pedidos...</p>
       </div>
     );
   }
 
-  if (pedidos.length === 0) {
+  if (pedidosVisibles.length === 0) {
     return (
-      <div style={s.wrap}>
-        <h2 style={s.titulo}>Mis pedidos</h2>
-        <div style={s.empty}>
+      <div className={styles.wrap}>
+        <h2 className={styles.titulo}>Mis pedidos</h2>
+        <div className={styles.empty}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
           <p style={{ color: 'var(--subtexto)', fontSize: 15 }}>Todavía no tenés pedidos registrados.</p>
         </div>
@@ -67,22 +115,27 @@ export default function HistorialPedidos({ empleado }) {
   }
 
   return (
-    <div style={s.wrap}>
-      <h2 style={s.titulo}>Mis pedidos</h2>
+    <div className={styles.wrap}>
+      <h2 className={styles.titulo}>Mis pedidos</h2>
       <p style={{ color: 'var(--subtexto)', fontSize: 13, marginBottom: 16 }}>
-        {pedidos.length} semana{pedidos.length !== 1 ? 's' : ''} registrada{pedidos.length !== 1 ? 's' : ''}
+        {pedidosVisibles.length} semana{pedidosVisibles.length !== 1 ? 's' : ''} registrada{pedidosVisibles.length !== 1 ? 's' : ''}
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {pedidos.map(p => {
+        {pedidosVisibles.map(p => {
           const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente;
           const esCurrent = esEstaSemana(p.semana_inicio);
           const abierto = expandido === p.id;
           const items = p.items ?? [];
+          const menuSemana = menusPorSemana.get(fechaKey(p.semana_inicio));
+          const diasPedido = construirDiasPedido(p, menuSemana);
+          const puedeEliminar = ['pendiente', 'en_proceso'].includes(p.estado)
+            && menuSemana?.disponible
+            && !menuSemana?.limiteEmpresa?.vencido;
 
           return (
-            <div key={p.id} style={s.card}>
-              <button style={s.cardHeader} onClick={() => setExpandido(abierto ? null : p.id)}>
+            <div key={p.id} className={styles.card}>
+              <button className={styles.cardHeader} onClick={() => setExpandido(abierto ? null : p.id)}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: 15 }}>
@@ -108,22 +161,41 @@ export default function HistorialPedidos({ empleado }) {
 
               {abierto && (
                 <div style={{ borderTop: '1px solid var(--borde)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {items.length === 0 ? (
+                  {diasPedido.length === 0 ? (
                     <p style={{ color: 'var(--subtexto)', fontSize: 13 }}>Sin platos registrados.</p>
                   ) : (
-                    items.map(item => (
-                      <div key={item.dia} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--verde)', minWidth: 72 }}>
-                          {DIAS_LABEL[item.dia] ?? item.dia}
+                    diasPedido.map(({ dia, item }) => (
+                      <div
+                        key={dia}
+                        className={`${styles.diaFila}${!item ? ` ${styles.diaFilaSinVianda}` : ''}`}
+                      >
+                        <span className={`${styles.diaLabel}${!item ? ` ${styles.diaLabelSinVianda}` : ''}`}>
+                          {DIAS_LABEL[dia] ?? dia}
                         </span>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>{item.plato_nombre}</div>
-                          {item.guarnicion_nombre && (
-                            <div style={{ fontSize: 12, color: 'var(--subtexto)' }}>+ {item.guarnicion_nombre}</div>
+                          {item ? (
+                            <>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>{item.plato_nombre}</div>
+                              {item.guarnicion_nombre && (
+                                <div style={{ fontSize: 12, color: 'var(--subtexto)' }}>+ {item.guarnicion_nombre}</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className={styles.sinVianda}>No pedís vianda</div>
                           )}
                         </div>
                       </div>
                     ))
+                  )}
+                  {puedeEliminar && (
+                    <button
+                      type="button"
+                      onClick={() => eliminarPedido(p)}
+                      disabled={mutationCancelar.isPending}
+                      className={styles.btnEliminar}
+                    >
+                      {mutationCancelar.isPending ? 'Eliminando...' : 'Eliminar pedido de esta semana'}
+                    </button>
                   )}
                 </div>
               )}
@@ -134,11 +206,3 @@ export default function HistorialPedidos({ empleado }) {
     </div>
   );
 }
-
-const s = {
-  wrap:       { maxWidth: 560, margin: '0 auto', padding: '20px 14px 74px' },
-  titulo:     { fontSize: 22, fontWeight: 800, color: '#1a1a1a', marginBottom: 4 },
-  empty:      { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, marginTop: 24 },
-  card:       { background: '#fff', borderRadius: 14, border: '2px solid var(--borde)', overflow: 'hidden' },
-  cardHeader: { width: '100%', background: 'none', border: 'none', padding: '14px 16px', display: 'flex', alignItems: 'center', cursor: 'pointer', textAlign: 'left' },
-};

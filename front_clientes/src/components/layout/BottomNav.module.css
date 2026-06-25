@@ -1,0 +1,50 @@
+.bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 560px;
+  margin: 0 auto;
+  background: #fff;
+  border-top: 1px solid #e5e5e5;
+  border-left: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  display: flex;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 4px 12px;
+  min-height: 58px;
+  border: none;
+  background: none;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.btnActivo {
+  color: var(--verde);
+}
+
+.icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btnActivo .label {
+  font-weight: 800;
+}
