@@ -492,8 +492,8 @@ async function main() {
     // ── 6. Empresas + empleados + pedidos ──────────────────────────────────────
     // Semanas objetivo para pedidos: -2, -1, actual, próxima
     const SEMANAS_PEDIDOS = [
-      { offset: -2, key: '-2', estadoPedido: 'confirmado' },
-      { offset: -1, key: '-1', estadoPedido: 'confirmado' },
+      { offset: -2, key: '-2', estadoPedido: 'entregado' },
+      { offset: -1, key: '-1', estadoPedido: 'entregado' },
       { offset:  0, key:  '0', estadoPedido: 'pendiente'  },
       { offset: +1, key: '+1', estadoPedido: 'pendiente'  },
     ];
