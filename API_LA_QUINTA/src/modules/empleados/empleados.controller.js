@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import * as repo from './empleados.repository.js';
 import { hashPassword } from '../auth/auth.service.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -63,8 +64,11 @@ export const updateEmpleado = asyncHandler(async (req, res) => {
 
 const CHARS_RESET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function genResetCode() {
-  // Formato legible: XXX-XXX (6 chars con guión)
-  const parte = () => Array.from({ length: 3 }, () => CHARS_RESET[Math.floor(Math.random() * CHARS_RESET.length)]).join('');
+  // Formato legible: XXX-XXX (6 chars con guión), generado con crypto para mayor seguridad
+  const parte = () => {
+    const bytes = crypto.randomBytes(3);
+    return Array.from(bytes, (b) => CHARS_RESET[b % CHARS_RESET.length]).join('');
+  };
   return `${parte()}-${parte()}`;
 }
 

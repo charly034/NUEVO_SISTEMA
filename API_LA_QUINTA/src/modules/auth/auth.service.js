@@ -113,7 +113,7 @@ export const usarResetCode = async (code, newPassword) => {
   if (new Date() > new Date(empleado.reset_code_expires_at)) {
     throw ApiError.badRequest('El código expiró. Solicitá uno nuevo al administrador');
   }
-  if (newPassword.length < 6) throw ApiError.badRequest('Mínimo 6 caracteres');
+  if (newPassword.length < 8) throw ApiError.badRequest('Mínimo 8 caracteres');
   const password_hash = await bcrypt.hash(newPassword, 10);
   await setPassword(empleado.id, password_hash);
   await clearResetCode(empleado.id);
@@ -127,7 +127,7 @@ export const cambiarPassword = async (empleadoId, currentPassword, newPassword) 
   if (!emp) throw ApiError.unauthorized('Sesión inválida');
   const ok = await bcrypt.compare(currentPassword, emp.password_hash);
   if (!ok) throw ApiError.badRequest('La contraseña actual es incorrecta');
-  if (newPassword.length < 6) throw ApiError.badRequest('Mínimo 6 caracteres');
+  if (newPassword.length < 8) throw ApiError.badRequest('Mínimo 8 caracteres');
   if (currentPassword === newPassword) throw ApiError.badRequest('La nueva contraseña debe ser diferente');
   const password_hash = await bcrypt.hash(newPassword, 10);
   await setPassword(empleadoId, password_hash);

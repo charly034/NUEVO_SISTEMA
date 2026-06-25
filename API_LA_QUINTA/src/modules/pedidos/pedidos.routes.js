@@ -3,7 +3,7 @@ import { requireAuth, optionalAuth, requireAdmin } from '../../middlewares/auth.
 import {
   getMenuHoy, getMenuSemana, getMenuActivo,
   getMiPedido, guardarPedido, cancelarMiPedido, getMiHistorial,
-  getPedidos, updateEstado,
+  getPedidos, getPedidoById, updateEstado,
 } from './pedidos.controller.js';
 
 const router = Router();
@@ -21,6 +21,7 @@ router.get('/mi-historial', requireAuth, getMiHistorial);
 
 // Admin
 router.get('/', requireAdmin, getPedidos);
+router.get('/:id', requireAdmin, getPedidoById);
 router.patch('/:id/estado', requireAdmin, updateEstado);
 
 export default router;

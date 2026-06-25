@@ -49,18 +49,32 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 const loginLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // ventana de 1 hora
-  max: 50,                    // 50 intentos por IP por hora
+  windowMs: 15 * 60 * 1000,  // ventana de 15 minutos
+  max: 10,                    // 10 intentos por IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Demasiados intentos de acceso. Intentá nuevamente en una hora.',
+    message: 'Demasiados intentos de acceso. Intentá nuevamente en 15 minutos.',
     errors: [],
   },
 });
 app.use('/api/v1/auth/login', loginLimiter);
 app.use('/api/v1/admin/auth/login', loginLimiter);
+
+const registroLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,  // ventana de 1 hora
+  max: 5,                     // 5 intentos por IP por hora
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Demasiados intentos de registro. Intentá nuevamente en una hora.',
+    errors: [],
+  },
+});
+app.use('/api/v1/auth/registro', registroLimiter);
+app.use('/api/v1/auth/usar-reset-code', registroLimiter);
 
 // Rutas versionadas
 app.use('/api', routes);

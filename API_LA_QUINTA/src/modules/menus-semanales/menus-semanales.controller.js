@@ -15,12 +15,14 @@ export const getMenuSemanal = asyncHandler(async (req, res) => {
 });
 
 export const createMenuSemanal = asyncHandler(async (req, res) => {
-  const menu = await service.createMenuSemanal(req.body);
+  const admin_id = req.adminUser?.sub ?? null;
+  const menu = await service.createMenuSemanal(req.body, admin_id);
   sendCreated(res, menu, 'Menú semanal creado exitosamente');
 });
 
 export const updateMenuSemanal = asyncHandler(async (req, res) => {
-  const menu = await service.updateMenuSemanal(req.params.id, req.body);
+  const admin_id = req.adminUser?.sub ?? null;
+  const menu = await service.updateMenuSemanal(req.params.id, req.body, admin_id);
   sendSuccess(res, menu, 'Menú semanal actualizado exitosamente');
 });
 

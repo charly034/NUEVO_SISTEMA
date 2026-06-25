@@ -28,14 +28,14 @@ export const getMenuSemanalById = async (id) => {
   return menu;
 };
 
-export const createMenuSemanal = async (data) => {
-  return repo.create(data);
+export const createMenuSemanal = async (data, admin_id = null) => {
+  return repo.create({ ...data, admin_id });
 };
 
-export const updateMenuSemanal = async (id, data) => {
+export const updateMenuSemanal = async (id, data, admin_id = null) => {
   const menu = await repo.findById(id);
   if (!menu) throw ApiError.notFound(`Menú semanal con id ${id} no encontrado`);
-  return repo.update(id, data);
+  return repo.update(id, data, admin_id);
 };
 
 export const deleteMenuSemanal = async (id) => {

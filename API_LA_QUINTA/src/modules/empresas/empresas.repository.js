@@ -1,6 +1,6 @@
 import { query } from '../../database/connection.js';
 
-const CAMPOS = 'id, nombre, slug, plan, modo_pedido, activo, limite_hora, limite_dia_semana, limite_anticipacion_dias, plazo_override_hasta, dias_laborales, codigo_registro, created_at';
+const CAMPOS = 'id, nombre, slug, plan, modo_pedido, activo, limite_hora, limite_dia_semana, limite_anticipacion_dias, plazo_override_hasta, dias_laborales, codigo_registro, email, telefono, created_at';
 
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0,O,1,I para evitar confusiones
 
@@ -47,14 +47,16 @@ export const findByCodigo = async (codigo) => {
 export const create = async ({
   nombre, slug, plan, modo_pedido, dias_laborales,
   limite_hora, limite_dia_semana, limite_anticipacion_dias,
+  email = null, telefono = null,
 }) => {
   const codigo_registro = await codigoUnico();
   const r = await query(
     `INSERT INTO empresas (
        nombre, slug, plan, modo_pedido, dias_laborales,
-       limite_hora, limite_dia_semana, limite_anticipacion_dias, codigo_registro
+       limite_hora, limite_dia_semana, limite_anticipacion_dias, codigo_registro,
+       email, telefono
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING ${CAMPOS}`,
     [
       nombre,
@@ -66,6 +68,8 @@ export const create = async ({
       limite_dia_semana || null,
       limite_anticipacion_dias ?? 0,
       codigo_registro,
+      email || null,
+      telefono || null,
     ]
   );
   return r.rows[0];

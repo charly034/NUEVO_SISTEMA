@@ -155,23 +155,26 @@ export const findByIdWithDias = async (id) => {
   };
 };
 
-export const create = async ({ nombre, fecha_inicio, fecha_fin }) => {
+export const create = async ({ nombre, fecha_inicio, fecha_fin, admin_id = null }) => {
   const result = await query(
-    'INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin) VALUES ($1, $2, $3) RETURNING id, nombre, fecha_inicio, fecha_fin, created_at, updated_at',
-    [nombre, fecha_inicio, fecha_fin]
+    `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id)
+     VALUES ($1, $2, $3, $4, $4)
+     RETURNING id, nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id, created_at, updated_at`,
+    [nombre, fecha_inicio, fecha_fin, admin_id]
   );
   return result.rows[0];
 };
 
-export const update = async (id, fields) => {
-  const keys = Object.keys(fields);
-  const values = Object.values(fields);
+export const update = async (id, fields, admin_id = null) => {
+  const allFields = admin_id ? { ...fields, updated_by_admin_id: admin_id } : fields;
+  const keys = Object.keys(allFields);
+  const values = Object.values(allFields);
   const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
   values.push(id);
 
   const result = await query(
     `UPDATE menus_semanales SET ${setClause}, updated_at = NOW() WHERE id = $${values.length}
-     RETURNING id, nombre, fecha_inicio, fecha_fin, created_at, updated_at`,
+     RETURNING id, nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id, created_at, updated_at`,
     values
   );
   return result.rows[0] || null;

@@ -43,6 +43,11 @@ export const getPedidos = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getPedidos(req.query), 'Pedidos obtenidos');
 });
 
+// Admin: obtener pedido por ID
+export const getPedidoById = asyncHandler(async (req, res) => {
+  sendSuccess(res, await service.getPedidoById(req.params.id), 'Pedido obtenido');
+});
+
 export const updateEstado = asyncHandler(async (req, res) => {
   const adminNombre = `${req.adminUser?.nombre ?? ''} ${req.adminUser?.apellido ?? ''}`.trim();
   sendSuccess(res, await service.cambiarEstado(req.params.id, req.body.estado, {

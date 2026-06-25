@@ -39,6 +39,7 @@ export const createEmpresa = asyncHandler(async (req, res) => {
   const {
     nombre, slug, plan, modo_pedido, dias_laborales,
     limite_hora, limite_dia_semana, limite_anticipacion_dias,
+    email, telefono,
   } = req.body;
   if (!nombre?.trim() || !slug?.trim()) throw ApiError.badRequest('nombre y slug son requeridos');
   const fields = {
@@ -50,6 +51,8 @@ export const createEmpresa = asyncHandler(async (req, res) => {
     limite_hora: limite_hora || null,
     limite_dia_semana: limite_dia_semana || null,
     limite_anticipacion_dias: Number(limite_anticipacion_dias ?? 0),
+    email: email?.trim() || null,
+    telefono: telefono?.trim() || null,
   };
   validarEmpresa(fields);
   const existe = await repo.findBySlug(fields.slug);
@@ -63,6 +66,7 @@ export const updateEmpresa = asyncHandler(async (req, res) => {
   const allowed = [
     'nombre', 'slug', 'plan', 'modo_pedido', 'activo',
     'limite_hora', 'limite_dia_semana', 'limite_anticipacion_dias', 'dias_laborales',
+    'email', 'telefono',
   ];
   const fields = Object.fromEntries(
     Object.entries(req.body).filter(([key]) => allowed.includes(key))

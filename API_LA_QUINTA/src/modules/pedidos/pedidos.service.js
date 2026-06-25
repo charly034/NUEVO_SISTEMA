@@ -214,6 +214,12 @@ function construirInfoLimite(empresa, semanaInicio) {
 
 export const getPedidos = (filters) => repo.findAll(filters);
 
+export const getPedidoById = async (id) => {
+  const pedido = await repo.findById(id);
+  if (!pedido) throw ApiError.notFound(`Pedido con id ${id} no encontrado`);
+  return pedido;
+};
+
 export const getMiPedido = (empleadoId, semanaInicio) => {
   if (!semanaInicio) throw ApiError.badRequest('semana_inicio es requerido');
   return repo.findPedidoByEmpleadoSemana(empleadoId, semanaInicio);

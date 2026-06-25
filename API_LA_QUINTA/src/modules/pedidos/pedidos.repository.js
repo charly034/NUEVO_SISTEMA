@@ -226,6 +226,37 @@ export const findEventosByPedidoIds = async (pedidoIds, db = query) => {
   }, {});
 };
 
+export const findById = async (id) => {
+  const r = await query(
+    `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
+            p.empleado_id, p.empresa_id,
+            e.nombre AS empleado_nombre, e.apellido AS empleado_apellido, e.email,
+            emp.nombre AS empresa_nombre,
+            json_agg(
+              json_build_object(
+                'id', pi.id, 'dia', pi.dia, 'plato_id', pi.plato_id,
+                'plato_nombre', pl.nombre, 'opcion', pi.opcion,
+                'tiene_guarnicion', pl.tiene_guarnicion,
+                'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+                'notas', pi.notas
+              ) ORDER BY pi.dia
+            ) FILTER (WHERE pi.id IS NOT NULL) AS items
+     FROM pedidos p
+     JOIN empleados e ON e.id = p.empleado_id
+     JOIN empresas emp ON emp.id = p.empresa_id
+     LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
+     LEFT JOIN platos pl ON pl.id = pi.plato_id
+     LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
+     WHERE p.id = $1
+     GROUP BY p.id, e.id, emp.id`,
+    [id]
+  );
+  const pedido = r.rows[0] || null;
+  if (!pedido) return null;
+  const eventosPorPedido = await findEventosByPedidoIds([pedido.id]);
+  return { ...pedido, eventos: eventosPorPedido[pedido.id] ?? [] };
+};
+
 export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, offset = 0 } = {}) => {
   const conds = [];
   const vals = [];
