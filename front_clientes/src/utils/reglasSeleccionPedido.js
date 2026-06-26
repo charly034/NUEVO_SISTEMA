@@ -4,37 +4,84 @@ export function platoRequiereGuarnicion(plato) {
   return Boolean(plato?.requiereGuarnicion);
 }
 
+function obtenerNombreGuarnicion(guarnicion) {
+  if (!guarnicion) return "";
+  return typeof guarnicion === "string" ? guarnicion : guarnicion.nombre;
+}
+
+function obtenerIdGuarnicion(guarnicion) {
+  if (!guarnicion || typeof guarnicion === "string") return null;
+  return guarnicion.id || null;
+}
+
+function crearIdDesdeTexto(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function crearSeleccionPedido(plato, guarnicion = "") {
+  if (!plato) return null;
+  const sinPedido = plato.id === opcionSinPedido.id;
+
+  return {
+    plato,
+    guarnicion,
+    platoId: sinPedido ? null : plato.platoId || plato.id,
+    nombrePlato: sinPedido ? "" : plato.nombre,
+    guarnicionId: sinPedido
+      ? null
+      : obtenerIdGuarnicion(guarnicion) || crearIdDesdeTexto(guarnicion),
+    nombreGuarnicion: sinPedido ? "" : obtenerNombreGuarnicion(guarnicion),
+    sinPedido,
+  };
+}
+
 export function seleccionDiaEsValida(seleccion) {
   if (!seleccion?.plato) return false;
-  if (seleccion.plato.id === opcionSinPedido.id) return true;
+  if (seleccion.plato.id === opcionSinPedido.id || seleccion.sinPedido) return true;
   if (!platoRequiereGuarnicion(seleccion.plato)) return true;
   return Boolean(seleccion.guarnicion);
 }
 
 export function construirTextoPlatoSeleccionado(seleccion) {
   if (!seleccion?.plato) return "Sin seleccionar";
-  if (seleccion.plato.id === opcionSinPedido.id) return "Sin pedido";
+  if (seleccion.plato.id === opcionSinPedido.id || seleccion.sinPedido) return "Sin pedido";
   if (seleccion.guarnicion) {
-    const nombreGuarnicion =
-      typeof seleccion.guarnicion === "string"
-        ? seleccion.guarnicion
-        : seleccion.guarnicion.nombre;
-    return `${seleccion.plato.nombre} con ${String(nombreGuarnicion).toLowerCase()}`;
+    return `${seleccion.plato.nombre} con ${obtenerNombreGuarnicion(seleccion.guarnicion).toLowerCase()}`;
   }
   return seleccion.plato.nombre;
 }
 
 export function crearSeleccionDesdeTexto(plato, opciones = []) {
-  const opcion = opciones.find((item) => item.nombre === plato);
-  if (opcion) return { plato: opcion, guarnicion: "" };
-  if (plato === "Sin pedido") return { plato: opcionSinPedido, guarnicion: "" };
-  return null;
+  const textoPlato = String(plato || "");
+  const textoNormalizado = textoPlato.toLowerCase();
+
+  if (textoPlato === "Sin pedido") {
+    return crearSeleccionPedido(opcionSinPedido);
+  }
+
+  const opcion = opciones.find((item) => {
+    const nombre = item.nombre.toLowerCase();
+    return textoNormalizado === nombre || textoNormalizado.startsWith(nombre);
+  });
+
+  if (!opcion) return null;
+
+  const guarnicion = (opcion.guarniciones || []).find((item) =>
+    textoNormalizado.includes(obtenerNombreGuarnicion(item).toLowerCase()),
+  ) || "";
+
+  return crearSeleccionPedido(opcion, guarnicion);
 }
 
 export function contarSeleccionesValidas(dias) {
-  return dias.filter(
-    (dia) =>
-      dia.plato &&
-      !["Sin pedido", "Sin seleccionar"].includes(dia.plato),
-  ).length;
+  return dias.filter((dia) => {
+    if (dia.seleccion?.sinPedido) return false;
+    if (dia.seleccion?.plato) return true;
+    return dia.plato && !["Sin pedido", "Sin seleccionar"].includes(dia.plato);
+  }).length;
 }

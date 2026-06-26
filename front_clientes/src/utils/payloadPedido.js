@@ -9,6 +9,15 @@ function obtenerIdGuarnicion(guarnicion) {
   return guarnicion.id || guarnicion.guarnicionId || null;
 }
 
+function crearIdDesdeTexto(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export function construirPayloadPedido({
   empresaId,
   semana,
@@ -30,7 +39,10 @@ export function construirPayloadPedido({
           diaId: dia.id || dia.clave,
           fecha: dia.fecha,
           platoId: sinPedido ? null : platoId,
-          guarnicionId: obtenerIdGuarnicion(dia.seleccion.guarnicion),
+          guarnicionId:
+            dia.seleccion.guarnicionId ||
+            obtenerIdGuarnicion(dia.seleccion.guarnicion) ||
+            crearIdDesdeTexto(dia.seleccion.guarnicion),
           sinPedido,
         };
       }),

@@ -3,6 +3,7 @@ import { opcionSinPedido } from "../data/opcionesMenuMock.js";
 import { pedidoService } from "../services/pedidoService.js";
 import {
   construirTextoPlatoSeleccionado,
+  crearSeleccionPedido,
   crearSeleccionDesdeTexto,
   platoRequiereGuarnicion,
   seleccionDiaEsValida,
@@ -127,10 +128,7 @@ export function useSeleccionDia({
   }
 
   function seleccionarPlato(plato) {
-    const seleccionNueva = {
-      plato,
-      guarnicion: "",
-    };
+    const seleccionNueva = crearSeleccionPedido(plato);
 
     setSeleccion(seleccionNueva);
 
@@ -140,10 +138,7 @@ export function useSeleccionDia({
   }
 
   function seleccionarGuarnicion(guarnicion) {
-    const seleccionCompleta = {
-      ...seleccion,
-      guarnicion,
-    };
+    const seleccionCompleta = crearSeleccionPedido(seleccion?.plato, guarnicion);
 
     setSeleccion(seleccionCompleta);
     confirmarSeleccionCompleta(seleccionCompleta);

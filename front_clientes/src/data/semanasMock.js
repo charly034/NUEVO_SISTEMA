@@ -1,12 +1,13 @@
 import { obtenerOpcionesMenuDia } from "./opcionesMenuMock.js";
+import { crearSeleccionDesdeTexto } from "../utils/reglasSeleccionPedido.js";
 
 const diasSemanaCompleta = [
   { clave: "lunes", dia: "Lunes", fecha: "2026-06-22" },
   { clave: "martes", dia: "Martes", fecha: "2026-06-23" },
-  { clave: "miercoles", dia: "Miércoles", fecha: "2026-06-24" },
+  { clave: "miercoles", dia: "Miercoles", fecha: "2026-06-24" },
   { clave: "jueves", dia: "Jueves", fecha: "2026-06-25" },
   { clave: "viernes", dia: "Viernes", fecha: "2026-06-26" },
-  { clave: "sabado", dia: "Sábado", fecha: "2026-06-27" },
+  { clave: "sabado", dia: "Sabado", fecha: "2026-06-27" },
   { clave: "domingo", dia: "Domingo", fecha: "2026-06-28" },
 ];
 
@@ -15,81 +16,129 @@ const diasLaborales = diasSemanaCompleta.slice(0, 5);
 function crearDias(platos, ajustes = {}) {
   const diasBase = ajustes.incluirFinDeSemana ? diasSemanaCompleta : diasLaborales;
 
-  return diasBase.map((dia) => ({
-    ...dia,
-    plato: platos[dia.clave] || "Sin seleccionar",
-    opciones: obtenerOpcionesMenuDia(dia.clave),
-    regla: ajustes.reglas?.[dia.clave],
-    bloqueado: ajustes.bloqueados?.includes(dia.clave),
-  }));
+  return diasBase.map((dia) => {
+    const opciones = obtenerOpcionesMenuDia(dia.clave);
+    const plato = platos[dia.clave] || "Sin seleccionar";
+    const bloqueado = ajustes.bloqueados?.includes(dia.clave) || false;
+    const seleccion = crearSeleccionDesdeTexto(plato, opciones);
+
+    return {
+      id: dia.clave,
+      clave: dia.clave,
+      nombre: dia.dia,
+      dia: dia.dia,
+      fecha: dia.fecha,
+      estado: bloqueado ? "bloqueado" : seleccion ? "seleccionado" : "sin_seleccionar",
+      plato,
+      seleccion,
+      opciones,
+      regla: ajustes.reglas?.[dia.clave],
+      bloqueado,
+    };
+  });
+}
+
+function crearSemana({
+  id,
+  tipo,
+  etiqueta,
+  fechaDesde,
+  fechaHasta,
+  estado,
+  tipoPlan,
+  fechaActualMock,
+  dias,
+  metadata,
+  sugerencias,
+  recomendacionesUsuario,
+}) {
+  const desde = fechaDesde.slice(8, 10);
+  const hasta = fechaHasta.slice(8, 10);
+  const mesDesde = fechaDesde.slice(5, 7);
+  const mesHasta = fechaHasta.slice(5, 7);
+
+  return {
+    id,
+    tipo,
+    etiqueta,
+    fechaDesde,
+    fechaHasta,
+    rango: `${desde}/${mesDesde} al ${hasta}/${mesHasta}`,
+    titulo: `Semana del lunes ${desde}/${mesDesde}`,
+    estado,
+    tipoPlan,
+    modalidad: tipoPlan,
+    limiteModificacion: { dia: "lunes", hora: "09:30" },
+    fechaActualMock,
+    dias,
+    metadata,
+    sugerencias,
+    recomendacionesUsuario,
+  };
 }
 
 export const fechaActualMockPedido = new Date("2026-06-22T08:45:00");
 
 export const semanasMock = [
-  {
-    id: "2026-06-15",
+  crearSemana({
+    id: "semana-2026-06-15",
     tipo: "anterior",
     etiqueta: "Semana anterior",
-    rango: "15/06 al 19/06",
-    titulo: "Semana del lunes 15/06",
+    fechaDesde: "2026-06-15",
+    fechaHasta: "2026-06-19",
     estado: "cerrado",
-    modalidad: "semanal",
-    limiteModificacion: { dia: "lunes", hora: "09:30" },
+    tipoPlan: "semanal",
     fechaActualMock: "2026-06-20T12:00:00",
     dias: crearDias({
-      lunes: "Pollo al verdeo con puré",
+      lunes: "Pollo al verdeo con pure de papas",
       martes: "Guiso de lentejas",
-      miercoles: "Suprema caprese con puré",
+      miercoles: "Suprema caprese con pure de papas",
       jueves: "Pastel de papa",
-      viernes: "Bife a la criolla",
+      viernes: "Bife a la criolla con arroz",
     }),
-  },
-  {
-    id: "2026-06-22-semanal",
+  }),
+  crearSemana({
+    id: "semana-2026-06-22-semanal",
     tipo: "actual",
     etiqueta: "Semana actual",
-    rango: "22/06 al 26/06",
-    titulo: "Semana del lunes 22/06",
+    fechaDesde: "2026-06-22",
+    fechaHasta: "2026-06-26",
     estado: "confirmado",
-    modalidad: "semanal",
-    limiteModificacion: { dia: "lunes", hora: "09:30" },
+    tipoPlan: "semanal",
     fechaActualMock: "2026-06-22T08:45:00",
     dias: crearDias({
-      lunes: "Pollo al verdeo con puré",
-      martes: "Hamburguesa de carne con puré de papas",
-      miercoles: "Rollitos de pollo con puré de zapallo",
-      jueves: "Zapallito relleno con salsa fileto",
-      viernes: "Tacos de pollo con ensalada",
+      lunes: "Pollo al verdeo con pure de papas",
+      martes: "Hamburguesa de carne con pure de papas",
+      miercoles: "Rollitos de pollo con pure de zapallo",
+      jueves: "Zapallito relleno",
+      viernes: "Tacos de pollo",
     }),
-  },
-  {
-    id: "2026-06-22-diario",
+  }),
+  crearSemana({
+    id: "semana-2026-06-22-diario",
     tipo: "actual",
     etiqueta: "Semana actual",
-    rango: "22/06 al 26/06",
-    titulo: "Semana del lunes 22/06",
+    fechaDesde: "2026-06-22",
+    fechaHasta: "2026-06-26",
     estado: "confirmado",
-    modalidad: "diario",
-    limiteModificacion: { hora: "09:30" },
+    tipoPlan: "diario",
     fechaActualMock: "2026-06-24T10:15:00",
     dias: crearDias({
       lunes: "Ravioles con bolognesa",
       martes: "Guiso de lentejas",
-      miercoles: "Tortilla de papa rellena con ensalada",
+      miercoles: "Tortilla de papa rellena",
       jueves: "Pastel de papa",
-      viernes: "Bife a la criolla",
+      viernes: "Bife a la criolla con arroz",
     }),
-  },
-  {
-    id: "2026-06-29",
+  }),
+  crearSemana({
+    id: "semana-2026-06-29",
     tipo: "proxima",
-    etiqueta: "Semana próxima",
-    rango: "29/06 al 05/07",
-    titulo: "Semana del lunes 29/06",
+    etiqueta: "Semana proxima",
+    fechaDesde: "2026-06-29",
+    fechaHasta: "2026-07-05",
     estado: "sin_pedido",
-    modalidad: "semanal",
-    limiteModificacion: { dia: "lunes", hora: "09:30" },
+    tipoPlan: "semanal",
     fechaActualMock: "2026-06-22T08:45:00",
     dias: crearDias(
       {
@@ -103,21 +152,20 @@ export const semanasMock = [
       },
       { incluirFinDeSemana: true },
     ),
-  },
-  {
-    id: "2026-07-06",
+  }),
+  crearSemana({
+    id: "semana-2026-07-06",
     tipo: "proxima",
-    etiqueta: "Semana próxima",
-    rango: "06/07 al 10/07",
-    titulo: "Semana del lunes 06/07",
+    etiqueta: "Semana proxima",
+    fechaDesde: "2026-07-06",
+    fechaHasta: "2026-07-10",
     estado: "sin_menu",
-    modalidad: "semanal",
-    limiteModificacion: { dia: "lunes", hora: "09:30" },
+    tipoPlan: "semanal",
     fechaActualMock: "2026-06-22T08:45:00",
     sugerencias: [
-      { dia: "Lunes", plato: "Milanesa con puré de papas" },
+      { dia: "Lunes", plato: "Milanesa con pure de papas" },
       { dia: "Martes", plato: "Tarta de verduras con ensalada" },
-      { dia: "Miércoles", plato: "Wok de pollo con arroz" },
+      { dia: "Miercoles", plato: "Wok de pollo con arroz" },
     ],
     recomendacionesUsuario: [],
     metadata: {
@@ -130,7 +178,7 @@ export const semanasMock = [
       jueves: "Sin seleccionar",
       viernes: "Sin seleccionar",
     }),
-  },
+  }),
 ];
 
 export const indiceInicialSemanaMock = 1;

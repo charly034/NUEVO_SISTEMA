@@ -28,7 +28,7 @@ function obtenerFechaActual(semana, fechaActual) {
 
 function obtenerInicioSemana(semana) {
   const primerDia = semana.dias?.[0]?.fecha;
-  return fechaDesdeISO(primerDia || semana.id);
+  return fechaDesdeISO(semana.fechaDesde || primerDia || semana.id);
 }
 
 function obtenerLimiteSemanal(semana) {
@@ -65,8 +65,9 @@ function tieneSugerenciaEnviada(semana) {
 }
 
 export function obtenerReglaDia(dia, semana) {
-  if (semana.modalidad === "mixto") return dia.regla || "diario";
-  return semana.modalidad || "semanal";
+  const tipoPlan = semana.tipoPlan || semana.modalidad || "semanal";
+  if (tipoPlan === "mixto") return dia.regla || "diario";
+  return tipoPlan;
 }
 
 export function puedeModificarDia(dia, semana, fechaActual) {
@@ -100,6 +101,7 @@ export function obtenerEstadoVisualDia(dia, semana, fechaActual) {
 
 export function obtenerMensajeLimiteModificacion(semana, fechaActual) {
   const puedeModificar = puedeModificarSemana(semana, fechaActual);
+  const tipoPlan = semana.tipoPlan || semana.modalidad || "semanal";
 
   if (semana.estado === "sin_menu") {
     return "El menú todavía no está publicado. Podés dejar sugerencias para esta semana.";
@@ -109,11 +111,11 @@ export function obtenerMensajeLimiteModificacion(semana, fechaActual) {
     return "El plazo para modificar ya terminó. Si necesitás un cambio, comunicate con La Quinta.";
   }
 
-  if (semana.modalidad === "diario") {
+  if (tipoPlan === "diario") {
     return "Cada plato se puede modificar hasta las 09:30 del mismo día.";
   }
 
-  if (semana.modalidad === "mixto") {
+  if (tipoPlan === "mixto") {
     return "Algunos días cierran antes y otros se pueden modificar el mismo día.";
   }
 
