@@ -11,7 +11,7 @@ export default function Badge({ children, tono = "neutro", className }) {
   return (
     <span
       className={unirClases(
-        "inline-flex min-h-7 items-center rounded-full border px-3 text-xs font-bold",
+        "inline-flex min-h-7 items-center rounded-full border px-2.5 text-sm font-bold",
         estilos[tono] || estilos.neutro,
         className,
       )}

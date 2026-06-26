@@ -9,6 +9,11 @@ import RecuperarPage from "./pages/RecuperarPage.jsx";
 import PedidoPage from "./pages/PedidoPage.jsx";
 import HistorialPage from "./pages/HistorialPage.jsx";
 import PerfilPage from "./pages/PerfilPage.jsx";
+import {
+  rutasAutenticacion,
+  rutasCliente,
+  rutasCompatibilidad,
+} from "./routes/rutasCliente.js";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 2 * 60 * 1000 } },
@@ -16,30 +21,30 @@ const queryClient = new QueryClient({
 
 const rutasPublicas = [
   {
-    path: "/login",
+    path: rutasAutenticacion.iniciarSesion,
     render: ({ login }) => <LoginPage onLogin={login} />,
   },
   {
-    path: "/registro",
+    path: rutasAutenticacion.crearCuenta,
     render: ({ setSession }) => <RegistroPage onRegistrado={setSession} />,
   },
   {
-    path: "/recuperar",
+    path: rutasAutenticacion.recuperarAcceso,
     render: () => <RecuperarPage />,
   },
 ];
 
 const rutasPrivadas = [
   {
-    path: "/pedido",
+    path: rutasCliente.pedidoSemanal,
     render: ({ empleado }) => <PedidoPage empleado={empleado} />,
   },
   {
-    path: "/historial",
+    path: rutasCliente.misPedidos,
     render: ({ empleado }) => <HistorialPage empleado={empleado} />,
   },
   {
-    path: "/perfil",
+    path: rutasCliente.miCuenta,
     render: ({ empleado, logout, setSession }) => (
       <PerfilPage
         empleado={empleado}
@@ -71,7 +76,7 @@ function AppRoutes() {
           path={ruta.path}
           element={
             empleado && !checking ? (
-              <Navigate to="/pedido" replace />
+              <Navigate to={rutasCliente.inicio} replace />
             ) : (
               ruta.render(auth)
             )
@@ -91,9 +96,22 @@ function AppRoutes() {
         />
       ))}
 
+      {rutasCompatibilidad.map((ruta) => (
+        <Route
+          key={ruta.desde}
+          path={ruta.desde}
+          element={<Navigate to={ruta.hacia} replace />}
+        />
+      ))}
+
       <Route
         path="*"
-        element={<Navigate to={empleado ? "/pedido" : "/login"} replace />}
+        element={
+          <Navigate
+            to={empleado ? rutasCliente.inicio : rutasAutenticacion.iniciarSesion}
+            replace
+          />
+        }
       />
     </Routes>
   );

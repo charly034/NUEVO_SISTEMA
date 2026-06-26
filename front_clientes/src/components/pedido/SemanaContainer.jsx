@@ -1,16 +1,28 @@
 import useEmblaCarousel from "embla-carousel-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { unirClases } from "../../compartido/utils/clases.js";
+import BotonIcono from "../ui/BotonIcono.jsx";
+import IndicadoresCarrusel from "../ui/IndicadoresCarrusel.jsx";
 import SemanaPedidoCard from "./SemanaPedidoCard.jsx";
 
-export default function SemanaContainer({ semanas }) {
-  const [indiceActivo, setIndiceActivo] = useState(1);
+export default function SemanaContainer({
+  fechaActual,
+  indiceInicial = 0,
+  modoActivo = { semanaId: null, modo: "lectura" },
+  onActualizarSemana,
+  onCambiarModoSemana,
+  onDirtyChange,
+  semanas,
+}) {
+  const [indiceActivo, setIndiceActivo] = useState(indiceInicial);
+  const puedeIrAnterior = indiceActivo > 0;
+  const puedeIrSiguiente = indiceActivo < semanas.length - 1;
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "center",
-    containScroll: "trimSnaps",
     dragFree: false,
     loop: false,
-    startIndex: 1,
+    startIndex: indiceInicial,
   });
 
   const actualizarIndice = useCallback(() => {
@@ -18,49 +30,114 @@ export default function SemanaContainer({ semanas }) {
     setIndiceActivo(emblaApi.selectedScrollSnap());
   }, [emblaApi]);
 
+  const irAnterior = useCallback(() => {
+    emblaApi?.scrollPrev();
+  }, [emblaApi]);
+
+  const irSiguiente = useCallback(() => {
+    emblaApi?.scrollNext();
+  }, [emblaApi]);
+
+  const irSemanaActual = useCallback(() => {
+    if (!emblaApi) return;
+    const indiceSemanaActual = semanas.findIndex((semana) => semana.tipo === "actual");
+    emblaApi.scrollTo(indiceSemanaActual >= 0 ? indiceSemanaActual : indiceInicial);
+  }, [emblaApi, indiceInicial, semanas]);
+
   useEffect(() => {
     if (!emblaApi) return undefined;
+    const fijarIndiceInicial = () => {
+      emblaApi.reInit();
+      emblaApi.scrollTo(indiceInicial, true);
+      actualizarIndice();
+    };
+    const primerIntento = window.setTimeout(fijarIndiceInicial, 50);
+    const segundoIntento = window.setTimeout(fijarIndiceInicial, 180);
+
     emblaApi.on("select", actualizarIndice);
     emblaApi.on("reInit", actualizarIndice);
 
     return () => {
+      window.clearTimeout(primerIntento);
+      window.clearTimeout(segundoIntento);
       emblaApi.off("select", actualizarIndice);
       emblaApi.off("reInit", actualizarIndice);
     };
-  }, [actualizarIndice, emblaApi]);
+  }, [actualizarIndice, emblaApi, indiceInicial, semanas.length]);
+
+  useEffect(() => {
+    window.addEventListener("pedido:ir-semana-actual", irSemanaActual);
+    return () => {
+      window.removeEventListener("pedido:ir-semana-actual", irSemanaActual);
+    };
+  }, [irSemanaActual]);
 
   return (
-    <section aria-label="Semanas de pedido" className="-mx-4">
-      <div ref={emblaRef} className="overflow-hidden px-4">
-        <div className="flex touch-pan-y gap-3">
-          {semanas.map((semana) => (
-            <div
-              key={semana.id}
-              className="min-w-0 flex-[0_0_91%] sm:flex-[0_0_88%]"
-            >
-              <SemanaPedidoCard semana={semana} />
-            </div>
-          ))}
+    <section aria-label="Semanas de pedido" className="-mx-4 flex min-h-0 flex-1 flex-col md:-mx-6">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div ref={emblaRef} className="h-full overflow-hidden">
+          <div className="flex h-full touch-pan-y gap-3 md:gap-4">
+            {semanas.map((semana, indice) => (
+              <div
+                key={semana.id}
+                className={unirClases(
+                  "min-h-0 min-w-0 flex-[0_0_84%] sm:flex-[0_0_82%] md:flex-[0_0_72%] lg:flex-[0_0_62%]",
+                  indice === 0 && "ml-[8%] sm:ml-[9%] md:ml-[14%] lg:ml-[19%]",
+                  indice === semanas.length - 1 && "mr-[8%] sm:mr-[9%] md:mr-[14%] lg:mr-[19%]",
+                )}
+              >
+                <SemanaPedidoCard
+                  fechaActual={fechaActual}
+                  modoCard={modoActivo.semanaId === semana.id ? modoActivo.modo : "lectura"}
+                  semana={semana}
+                  onCambiarModo={(modo, opciones) =>
+                    onCambiarModoSemana?.(semana.id, modo, opciones)
+                  }
+                  onDirtyChange={(hayCambios) => {
+                    if (modoActivo.semanaId === semana.id) {
+                      onDirtyChange?.(hayCambios);
+                    }
+                  }}
+                  onActualizarSemana={onActualizarSemana}
+                />
+              </div>
+            ))}
+          </div>
         </div>
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 bottom-0 left-0 z-20 w-12 bg-gradient-to-r from-[#fbfaf7] via-[#fbfaf7]/75 to-transparent md:w-16"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 right-0 bottom-0 z-20 w-12 bg-gradient-to-l from-[#fbfaf7] via-[#fbfaf7]/75 to-transparent md:w-16"
+        />
+
+        <BotonIcono
+          aria-label="Ver semana anterior"
+          className="absolute top-1/2 left-2 z-30 -translate-y-1/2"
+          disabled={!puedeIrAnterior}
+          onClick={irAnterior}
+        >
+          <ChevronLeft className="size-5" aria-hidden="true" />
+        </BotonIcono>
+        <BotonIcono
+          aria-label="Ver semana siguiente"
+          className="absolute top-1/2 right-2 z-30 -translate-y-1/2"
+          disabled={!puedeIrSiguiente}
+          onClick={irSiguiente}
+        >
+          <ChevronRight className="size-5" aria-hidden="true" />
+        </BotonIcono>
       </div>
 
-      <div className="mt-5 flex justify-center gap-2" aria-label="Indicadores de semana">
-        {semanas.map((semana, indice) => (
-          <button
-            key={semana.id}
-            type="button"
-            aria-label={`Ver ${semana.etiqueta}`}
-            aria-current={indiceActivo === indice ? "true" : undefined}
-            onClick={() => emblaApi?.scrollTo(indice)}
-            className={unirClases(
-              "h-2.5 rounded-full transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2d5a27]",
-              indiceActivo === indice
-                ? "w-7 bg-[#2d5a27]"
-                : "w-2.5 bg-[#d8d2c8]",
-            )}
-          />
-        ))}
-      </div>
+      <IndicadoresCarrusel
+        cantidad={semanas.length}
+        etiquetas={semanas.map((semana) => semana.etiqueta)}
+        indiceActivo={indiceActivo}
+        onSeleccionar={(indice) => emblaApi?.scrollTo(indice)}
+      />
     </section>
   );
 }
