@@ -30,7 +30,7 @@ export default function PedidosHoy() {
   const { data: pedidosData, isLoading } = usePedidos({ semana_inicio: lunes, limit: 500 });
   const { data: empresas = [] } = useEmpresas();
 
-  const pedidos = pedidosData?.pedidos ?? pedidosData ?? [];
+  const pedidos = useMemo(() => pedidosData?.pedidos ?? pedidosData ?? [], [pedidosData]);
 
   const pedidosHoy = useMemo(() => {
     return pedidos

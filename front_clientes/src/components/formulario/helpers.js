@@ -119,3 +119,22 @@ export function sumarSemanasISO(fechaISO, semanas) {
   base.setDate(base.getDate() + semanas * 7);
   return isoLocal(base);
 }
+
+export function semanaPermitePedido(menuSemana) {
+  if (!menuSemana || menuSemana.placeholder || !menuSemana.menu?.id) return false;
+
+  const ahora = new Date();
+  const fechaFin = fechaLocalDesdeISO(menuSemana.menu.fecha_fin);
+  if (fechaFin) {
+    fechaFin.setHours(23, 59, 59, 999);
+    if (ahora > fechaFin) return false;
+  }
+
+  if (menuSemana.menu.fecha_limite_pedidos && new Date(menuSemana.menu.fecha_limite_pedidos) < ahora) {
+    return false;
+  }
+
+  if (menuSemana.limiteEmpresa?.vencido) return false;
+
+  return true;
+}

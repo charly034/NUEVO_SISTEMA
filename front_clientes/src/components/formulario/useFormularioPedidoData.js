@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { menuApi, pedidoApi, guarnicionesApi } from "../../services/api.js";
 import { getDiasSemana } from "../../utils/dias.js";
 import { addDias } from "../../utils/dates.js";
-import { lunesActualISO, sumarSemanasISO } from "./helpers.js";
+import { lunesActualISO, semanaPermitePedido, sumarSemanasISO } from "./helpers.js";
 
 function construirSemanasCarrusel({ menus, historial, diasLaborales }) {
   const porSemanaMenu = new Map(
@@ -109,9 +109,8 @@ export function useFormularioPedidoData({ empleado }) {
         ? pedidoHistorialSemana
         : null;
   const tienePedidoGuardado = (pedidoVisible?.items?.length ?? 0) > 0;
-  const puedeModificarPedido =
-    !!menuSemana?.disponible && !limiteEmpresaVencido;
-  const menu = menuSemana?.disponible ? menuSemana.menu : null;
+  const puedeModificarPedido = semanaPermitePedido(menuSemana);
+  const menu = semanaPermitePedido(menuSemana) ? menuSemana.menu : null;
   const diasSemana = getDiasSemana(menuSemana?.dias_laborales);
   const diasCerrados = new Set(menuSemana?.limiteEmpresa?.diasCerrados ?? []);
   const diasConFechaYBloqueo = semanaInicio

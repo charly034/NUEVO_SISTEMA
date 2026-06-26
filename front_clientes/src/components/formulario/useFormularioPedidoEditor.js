@@ -124,8 +124,8 @@ export function useFormularioPedidoEditor({
     }
   }, [pedidoExistente]);
 
-  const diaActivoParaPedido = ({ dia, bloqueado }) =>
-    !bloqueado && !diasSinServicio.has(dia) && !noAsiste[dia];
+  const diaActivoParaPedido = ({ dia, bloqueado }, sourceNoAsiste = noAsiste) =>
+    !bloqueado && !diasSinServicio.has(dia) && !sourceNoAsiste[dia];
 
   const diaNecesitaGuarnicion = (dia, source = selecciones) =>
     !!source[dia]?.plato_id &&
@@ -137,7 +137,8 @@ export function useFormularioPedidoEditor({
 
   const primerIncompleto =
     diasConFechaYBloqueo.find(
-      (item) => diaActivoParaPedido(item) && !diaTienePedidoCompleto(item.dia),
+      (item) =>
+        diaActivoParaPedido(item) && !diaTienePedidoCompleto(item.dia),
     )?.dia ?? null;
   const diaEfectivo =
     expandidoDia === undefined ? primerIncompleto : expandidoDia;
@@ -153,8 +154,14 @@ export function useFormularioPedidoEditor({
     return () => clearTimeout(timer);
   }, [diaEfectivo]);
 
-  const avanzarAlSiguiente = (diaActual, seleccionesActuales) => {
-    const diasActivos = diasConFechaYBloqueo.filter(diaActivoParaPedido);
+  const avanzarAlSiguiente = (
+    diaActual,
+    seleccionesActuales,
+    noAsisteActual = noAsiste,
+  ) => {
+    const diasActivos = diasConFechaYBloqueo.filter((item) =>
+      diaActivoParaPedido(item, noAsisteActual),
+    );
     const idx = diasActivos.findIndex((item) => item.dia === diaActual);
     for (let i = idx + 1; i < diasActivos.length; i++) {
       if (!diaTienePedidoCompleto(diasActivos[i].dia, seleccionesActuales)) {
@@ -181,14 +188,15 @@ export function useFormularioPedidoEditor({
 
   const toggleNoAsiste = (dia) => {
     const marcandoNoAsiste = !noAsiste[dia];
-    setNoAsiste((prev) => ({ ...prev, [dia]: !prev[dia] }));
+    const nuevoNoAsiste = { ...noAsiste, [dia]: !noAsiste[dia] };
+    setNoAsiste(nuevoNoAsiste);
     if (marcandoNoAsiste) {
-      setSelecciones((prev) => {
-        const next = { ...prev };
-        delete next[dia];
-        return next;
-      });
-      if (diaEfectivo === dia) setExpandidoDia(null);
+      const nuevasSel = { ...selecciones };
+      delete nuevasSel[dia];
+      setSelecciones(nuevasSel);
+      avanzarAlSiguiente(dia, nuevasSel, nuevoNoAsiste);
+    } else {
+      setExpandidoDia(dia);
     }
   };
 
@@ -221,13 +229,16 @@ export function useFormularioPedidoEditor({
   };
 
   const setGuarnicion = (dia, guarnicionId) => {
-    setSelecciones((prev) => ({
-      ...prev,
+    const nuevasSel = {
+      ...selecciones,
       [dia]: {
-        ...prev[dia],
+        ...selecciones[dia],
         guarnicion_id: guarnicionId ? parseInt(guarnicionId) : null,
       },
-    }));
+    };
+    setSelecciones(nuevasSel);
+    // Delay para que el colapso de guarnición sea visible antes de avanzar
+    setTimeout(() => avanzarAlSiguiente(dia, nuevasSel), 320);
   };
 
   const setNotas = (dia, notas) => {
@@ -341,7 +352,9 @@ export function useFormularioPedidoEditor({
     : itemsActuales.length > 0;
 
   const handleEnviar = async () => {
-    const diasActivosLista = diasConFechaYBloqueo.filter(diaActivoParaPedido);
+    const diasActivosLista = diasConFechaYBloqueo.filter((item) =>
+      diaActivoParaPedido(item),
+    );
     const diasSinGuarnicion = diasActivosLista.filter(({ dia }) =>
       diaNecesitaGuarnicion(dia),
     );
@@ -405,13 +418,19 @@ export function useFormularioPedidoEditor({
     setExpandidoDia(null);
   };
 
-  const diasActivosLista = diasConFechaYBloqueo.filter(diaActivoParaPedido);
+  const diasActivosLista = diasConFechaYBloqueo.filter((item) =>
+    diaActivoParaPedido(item),
+  );
   const diasFaltanGuarnicion = diasActivosLista.filter(({ dia }) =>
     diaNecesitaGuarnicion(dia),
   );
   const diasCompletados = diasActivosLista.filter(({ dia }) =>
     diaTienePedidoCompleto(dia),
   ).length;
+  const flujoCompleto =
+    diasActivosLista.length > 0 &&
+    diasCompletados === diasActivosLista.length &&
+    diasFaltanGuarnicion.length === 0;
   const envioBloqueado =
     mutation.isPending ||
     diasCompletados === 0 ||
@@ -429,8 +448,7 @@ export function useFormularioPedidoEditor({
             ? "Guardar cambios"
             : "Confirmar pedido";
   const mostrarFooterPedido =
-    hayCambiosSinGuardar ||
-    (!tienePedidoGuardado && diasCompletados > 0) ||
+    flujoCompleto ||
     mutation.isPending ||
     mutation.isError;
 

@@ -15,7 +15,7 @@ export function Pantalla({ children, noScroll }) {
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          padding: "10px 14px 0",
+          padding: "clamp(6px, 1.4dvh, 10px) clamp(8px, 3vw, 14px) 0",
           boxSizing: "border-box",
         }}
       >
@@ -193,6 +193,7 @@ const DiaCard = forwardRef(function DiaCard(
       ref={ref}
       style={{
         ...s.diaCard,
+        ...(expandido ? s.diaCardExpandida : {}),
         ...(seleccion?.plato_id && !hayGuarnicionPendiente
           ? { borderColor: "var(--verde)" }
           : {}),
@@ -266,16 +267,19 @@ const DiaCard = forwardRef(function DiaCard(
 
       <div
         style={{
-          maxHeight: expandido ? 700 : 0,
+          maxHeight: expandido ? "100%" : 0,
+          flex: expandido ? 1 : "initial",
+          minHeight: 0,
           opacity: expandido ? 1 : 0,
           overflow: "hidden",
           transition: "max-height 340ms ease, opacity 220ms ease",
         }}
       >
-        <div style={{ padding: "0 14px 14px" }}>
+        <div style={s.diaContenido}>
           <div
             style={{
-              maxHeight: 300,
+              flex: 1,
+              minHeight: 0,
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",

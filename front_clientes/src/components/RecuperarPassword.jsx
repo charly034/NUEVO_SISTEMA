@@ -1,13 +1,16 @@
 import { useState } from "react";
+import AuthLayout from "../compartido/layout/AuthLayout.jsx";
+import Alerta from "../compartido/ui/Alerta.jsx";
+import Boton from "../compartido/ui/Boton.jsx";
+import CampoPassword from "../compartido/ui/CampoPassword.jsx";
+import CampoTexto from "../compartido/ui/CampoTexto.jsx";
 import { authApi } from "../services/api.js";
-import styles from "./RecuperarPassword.module.css";
 
 export default function RecuperarPassword({ onVolver, onExito }) {
   const [codigo, setCodigo] = useState("");
-  const [paso, setPaso] = useState(1); // 1 = ingresar código, 2 = nueva contraseña
+  const [paso, setPaso] = useState(1);
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
-  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const errorId = error ? "recuperar-error" : undefined;
@@ -39,211 +42,121 @@ export default function RecuperarPassword({ onVolver, onExito }) {
   };
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.card}>
-        <div className={styles.icono}>🔑</div>
-        <h2 className={styles.titulo}>Recuperar contraseña</h2>
+    <AuthLayout icono="🔑" titulo="Recuperar contraseña" compacto>
+      {paso === 1 && (
+        <form
+          onSubmit={handleCodigo}
+          className="flex flex-col gap-3.5 text-left"
+          aria-busy={loading}
+        >
+          <p className="text-sm leading-relaxed text-slate-500">
+            Pedí un código de recuperación a tu empresa y escribilo acá. Por
+            seguridad, usalo apenas te lo entreguen.
+          </p>
 
-        {paso === 1 && (
-          <form
-            onSubmit={handleCodigo}
-            className={styles.form}
-            aria-busy={loading}
+          <CampoTexto
+            id="recuperar-codigo"
+            label="Código de recuperación"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+            placeholder="XXX-XXX"
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={7}
+            required
+            aria-invalid={!!error}
+            aria-describedby={errorId}
+            inputClassName="text-center text-xl font-bold uppercase tracking-[0.2em]"
+          />
+
+          {error && (
+            <Alerta id="recuperar-error" variante="error">
+              {error}
+            </Alerta>
+          )}
+
+          <Boton type="submit" anchoCompleto>
+            Continuar →
+          </Boton>
+
+          <Boton
+            type="button"
+            variante="fantasma"
+            className="min-h-7 py-1 text-sm font-medium"
+            onClick={onVolver}
+            anchoCompleto
           >
-            <p className={styles.info}>
-              Pedí un código de recuperación a tu empresa y escribilo acá. Por
-              seguridad, usalo apenas te lo entreguen.
-            </p>
-            <label className={styles.label}>
-              Código de recuperación
-              <input
-                className={`${styles.input} ${styles.inputCodigo}`}
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-                placeholder="XXX-XXX"
-                autoFocus
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={7}
-                required
-                aria-invalid={!!error}
-                aria-describedby={errorId}
-              />
-            </label>
-            {error && (
-              <p id="recuperar-error" role="alert" className={styles.error}>
-                {error}
-              </p>
-            )}
-            <button type="submit" className={styles.btn}>
-              Continuar →
-            </button>
-            <button type="button" onClick={onVolver} className={styles.linkBtn}>
-              ← Volver al inicio de sesión
-            </button>
-          </form>
-        )}
+            Volver al inicio de sesión
+          </Boton>
+        </form>
+      )}
 
-        {paso === 2 && (
-          <form
-            onSubmit={handleSubmit}
-            className={styles.form}
-            aria-busy={loading}
+      {paso === 2 && (
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-3.5 text-left"
+          aria-busy={loading}
+        >
+          <p className="text-sm leading-relaxed text-slate-500">
+            Código{" "}
+            <strong className="font-mono text-[var(--verde)]">{codigo}</strong>.
+            Elegí tu nueva contraseña.
+          </p>
+
+          <CampoPassword
+            id="recuperar-password"
+            label="Nueva contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="Mínimo 8 caracteres"
+            autoComplete="new-password"
+            autoFocus
+            aria-invalid={!!error}
+            aria-describedby={errorId}
+          />
+
+          <CampoPassword
+            id="recuperar-password-confirmacion"
+            label="Confirmar contraseña"
+            value={password2}
+            onChange={(e) => setPassword2(e.target.value)}
+            required
+            placeholder="Repetí la contraseña"
+            autoComplete="new-password"
+            error={password2 && password2 !== password ? "No coincide" : null}
+            aria-invalid={
+              !!error || (password2 !== "" && password2 !== password)
+            }
+            aria-describedby={errorId}
+          />
+
+          {error && (
+            <Alerta id="recuperar-error" variante="error">
+              {error}
+            </Alerta>
+          )}
+
+          <Boton type="submit" anchoCompleto cargando={loading}>
+            {loading ? "Guardando..." : "Guardar nueva contraseña"}
+          </Boton>
+
+          <Boton
+            type="button"
+            variante="fantasma"
+            className="min-h-7 py-1 text-sm font-medium"
+            onClick={() => {
+              setPaso(1);
+              setError("");
+            }}
+            anchoCompleto
           >
-            <p className={styles.info}>
-              Código <strong className={styles.codigo}>{codigo}</strong>. Elegí
-              tu nueva contraseña.
-            </p>
-
-            <label className={styles.label}>
-              Nueva contraseña
-              <div className={styles.passWrap}>
-                <input
-                  className={`${styles.input} ${styles.inputConIcono}`}
-                  type={showPass ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="Mínimo 8 caracteres"
-                  autoComplete="new-password"
-                  autoFocus
-                  aria-invalid={!!error}
-                  aria-describedby={errorId}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className={styles.eyeBtn}
-                  aria-label={showPass ? "Ocultar" : "Ver"}
-                  aria-pressed={showPass}
-                >
-                  {showPass ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-
-            <label className={styles.label}>
-              Confirmar contraseña
-              <div className={styles.passWrap}>
-                <input
-                  className={`${styles.input} ${styles.inputConIcono} ${password2 && password2 !== password ? styles.inputError : ""}`}
-                  type={showPass ? "text" : "password"}
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
-                  required
-                  placeholder="Repetí la contraseña"
-                  autoComplete="new-password"
-                  aria-invalid={
-                    !!error || (password2 !== "" && password2 !== password)
-                  }
-                  aria-describedby={errorId}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className={styles.eyeBtn}
-                  aria-label={showPass ? "Ocultar" : "Ver"}
-                  aria-pressed={showPass}
-                >
-                  {showPass ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-
-            {error && (
-              <p id="recuperar-error" role="alert" className={styles.error}>
-                {error}
-              </p>
-            )}
-
-            <button type="submit" className={styles.btn} disabled={loading}>
-              {loading ? (
-                <span className={styles.loadingRow}>
-                  <svg
-                    className={styles.spinner}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className={styles.spinnerTrack}
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="white"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className={styles.spinnerFill}
-                      fill="white"
-                      d="M4 12a8 8 0 018-8v8z"
-                    />
-                  </svg>
-                  Guardando…
-                </span>
-              ) : (
-                "Guardar nueva contraseña"
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPaso(1);
-                setError("");
-              }}
-              className={styles.linkBtn}
-            >
-              ← Cambiar código
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+            Cambiar código
+          </Boton>
+        </form>
+      )}
+    </AuthLayout>
   );
 }

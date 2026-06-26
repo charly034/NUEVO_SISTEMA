@@ -5,6 +5,10 @@ export default function OpcionBtn({ plato, badge, seleccionado, guarnicionId, gu
   // Comienza expandido si no hay guarnición elegida; colapsado si ya hay una
   const [guarnicionExpanded, setGuarnicionExpanded] = useState(!guarnicionId);
 
+  const mostrarGuarniciones =
+    (seleccionado && plato.tiene_guarnicion && !guarnicionId) ||
+    guarnicionExpanded;
+
   const handleGuarnicion = (gId) => {
     onGuarnicion(gId);
     setGuarnicionExpanded(false);
@@ -37,7 +41,7 @@ export default function OpcionBtn({ plato, badge, seleccionado, guarnicionId, gu
       </button>
 
       {seleccionado && plato.tiene_guarnicion && (
-        guarnicionExpanded ? (
+        mostrarGuarniciones ? (
           <div ref={guarnicionRef} style={sG.panel}>
             <span style={sG.label}>Seleccioná tu guarnición</span>
             <div style={sG.chips}>

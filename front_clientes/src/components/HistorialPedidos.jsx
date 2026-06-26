@@ -1,21 +1,24 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { menuApi, pedidoApi } from '../services/api.js';
-import { DIAS_LABEL, getDiasSemana } from '../utils/dias.js';
-import { confirmar, toast } from '../lib/swal.js';
-import styles from './HistorialPedidos.module.css';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Badge from "../compartido/ui/Badge.jsx";
+import Boton from "../compartido/ui/Boton.jsx";
+import Pagina from "../compartido/ui/Pagina.jsx";
+import Tarjeta from "../compartido/ui/Tarjeta.jsx";
+import { confirmar, toast } from "../lib/swal.js";
+import { menuApi, pedidoApi } from "../services/api.js";
+import { DIAS_LABEL, getDiasSemana } from "../utils/dias.js";
 
 const ESTADO_CONFIG = {
-  pendiente:   { label: 'Confirmado',  color: '#2e7d32', bg: '#e8f5e9' },
-  en_proceso:  { label: 'En proceso',  color: '#e65100', bg: '#fff3e0' },
-  listo:       { label: 'Listo',       color: '#1565c0', bg: '#e3f2fd' },
-  entregado:   { label: 'Entregado',   color: '#555',    bg: '#f5f5f5' },
-  cancelado:   { label: 'Cancelado',   color: '#c62828', bg: '#ffebee' },
+  pendiente: { label: "Confirmado", variante: "verde" },
+  en_proceso: { label: "En proceso", variante: "naranja" },
+  listo: { label: "Listo", variante: "azul" },
+  entregado: { label: "Entregado", variante: "gris" },
+  cancelado: { label: "Cancelado", variante: "rojo" },
 };
 
 function formatSemana(fechaISO) {
-  if (!fechaISO) return '';
-  const [y, m, d] = String(fechaISO).split('T')[0].split('-').map(Number);
+  if (!fechaISO) return "";
+  const [y, m, d] = String(fechaISO).split("T")[0].split("-").map(Number);
   const lunes = new Date(y, m - 1, d);
   const viernes = new Date(y, m - 1, d + 4);
   const fmt = (dt) => `${dt.getDate()}/${dt.getMonth() + 1}`;
@@ -33,21 +36,37 @@ function lunesDeHoy() {
 
 function esEstaSemana(fechaISO) {
   if (!fechaISO) return false;
-  const [y, m, d] = String(fechaISO).split('T')[0].split('-').map(Number);
+  const [y, m, d] = String(fechaISO).split("T")[0].split("-").map(Number);
   const semana = new Date(y, m - 1, d);
   const lunes = lunesDeHoy();
   return semana.getTime() === lunes.getTime();
 }
 
 function fechaKey(fechaISO) {
-  return String(fechaISO || '').split('T')[0];
+  return String(fechaISO || "").split("T")[0];
 }
 
 function construirDiasPedido(pedido, menuSemana) {
   const items = pedido.items ?? [];
-  const porDia = new Map(items.map(item => [item.dia, item]));
-  const dias = menuSemana ? getDiasSemana(menuSemana.dias_laborales) : items.map(item => item.dia);
-  return dias.map(dia => ({ dia, item: porDia.get(dia) || null }));
+  const porDia = new Map(items.map((item) => [item.dia, item]));
+  const dias = menuSemana
+    ? getDiasSemana(menuSemana.dias_laborales)
+    : items.map((item) => item.dia);
+  return dias.map((dia) => ({ dia, item: porDia.get(dia) || null }));
+}
+
+function EncabezadoPagina({ cantidad }) {
+  return (
+    <header className="mb-4">
+      <h2 className="text-2xl font-extrabold text-slate-950">Mis pedidos</h2>
+      {cantidad !== undefined && (
+        <p className="mt-1 text-sm text-slate-500">
+          {cantidad} semana{cantidad !== 1 ? "s" : ""} registrada
+          {cantidad !== 1 ? "s" : ""}
+        </p>
+      )}
+    </header>
+  );
 }
 
 export default function HistorialPedidos({ empleado }) {
@@ -55,154 +74,188 @@ export default function HistorialPedidos({ empleado }) {
   const [expandido, setExpandido] = useState(null);
 
   const { data: pedidos = [], isLoading } = useQuery({
-    queryKey: ['mi-historial', empleado.id],
+    queryKey: ["mi-historial", empleado.id],
     queryFn: pedidoApi.miHistorial,
     staleTime: 60 * 1000,
   });
 
   const { data: menuData } = useQuery({
-    queryKey: ['menus-publicados'],
+    queryKey: ["menus-publicados"],
     queryFn: menuApi.activo,
     staleTime: 60 * 1000,
   });
 
   const menusPorSemana = new Map(
-    (menuData?.menus_disponibles ?? []).map(menuSemana => [fechaKey(menuSemana.menu?.fecha_inicio), menuSemana])
+    (menuData?.menus_disponibles ?? []).map((menuSemana) => [
+      fechaKey(menuSemana.menu?.fecha_inicio),
+      menuSemana,
+    ]),
   );
 
-  const pedidosVisibles = pedidos.filter(p => p.estado !== 'cancelado');
+  const pedidosVisibles = pedidos.filter((pedido) => pedido.estado !== "cancelado");
 
   const mutationCancelar = useMutation({
     mutationFn: pedidoApi.cancelar,
     onSuccess: (_data, semanaInicio) => {
-      queryClient.invalidateQueries({ queryKey: ['mi-historial', empleado.id] });
-      queryClient.invalidateQueries({ queryKey: ['mi-pedido', empleado.id, semanaInicio] });
-      queryClient.invalidateQueries({ queryKey: ['menus-publicados'] });
+      queryClient.invalidateQueries({ queryKey: ["mi-historial", empleado.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["mi-pedido", empleado.id, semanaInicio],
+      });
+      queryClient.invalidateQueries({ queryKey: ["menus-publicados"] });
       setExpandido(null);
-      toast.success('Pedido eliminado. Podés volver a cargarlo mientras siga abierto.');
+      toast.success(
+        "Pedido eliminado. Podés volver a cargarlo mientras siga abierto.",
+      );
     },
-    onError: (e) => toast.error(e?.message || 'No se pudo eliminar el pedido'),
+    onError: (error) =>
+      toast.error(error?.message || "No se pudo eliminar el pedido"),
   });
 
   const eliminarPedido = async (pedido) => {
-    if (!await confirmar({
-      titulo: '¿Eliminar pedido?',
-      texto: 'Se eliminará el pedido completo de esa semana. Si el plazo sigue abierto, vas a poder cargarlo de nuevo.',
-      botonConfirmar: 'Sí, eliminar',
-      color: '#dc2626',
-    })) return;
+    if (
+      !(await confirmar({
+        titulo: "¿Eliminar pedido?",
+        texto:
+          "Se eliminará el pedido completo de esa semana. Si el plazo sigue abierto, vas a poder cargarlo de nuevo.",
+        botonConfirmar: "Sí, eliminar",
+        color: "#dc2626",
+      }))
+    ) {
+      return;
+    }
     mutationCancelar.mutate(fechaKey(pedido.semana_inicio));
   };
 
   if (isLoading) {
     return (
-      <div className={styles.wrap}>
-        <p style={{ textAlign: 'center', padding: 60, color: 'var(--subtexto)' }}>Cargando pedidos...</p>
-      </div>
+      <Pagina>
+        <p className="py-16 text-center text-sm text-slate-500">
+          Cargando pedidos...
+        </p>
+      </Pagina>
     );
   }
 
   if (pedidosVisibles.length === 0) {
     return (
-      <div className={styles.wrap}>
-        <h2 className={styles.titulo}>Mis pedidos</h2>
-        <div className={styles.empty}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-          <p style={{ color: 'var(--subtexto)', fontSize: 15 }}>Todavía no tenés pedidos registrados.</p>
-        </div>
-      </div>
+      <Pagina>
+        <EncabezadoPagina />
+        <Tarjeta className="mt-6 px-5 py-14 text-center">
+          <div className="mb-3 text-5xl" aria-hidden="true">
+            📋
+          </div>
+          <p className="text-sm text-slate-500">
+            Todavía no tenés pedidos registrados.
+          </p>
+        </Tarjeta>
+      </Pagina>
     );
   }
 
   return (
-    <div className={styles.wrap}>
-      <h2 className={styles.titulo}>Mis pedidos</h2>
-      <p style={{ color: 'var(--subtexto)', fontSize: 13, marginBottom: 16 }}>
-        {pedidosVisibles.length} semana{pedidosVisibles.length !== 1 ? 's' : ''} registrada{pedidosVisibles.length !== 1 ? 's' : ''}
-      </p>
+    <Pagina>
+      <EncabezadoPagina cantidad={pedidosVisibles.length} />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {pedidosVisibles.map(p => {
-          const cfg = ESTADO_CONFIG[p.estado] ?? ESTADO_CONFIG.pendiente;
-          const esCurrent = esEstaSemana(p.semana_inicio);
-          const abierto = expandido === p.id;
-          const items = p.items ?? [];
-          const menuSemana = menusPorSemana.get(fechaKey(p.semana_inicio));
-          const diasPedido = construirDiasPedido(p, menuSemana);
-          const puedeEliminar = ['pendiente', 'en_proceso'].includes(p.estado)
-            && menuSemana?.disponible
-            && !menuSemana?.limiteEmpresa?.vencido;
+      <div className="flex flex-col gap-2.5">
+        {pedidosVisibles.map((pedido) => {
+          const cfg = ESTADO_CONFIG[pedido.estado] ?? ESTADO_CONFIG.pendiente;
+          const esActual = esEstaSemana(pedido.semana_inicio);
+          const abierto = expandido === pedido.id;
+          const items = pedido.items ?? [];
+          const menuSemana = menusPorSemana.get(fechaKey(pedido.semana_inicio));
+          const diasPedido = construirDiasPedido(pedido, menuSemana);
+          const puedeEliminar =
+            ["pendiente", "en_proceso"].includes(pedido.estado) &&
+            menuSemana?.disponible &&
+            !menuSemana?.limiteEmpresa?.vencido;
 
           return (
-            <div key={p.id} className={styles.card}>
-              <button className={styles.cardHeader} onClick={() => setExpandido(abierto ? null : p.id)}>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, fontSize: 15 }}>
-                      Semana del {formatSemana(p.semana_inicio)}
+            <Tarjeta key={pedido.id} className="overflow-hidden">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                onClick={() => setExpandido(abierto ? null : pedido.id)}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[15px] font-bold text-slate-950">
+                      Semana del {formatSemana(pedido.semana_inicio)}
                     </span>
-                    {esCurrent && (
-                      <span style={{ fontSize: 11, background: 'var(--verde)', color: '#fff', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>
-                        Esta semana
-                      </span>
-                    )}
+                    {esActual && <Badge variante="verde">Esta semana</Badge>}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <span style={{ fontSize: 12, background: cfg.bg, color: cfg.color, borderRadius: 20, padding: '2px 9px', fontWeight: 600 }}>
-                      {cfg.label}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--subtexto)' }}>
-                      {items.length} día{items.length !== 1 ? 's' : ''}
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge variante={cfg.variante}>{cfg.label}</Badge>
+                    <span className="text-xs text-slate-500">
+                      {items.length} día{items.length !== 1 ? "s" : ""}
                     </span>
                   </div>
                 </div>
-                <span style={{ color: 'var(--subtexto)', fontSize: 18, marginLeft: 8 }}>{abierto ? '▲' : '▼'}</span>
+                <span className="shrink-0 text-lg text-slate-500">
+                  {abierto ? "▲" : "▼"}
+                </span>
               </button>
 
               {abierto && (
-                <div style={{ borderTop: '1px solid var(--borde)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="flex flex-col gap-2 border-t border-[var(--borde)] px-4 py-3">
                   {diasPedido.length === 0 ? (
-                    <p style={{ color: 'var(--subtexto)', fontSize: 13 }}>Sin platos registrados.</p>
+                    <p className="text-sm text-slate-500">
+                      Sin platos registrados.
+                    </p>
                   ) : (
                     diasPedido.map(({ dia, item }) => (
                       <div
                         key={dia}
-                        className={`${styles.diaFila}${!item ? ` ${styles.diaFilaSinVianda}` : ''}`}
+                        className={item ? "flex gap-3" : "flex gap-3 opacity-80"}
                       >
-                        <span className={`${styles.diaLabel}${!item ? ` ${styles.diaLabelSinVianda}` : ''}`}>
+                        <span
+                          className={
+                            item
+                              ? "w-[72px] shrink-0 text-sm font-bold text-[var(--verde)]"
+                              : "w-[72px] shrink-0 text-sm font-bold text-slate-500"
+                          }
+                        >
                           {DIAS_LABEL[dia] ?? dia}
                         </span>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           {item ? (
                             <>
-                              <div style={{ fontSize: 14, fontWeight: 600 }}>{item.plato_nombre}</div>
+                              <div className="text-sm font-semibold text-slate-950">
+                                {item.plato_nombre}
+                              </div>
                               {item.guarnicion_nombre && (
-                                <div style={{ fontSize: 12, color: 'var(--subtexto)' }}>+ {item.guarnicion_nombre}</div>
+                                <div className="mt-0.5 text-xs text-slate-500">
+                                  + {item.guarnicion_nombre}
+                                </div>
                               )}
                             </>
                           ) : (
-                            <div className={styles.sinVianda}>No pedís vianda</div>
+                            <Badge variante="gris">No pedís vianda</Badge>
                           )}
                         </div>
                       </div>
                     ))
                   )}
+
                   {puedeEliminar && (
-                    <button
+                    <Boton
                       type="button"
-                      onClick={() => eliminarPedido(p)}
+                      variante="peligro"
+                      anchoCompleto
                       disabled={mutationCancelar.isPending}
-                      className={styles.btnEliminar}
+                      onClick={() => eliminarPedido(pedido)}
+                      className="mt-2 text-sm"
                     >
-                      {mutationCancelar.isPending ? 'Eliminando...' : 'Eliminar pedido de esta semana'}
-                    </button>
+                      {mutationCancelar.isPending
+                        ? "Eliminando..."
+                        : "Eliminar pedido de esta semana"}
+                    </Boton>
                   )}
                 </div>
               )}
-            </div>
+            </Tarjeta>
           );
         })}
       </div>
-    </div>
+    </Pagina>
   );
 }

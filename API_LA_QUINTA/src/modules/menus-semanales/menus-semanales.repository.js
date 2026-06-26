@@ -86,7 +86,10 @@ export const findPublicadoActivo = async () => {
 
 export const cambiarEstado = async (id, estado, extra = {}) => {
   const campos = { estado };
-  if (estado === 'publicado') campos.publicado_at = new Date().toISOString();
+  if (estado === 'publicado') {
+    campos.publicado_at = new Date().toISOString();
+    campos.cerrado_at = null;
+  }
   if (estado === 'cerrado') campos.cerrado_at = new Date().toISOString();
   if (extra.fecha_limite_pedidos !== undefined) campos.fecha_limite_pedidos = extra.fecha_limite_pedidos;
 

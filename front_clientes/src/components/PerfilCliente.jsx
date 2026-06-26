@@ -1,6 +1,11 @@
 import { useState } from "react";
+import Alerta from "../compartido/ui/Alerta.jsx";
+import Boton from "../compartido/ui/Boton.jsx";
+import CampoPassword from "../compartido/ui/CampoPassword.jsx";
+import CampoTexto from "../compartido/ui/CampoTexto.jsx";
+import Pagina from "../compartido/ui/Pagina.jsx";
+import Tarjeta from "../compartido/ui/Tarjeta.jsx";
 import { authApi } from "../services/api.js";
-import styles from "./PerfilCliente.module.css";
 
 const PLANES = {
   basico: "Básico",
@@ -8,55 +13,16 @@ const PLANES = {
   con_postre_bebida: "Con postre y bebida",
 };
 
-function PasswordVisibilityButton({ showPass, onToggle }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={styles.eyeBtn}
-      aria-label={showPass ? "Ocultar" : "Ver"}
-      aria-pressed={showPass}
-    >
-      {showPass ? (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={styles.eyeIco}
-        >
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-          <line x1="1" y1="1" x2="23" y2="23" />
-        </svg>
-      ) : (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={styles.eyeIco}
-        >
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
 function formatFecha(iso) {
   if (!iso) return null;
   const [y, m, d] = iso.split("T")[0].split("-");
   return `${d}/${m}/${y}`;
 }
 
-// ── Formulario cambio de contraseña ──────────────────────────────────────────
 function CambiarPasswordForm({ onCerrar }) {
   const [actual, setActual] = useState("");
   const [nuevo, setNuevo] = useState("");
   const [nuevo2, setNuevo2] = useState("");
-  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
@@ -78,111 +44,102 @@ function CambiarPasswordForm({ onCerrar }) {
     }
   };
 
-  if (ok)
+  if (ok) {
     return (
-      <div className={styles.passwordOk}>
-        <div className={styles.passwordOkIcon}>✅</div>
-        <p className={styles.passwordOkText}>¡Contraseña actualizada!</p>
-        <button onClick={onCerrar} className={styles.passwordBtnOk}>
+      <div className="py-2 text-center">
+        <div className="mb-2 text-4xl" aria-hidden="true">
+          ✅
+        </div>
+        <p className="mb-3 font-bold text-[var(--verde)]">
+          ¡Contraseña actualizada!
+        </p>
+        <Boton type="button" anchoCompleto onClick={onCerrar}>
           Listo
-        </button>
+        </Boton>
       </div>
     );
+  }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={styles.passwordForm}
-      aria-busy={loading}
-    >
-      <label className={styles.passwordLabel}>
-        Contraseña actual
-        <div className={styles.passwordFieldWrap}>
-          <input
-            className={`${styles.passwordInput} ${styles.passwordInputWithIcon}`}
-            type={showPass ? "text" : "password"}
-            value={actual}
-            onChange={(e) => setActual(e.target.value)}
-            required
-            autoFocus
-            autoComplete="current-password"
-            aria-invalid={!!error}
-            aria-describedby={errorId}
-          />
-          <PasswordVisibilityButton
-            showPass={showPass}
-            onToggle={() => setShowPass((v) => !v)}
-          />
-        </div>
-      </label>
-      <label className={styles.passwordLabel}>
-        Nueva contraseña
-        <div className={styles.passwordFieldWrap}>
-          <input
-            className={`${styles.passwordInput} ${styles.passwordInputWithIcon}`}
-            type={showPass ? "text" : "password"}
-            value={nuevo}
-            onChange={(e) => setNuevo(e.target.value)}
-            required
-            minLength={8}
-            placeholder="Mínimo 8 caracteres"
-            autoComplete="new-password"
-            aria-invalid={!!error}
-            aria-describedby={errorId}
-          />
-          <PasswordVisibilityButton
-            showPass={showPass}
-            onToggle={() => setShowPass((v) => !v)}
-          />
-        </div>
-      </label>
-      <label className={styles.passwordLabel}>
-        Confirmar nueva contraseña
-        <div className={styles.passwordFieldWrap}>
-          <input
-            className={`${styles.passwordInput} ${styles.passwordInputWithIcon} ${nuevo2 && nuevo2 !== nuevo ? styles.passwordInputError : ""}`}
-            type={showPass ? "text" : "password"}
-            value={nuevo2}
-            onChange={(e) => setNuevo2(e.target.value)}
-            required
-            autoComplete="new-password"
-            aria-invalid={!!error || (nuevo2 !== "" && nuevo2 !== nuevo)}
-            aria-describedby={errorId}
-          />
-          <PasswordVisibilityButton
-            showPass={showPass}
-            onToggle={() => setShowPass((v) => !v)}
-          />
-        </div>
-      </label>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3" aria-busy={loading}>
+      <CampoPassword
+        id="perfil-password-actual"
+        label="Contraseña actual"
+        value={actual}
+        onChange={(e) => setActual(e.target.value)}
+        required
+        autoFocus
+        autoComplete="current-password"
+        aria-invalid={!!error}
+        aria-describedby={errorId}
+      />
+
+      <CampoPassword
+        id="perfil-password-nuevo"
+        label="Nueva contraseña"
+        value={nuevo}
+        onChange={(e) => setNuevo(e.target.value)}
+        required
+        minLength={8}
+        placeholder="Mínimo 8 caracteres"
+        autoComplete="new-password"
+        aria-invalid={!!error}
+        aria-describedby={errorId}
+      />
+
+      <CampoPassword
+        id="perfil-password-confirmacion"
+        label="Confirmar nueva contraseña"
+        value={nuevo2}
+        onChange={(e) => setNuevo2(e.target.value)}
+        required
+        autoComplete="new-password"
+        error={nuevo2 && nuevo2 !== nuevo ? "No coincide" : null}
+        aria-invalid={!!error || (nuevo2 !== "" && nuevo2 !== nuevo)}
+        aria-describedby={errorId}
+      />
+
       {error && (
-        <p
-          id="perfil-password-error"
-          role="alert"
-          className={styles.passwordError}
-        >
+        <Alerta id="perfil-password-error" variante="error">
           {error}
-        </p>
+        </Alerta>
       )}
-      <button
-        type="submit"
-        className={styles.passwordBtnPrimary}
-        disabled={loading}
-      >
-        {loading ? "Guardando…" : "Guardar nueva contraseña"}
-      </button>
-      <button
-        type="button"
-        onClick={onCerrar}
-        className={styles.passwordBtnLink}
-      >
+
+      <Boton type="submit" anchoCompleto cargando={loading}>
+        {loading ? "Guardando..." : "Guardar nueva contraseña"}
+      </Boton>
+      <Boton type="button" variante="fantasma" anchoCompleto onClick={onCerrar}>
         Cancelar
-      </button>
+      </Boton>
     </form>
   );
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+function FilaDato({ label, valor, last }) {
+  return (
+    <div
+      className={
+        last
+          ? "flex items-center justify-between py-2.5"
+          : "flex items-center justify-between border-b border-[var(--borde)] py-2.5"
+      }
+    >
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="max-w-[60%] break-words text-right text-sm font-semibold text-slate-950">
+        {valor}
+      </span>
+    </div>
+  );
+}
+
+function TituloSeccion({ children }) {
+  return (
+    <span className="mb-3 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+      {children}
+    </span>
+  );
+}
+
 export default function PerfilCliente({
   empleado,
   onLogout,
@@ -207,13 +164,15 @@ export default function PerfilCliente({
       : "",
   });
 
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const setCampo = (campo, valor) =>
+    setForm((actual) => ({ ...actual, [campo]: valor }));
 
   const handleGuardar = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.nombre.trim() || !form.apellido.trim())
+    if (!form.nombre.trim() || !form.apellido.trim()) {
       return setError("Nombre y apellido son obligatorios");
+    }
     setLoading(true);
     try {
       const updated = await authApi.actualizarPerfil(form);
@@ -242,156 +201,130 @@ export default function PerfilCliente({
   };
 
   return (
-    <div className={styles.wrap}>
-      {/* Avatar + nombre */}
-      <div className={styles.hero}>
-        <div className={styles.avatar}>{iniciales}</div>
-        <div>
-          <h2 className={styles.nombre}>
+    <Pagina className="max-w-[520px] pt-6">
+      <header className="mb-6 flex items-center gap-4 px-1">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--verde)] text-2xl font-extrabold text-white">
+          {iniciales}
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-xl font-extrabold text-slate-950">
             {empleado.nombre} {empleado.apellido}
           </h2>
-          <p className={styles.empresa}>{empleado.empresa?.nombre}</p>
+          <p className="mt-1 text-sm text-slate-500">{empleado.empresa?.nombre}</p>
         </div>
-      </div>
+      </header>
 
-      {/* Toast guardado */}
-      {guardado && <div className={styles.toast}>✅ Datos actualizados</div>}
+      {guardado && (
+        <Alerta variante="exito" className="mb-3">
+          ✅ Datos actualizados
+        </Alerta>
+      )}
 
-      {/* ── Datos personales ── */}
-      <div className={styles.card}>
-        <div className={styles.cardHeader}>
-          <span className={styles.cardLabel}>Mis datos</span>
+      <Tarjeta className="mb-3 px-4 py-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <TituloSeccion>Mis datos</TituloSeccion>
           {!editando && (
-            <button
+            <Boton
+              type="button"
+              variante="fantasma"
+              className="min-h-0 px-0 py-0 text-sm font-bold text-[var(--verde)]"
               onClick={() => setEditando(true)}
-              className={styles.editBtn}
             >
               ✏️ Editar
-            </button>
+            </Boton>
           )}
         </div>
 
         {editando ? (
-          <form onSubmit={handleGuardar} className={styles.formStack}>
-            <div className={styles.fila2}>
-              <label className={styles.label}>
-                Nombre
-                <input
-                  className={styles.input}
-                  value={form.nombre}
-                  onChange={(e) => set("nombre", e.target.value)}
-                  required
-                  autoFocus
-                />
-              </label>
-              <label className={styles.label}>
-                Apellido
-                <input
-                  className={styles.input}
-                  value={form.apellido}
-                  onChange={(e) => set("apellido", e.target.value)}
-                  required
-                />
-              </label>
+          <form onSubmit={handleGuardar} className="flex flex-col gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <CampoTexto
+                id="perfil-nombre"
+                label="Nombre"
+                value={form.nombre}
+                onChange={(e) => setCampo("nombre", e.target.value)}
+                required
+                autoFocus
+              />
+              <CampoTexto
+                id="perfil-apellido"
+                label="Apellido"
+                value={form.apellido}
+                onChange={(e) => setCampo("apellido", e.target.value)}
+                required
+              />
             </div>
-            <label className={styles.label}>
-              Teléfono <span className={styles.opcional}>(opcional)</span>
-              <input
-                className={styles.input}
-                type="tel"
-                value={form.telefono}
-                onChange={(e) => set("telefono", e.target.value)}
-                placeholder="+54 261 555-0000"
-              />
-            </label>
-            <label className={styles.label}>
-              Fecha de nacimiento{" "}
-              <span className={styles.opcional}>(opcional)</span>
-              <input
-                className={styles.input}
-                type="date"
-                value={form.fecha_nacimiento}
-                onChange={(e) => set("fecha_nacimiento", e.target.value)}
-              />
-            </label>
-            {error && (
-              <p role="alert" className={styles.errorMsg}>
-                {error}
-              </p>
-            )}
-            <div className={styles.actionRow}>
-              <button
-                type="submit"
-                className={styles.btnPrimary}
-                disabled={loading}
-              >
-                {loading ? "Guardando…" : "Guardar cambios"}
-              </button>
-              <button
-                type="button"
-                onClick={cancelar}
-                className={styles.btnCancel}
-              >
+            <CampoTexto
+              id="perfil-telefono"
+              label="Teléfono (opcional)"
+              type="tel"
+              value={form.telefono}
+              onChange={(e) => setCampo("telefono", e.target.value)}
+              placeholder="+54 261 555-0000"
+            />
+            <CampoTexto
+              id="perfil-nacimiento"
+              label="Fecha de nacimiento (opcional)"
+              type="date"
+              value={form.fecha_nacimiento}
+              onChange={(e) => setCampo("fecha_nacimiento", e.target.value)}
+            />
+            {error && <Alerta variante="error">{error}</Alerta>}
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Boton type="submit" cargando={loading}>
+                {loading ? "Guardando..." : "Guardar cambios"}
+              </Boton>
+              <Boton type="button" variante="secundario" onClick={cancelar}>
                 Cancelar
-              </button>
+              </Boton>
             </div>
           </form>
         ) : (
           <div>
-            <Fila
+            <FilaDato
               label="Nombre"
               valor={`${empleado.nombre} ${empleado.apellido}`}
             />
-            <Fila label="Email" valor={empleado.email} />
-            <Fila label="Teléfono" valor={empleado.telefono || "—"} />
-            <Fila
+            <FilaDato label="Email" valor={empleado.email} />
+            <FilaDato label="Teléfono" valor={empleado.telefono || "—"} />
+            <FilaDato
               label="Cumpleaños"
               valor={formatFecha(empleado.fecha_nacimiento) || "—"}
               last
             />
           </div>
         )}
-      </div>
+      </Tarjeta>
 
-      {/* ── Empresa ── */}
-      <div className={styles.card}>
-        <span className={styles.cardLabel}>Mi empresa</span>
-        <div>
-          <Fila label="Empresa" valor={empleado.empresa?.nombre ?? "—"} />
-          <Fila label="Plan" valor={plan} last />
-        </div>
-      </div>
+      <Tarjeta className="mb-3 px-4 py-4">
+        <TituloSeccion>Mi empresa</TituloSeccion>
+        <FilaDato label="Empresa" valor={empleado.empresa?.nombre ?? "—"} />
+        <FilaDato label="Plan" valor={plan} last />
+      </Tarjeta>
 
-      {/* ── Seguridad ── */}
-      <div className={styles.card}>
-        <span className={styles.cardLabel}>Seguridad</span>
+      <Tarjeta className="mb-3 px-4 py-4">
+        <TituloSeccion>Seguridad</TituloSeccion>
         {showPass ? (
           <CambiarPasswordForm onCerrar={() => setShowPass(false)} />
         ) : (
-          <button
+          <Boton
+            type="button"
+            variante="secundario"
+            anchoCompleto
             onClick={() => setShowPass(true)}
-            className={styles.btnSecundario}
           >
             🔒 Cambiar contraseña
-          </button>
+          </Boton>
         )}
-      </div>
+      </Tarjeta>
 
-      {/* Cerrar sesión */}
-      <button onClick={onLogout} className={styles.btnLogout}>
+      <Boton type="button" variante="peligro" anchoCompleto onClick={onLogout}>
         Cerrar sesión
-      </button>
+      </Boton>
 
-      <p className={styles.footerNote}>La Quinta · Sistema de pedidos</p>
-    </div>
-  );
-}
-
-function Fila({ label, valor, last }) {
-  return (
-    <div className={`${styles.fila} ${last ? styles.filaLast : ""}`}>
-      <span className={styles.filaLabel}>{label}</span>
-      <span className={styles.filaValor}>{valor}</span>
-    </div>
+      <p className="mt-6 text-center text-xs text-slate-300">
+        La Quinta · Sistema de pedidos
+      </p>
+    </Pagina>
   );
 }

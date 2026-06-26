@@ -157,7 +157,7 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
 }
 
 // ── Panel de detalle ─────────────────────────────────────────────────
-function PanelDetalle({ lunesIso, menu, estadoMut, onPublicar, onDelete }) {
+function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, onReabrir, onDelete }) {
   const domingo = addDias(lunesIso, 6);
 
   if (!menu) {
@@ -209,19 +209,28 @@ function PanelDetalle({ lunesIso, menu, estadoMut, onPublicar, onDelete }) {
             <>
               <button
                 onClick={() => estadoMut({ estado: 'cerrado' })}
-                disabled={estadoMut.isPending}
+                disabled={estadoPending}
                 style={btnStyle('#f97316', '#fff')}
               >
                 Cerrar pedidos
               </button>
               <button
                 onClick={() => estadoMut({ estado: 'borrador' })}
-                disabled={estadoMut.isPending}
+                disabled={estadoPending}
                 style={btnStyle('#f3f4f6', '#374151')}
               >
                 Volver a borrador
               </button>
             </>
+          )}
+          {estado === 'cerrado' && (
+            <button
+              onClick={onReabrir}
+              disabled={estadoPending}
+              style={btnStyle('#16a34a', '#fff')}
+            >
+              Reabrir pedidos
+            </button>
           )}
           <Link
             to={`/semanas/${menu.id}`}
@@ -373,6 +382,7 @@ export default function Semanas() {
   const [selLunes, setSelLunes] = useState(lunesActual);
   const [modalPublicar, setModalPublicar] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmReabrir, setConfirmReabrir] = useState(false);
 
   const query     = useMenusSemanales({ limit: 100 });
   const deleteMut = useDeleteMenu();
@@ -387,15 +397,26 @@ export default function Semanas() {
   const menuSel = menuByLunes.get(selLunes) ?? null;
 
   const handleEstado = async ({ estado, extra = {} }) => {
-    if (!menuSel) return;
+    if (!menuSel) return false;
     try {
       await estadoMut.mutateAsync({ id: menuSel.id, estado, extra });
-      const labels = { publicado: 'publicado', borrador: 'vuelto a borrador', cerrado: 'cerrado' };
+      const labels = {
+        publicado: menuSel.estado === 'cerrado' ? 'reabierto' : 'publicado',
+        borrador: 'vuelto a borrador',
+        cerrado: 'cerrado',
+      };
       toast.success(`Menú ${labels[estado]}`);
       setModalPublicar(false);
+      return true;
     } catch (e) {
-      toast.error(e?.message || 'Error al publicar el menú');
+      toast.error(e?.message || 'Error al cambiar el estado');
+      return false;
     }
+  };
+
+  const handleReabrir = async () => {
+    const ok = await handleEstado({ estado: 'publicado' });
+    if (ok) setConfirmReabrir(false);
   };
 
   const handleDelete = async () => {
@@ -517,7 +538,9 @@ export default function Semanas() {
             lunesIso={selLunes}
             menu={menuSel}
             estadoMut={handleEstado}
+            estadoPending={estadoMut.isPending}
             onPublicar={() => setModalPublicar(true)}
+            onReabrir={() => setConfirmReabrir(true)}
             onDelete={() => setConfirmDelete(true)}
           />
         )}
@@ -533,6 +556,27 @@ export default function Semanas() {
             loading={estadoMut.isPending}
           />
         )}
+      </Modal>
+
+      {/* Modal confirmar reabrir */}
+      <Modal open={confirmReabrir} onClose={() => setConfirmReabrir(false)} title="Reabrir pedidos">
+        <p style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
+          ¿Reabrir <strong>{menuSel?.nombre}</strong>?
+        </p>
+        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 20 }}>
+          La semana volverá a estar publicada y los empleados podrán cargar o modificar pedidos si todavía están dentro del plazo definido.
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={() => setConfirmReabrir(false)} className="btn-secondary">Cancelar</button>
+          <button
+            onClick={handleReabrir}
+            disabled={estadoMut.isPending}
+            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            {estadoMut.isPending && <Spinner size="sm" />}
+            Reabrir pedidos
+          </button>
+        </div>
       </Modal>
 
       {/* Modal confirmar eliminar */}

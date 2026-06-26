@@ -53,16 +53,19 @@ export const cambiarEstadoMenu = async (id, estado, extra = {}) => {
   if (!menu) throw ApiError.notFound(`Menú semanal con id ${id} no encontrado`);
 
   // Validar transiciones permitidas
-  const transiciones = { borrador: ['publicado'], publicado: ['borrador', 'cerrado'], cerrado: [] };
+  const transiciones = { borrador: ['publicado'], publicado: ['borrador', 'cerrado'], cerrado: ['publicado'] };
   if (!transiciones[menu.estado].includes(estado)) {
     throw ApiError.conflict(`No se puede pasar de "${menu.estado}" a "${estado}"`);
   }
 
   // Permitir múltiples menús publicados (semana actual + semana siguiente)
 
-  return repo.cambiarEstado(id, estado, {
-    fecha_limite_pedidos: extra.fecha_limite_pedidos || null,
-  });
+  const datosExtra = {};
+  if (Object.prototype.hasOwnProperty.call(extra, 'fecha_limite_pedidos')) {
+    datosExtra.fecha_limite_pedidos = extra.fecha_limite_pedidos || null;
+  }
+
+  return repo.cambiarEstado(id, estado, datosExtra);
 };
 
 // ── Platos por día ────────────────────────────────────────────────

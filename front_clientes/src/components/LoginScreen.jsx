@@ -1,10 +1,14 @@
 import { useState } from "react";
-import styles from "./LoginScreen.module.css";
+import AuthLayout from "../compartido/layout/AuthLayout.jsx";
+import Alerta from "../compartido/ui/Alerta.jsx";
+import Boton from "../compartido/ui/Boton.jsx";
+import CampoPassword from "../compartido/ui/CampoPassword.jsx";
+import CampoTexto from "../compartido/ui/CampoTexto.jsx";
+import Checkbox from "../compartido/ui/Checkbox.jsx";
 
 export default function LoginScreen({ onLogin, onRegistrar, onRecuperar }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,156 +31,85 @@ export default function LoginScreen({ onLogin, onRegistrar, onRecuperar }) {
   };
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.card}>
-        <div className={styles.logo}>🌿</div>
-        <h1 className={styles.titulo}>La Quinta</h1>
-        <p className={styles.sub}>Sistema de pedidos</p>
-        <p className={styles.loginHint}>
-          Entrá con el email registrado en tu empresa. Si es tu primera vez, usá
-          el código que te dieron.
-        </p>
+    <AuthLayout subtitulo="Sistema de pedidos">
+      <p className="-mt-1 mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-snug text-slate-500">
+        Entrá con el email registrado en tu empresa. Si es tu primera vez, usá
+        el código que te dieron.
+      </p>
 
-        <form
-          onSubmit={handleSubmit}
-          className={styles.form}
-          aria-busy={loading}
-        >
-          {/* Email */}
-          <label className={styles.label}>
-            Email
-            <input
-              className={styles.input}
-              type="email"
-              required
-              autoFocus
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@empresa.com"
-              aria-invalid={!!error}
-              aria-describedby={errorId}
-            />
-          </label>
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-2.5 text-left"
+        aria-busy={loading}
+      >
+        <CampoTexto
+          id="login-email"
+          label="Email"
+          type="email"
+          required
+          autoFocus
+          autoComplete="username"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="usuario@empresa.com"
+          aria-invalid={!!error}
+          aria-describedby={errorId}
+        />
 
-          {/* Contraseña con toggle */}
-          <label className={styles.label}>
-            Contraseña
-            <div className={styles.passWrap}>
-              <input
-                className={`${styles.input} ${styles.inputConIcono}`}
-                type={showPass ? "text" : "password"}
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                aria-invalid={!!error}
-                aria-describedby={errorId}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass((v) => !v)}
-                className={styles.eyeBtn}
-                aria-label={showPass ? "Ocultar contraseña" : "Ver contraseña"}
-                aria-pressed={showPass}
-              >
-                {showPass ? (
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className={styles.eyeIcon}
-                  >
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className={styles.eyeIcon}
-                  >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </label>
+        <CampoPassword
+          id="login-password"
+          label="Contraseña"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          aria-invalid={!!error}
+          aria-describedby={errorId}
+        />
 
-          {/* Recordarme */}
-          <label className={styles.checkLabel}>
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-              className={styles.checkbox}
-            />
-            Mantener sesión activa
-          </label>
+        <Checkbox
+          checked={remember}
+          onChange={(e) => setRemember(e.target.checked)}
+          label="Mantener sesión activa"
+        />
 
-          {/* Error */}
-          {error && (
-            <p id="login-error" role="alert" className={styles.error}>
-              {error}
-            </p>
-          )}
+        {error && (
+          <Alerta id="login-error" variante="error">
+            {error}
+          </Alerta>
+        )}
 
-          {/* Botón */}
-          <button type="submit" className={styles.btn} disabled={loading}>
-            {loading ? (
-              <span className={styles.loadingRow}>
-                <svg className={styles.spinner} viewBox="0 0 24 24" fill="none">
-                  <circle
-                    className={styles.spinnerTrack}
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="white"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className={styles.spinnerFill}
-                    fill="white"
-                    d="M4 12a8 8 0 018-8v8z"
-                  />
-                </svg>
-                Ingresando…
-              </span>
-            ) : (
-              "Ingresar"
-            )}
-          </button>
+        <Boton type="submit" anchoCompleto cargando={loading}>
+          {loading ? "Ingresando..." : "Ingresar"}
+        </Boton>
 
-          {onRecuperar && (
-            <button
+        {onRecuperar && (
+          <Boton
+            type="button"
+            variante="fantasma"
+            className="min-h-6 py-1 text-sm font-medium"
+            onClick={onRecuperar}
+            anchoCompleto
+          >
+            ¿Olvidaste tu contraseña?
+          </Boton>
+        )}
+
+        {onRegistrar && (
+          <div className="flex flex-col items-center justify-center gap-1 pt-1 text-center text-sm sm:flex-row sm:gap-2">
+            <span className="text-slate-500">¿Primera vez?</span>
+            <Boton
               type="button"
-              onClick={onRecuperar}
-              className={styles.recuperarLink}
+              variante="fantasma"
+              className="min-h-6 px-0 py-0 font-bold text-[var(--verde)]"
+              onClick={onRegistrar}
             >
-              ¿Olvidaste tu contraseña?
-            </button>
-          )}
-
-          {onRegistrar && (
-            <div className={styles.registroRow}>
-              <span className={styles.registroTexto}>¿Primera vez?</span>
-              <button
-                type="button"
-                onClick={onRegistrar}
-                className={styles.registroLink}
-              >
-                Crear cuenta con código
-              </button>
-            </div>
-          )}
-        </form>
-      </div>
-    </div>
+              Crear cuenta con código
+            </Boton>
+          </div>
+        )}
+      </form>
+    </AuthLayout>
   );
 }

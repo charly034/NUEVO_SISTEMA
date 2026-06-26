@@ -24,6 +24,105 @@ import {
 } from "./formulario/FormularioPedidoEstados.jsx";
 import FormularioPedidoEditable from "./formulario/FormularioPedidoEditable.jsx";
 
+const VISTA_PEDIDO = {
+  CARGANDO_MENU: "cargando_menu",
+  CONFIRMACION_RECIENTE: "confirmacion_reciente",
+  SIN_MENUS_PUBLICADOS: "sin_menus_publicados",
+  LIMITE_VENCIDO: "limite_vencido",
+  SOLO_LECTURA_CON_PEDIDO: "solo_lectura_con_pedido",
+  SOLO_LECTURA_CON_MENU: "solo_lectura_con_menu",
+  SOLO_LECTURA_SIN_MENU: "solo_lectura_sin_menu",
+  PEDIDO_GUARDADO: "pedido_guardado",
+  PREVIEW_CREACION: "preview_creacion",
+  CARGANDO_PEDIDO_EXISTENTE: "cargando_pedido_existente",
+  EDITABLE: "editable",
+};
+
+function ordenarItemsPedido(items = []) {
+  return items
+    .slice()
+    .sort((a, b) => ORDEN_DIAS.indexOf(a.dia) - ORDEN_DIAS.indexOf(b.dia));
+}
+
+function textoCantidadDias(cantidad, textoResumen) {
+  return `${cantidad} día${cantidad !== 1 ? "s" : ""} · ${textoResumen}`;
+}
+
+function PedidoLayout({
+  empleado,
+  menusDisponibles,
+  semanaSelIdx,
+  onChangeSemana,
+  children,
+}) {
+  return (
+    <Pantalla noScroll>
+      <HeaderUsuario empleado={empleado} />
+      <SelectorSemana
+        menus={menusDisponibles}
+        selIdx={semanaSelIdx}
+        onChange={onChangeSemana}
+        noScroll
+      />
+      {children}
+    </Pantalla>
+  );
+}
+
+function obtenerVistaPedido({
+  loadingMenu,
+  confirmado,
+  menusDisponibles,
+  menuSemana,
+  limiteEmpresaVencido,
+  puedeModificarPedido,
+  tienePedidoGuardado,
+  modoEdicionPedido,
+  semanaSelIdx,
+  modoCreacionPedido,
+  pedidoExistente,
+}) {
+  if (loadingMenu) return VISTA_PEDIDO.CARGANDO_MENU;
+  if (confirmado) return VISTA_PEDIDO.CONFIRMACION_RECIENTE;
+  if (menusDisponibles.length === 0) return VISTA_PEDIDO.SIN_MENUS_PUBLICADOS;
+
+  if (menuSemana?.disponible && limiteEmpresaVencido) {
+    return VISTA_PEDIDO.LIMITE_VENCIDO;
+  }
+
+  if (!puedeModificarPedido) {
+    const pedidoHistorial = menuSemana?.pedidoHistorial;
+    const tieneMenuPublicado =
+      !menuSemana?.placeholder && !!menuSemana?.menu?.id;
+
+    if (pedidoHistorial?.items?.length) {
+      return VISTA_PEDIDO.SOLO_LECTURA_CON_PEDIDO;
+    }
+    if (tieneMenuPublicado) {
+      return VISTA_PEDIDO.SOLO_LECTURA_CON_MENU;
+    }
+    return VISTA_PEDIDO.SOLO_LECTURA_SIN_MENU;
+  }
+
+  if (tienePedidoGuardado && !modoEdicionPedido) {
+    return VISTA_PEDIDO.PEDIDO_GUARDADO;
+  }
+
+  if (!tienePedidoGuardado && semanaSelIdx > 0 && !modoCreacionPedido) {
+    return VISTA_PEDIDO.PREVIEW_CREACION;
+  }
+
+  if (
+    modoEdicionPedido &&
+    tienePedidoGuardado &&
+    !pedidoExistente?.items?.length
+  ) {
+    return VISTA_PEDIDO.CARGANDO_PEDIDO_EXISTENTE;
+  }
+
+  return VISTA_PEDIDO.EDITABLE;
+}
+
 export default function FormularioPedido({ empleado }) {
   const {
     semanaSelIdx,
@@ -88,11 +187,25 @@ export default function FormularioPedido({ empleado }) {
     diasSinServicio,
   });
 
-  if (loadingMenu) {
+  const vistaPedido = obtenerVistaPedido({
+    loadingMenu,
+    confirmado,
+    menusDisponibles,
+    menuSemana,
+    limiteEmpresaVencido,
+    puedeModificarPedido,
+    tienePedidoGuardado,
+    modoEdicionPedido,
+    semanaSelIdx,
+    modoCreacionPedido,
+    pedidoExistente,
+  });
+
+  if (vistaPedido === VISTA_PEDIDO.CARGANDO_MENU) {
     return <LoadingMenuState />;
   }
 
-  if (confirmado) {
+  if (vistaPedido === VISTA_PEDIDO.CONFIRMACION_RECIENTE) {
     return (
       <ConfirmacionPedidoState
         diasSemana={diasSemana}
@@ -107,14 +220,12 @@ export default function FormularioPedido({ empleado }) {
     );
   }
 
-  if (menusDisponibles.length === 0) {
+  if (vistaPedido === VISTA_PEDIDO.SIN_MENUS_PUBLICADOS) {
     return <NoMenusPublicadosState empleado={empleado} />;
   }
 
-  if (menuSemana?.disponible && limiteEmpresaVencido) {
-    const itemsExistentes = (pedidoExistente?.items ?? [])
-      .slice()
-      .sort((a, b) => ORDEN_DIAS.indexOf(a.dia) - ORDEN_DIAS.indexOf(b.dia));
+  if (vistaPedido === VISTA_PEDIDO.LIMITE_VENCIDO) {
+    const itemsExistentes = ordenarItemsPedido(pedidoExistente?.items ?? []);
     const textoResumenLimite = construirTextoResumenLimite({
       semanaInicio,
       limiteEmpresa: menuSemana.limiteEmpresa,
@@ -122,18 +233,19 @@ export default function FormularioPedido({ empleado }) {
     const diasResumen = construirDiasResumenPedido(itemsExistentes, diasSemana);
 
     return (
-      <Pantalla noScroll>
-        <HeaderUsuario empleado={empleado} />
-        <SelectorSemana
-          menus={menusDisponibles}
-          selIdx={semanaSelIdx}
-          onChange={setSemanaSelIdx}
-          noScroll
-        />
+      <PedidoLayout
+        empleado={empleado}
+        menusDisponibles={menusDisponibles}
+        semanaSelIdx={semanaSelIdx}
+        onChangeSemana={setSemanaSelIdx}
+      >
         {itemsExistentes.length > 0 ? (
           <PedidoConfirmadoCard
             dias={diasResumen}
-            textoResumen={`${itemsExistentes.length} día${itemsExistentes.length !== 1 ? "s" : ""} · ${textoResumenLimite}`}
+            textoResumen={textoCantidadDias(
+              itemsExistentes.length,
+              textoResumenLimite,
+            )}
           />
         ) : (
           <MenuSemanalCard
@@ -141,68 +253,56 @@ export default function FormularioPedido({ empleado }) {
             textoResumen={textoResumenLimite}
           />
         )}
-      </Pantalla>
+      </PedidoLayout>
     );
   }
 
-  if (!menuSemana?.disponible) {
-    const pedidoHistorial = menuSemana?.pedidoHistorial;
-    const tieneMenuPublicado =
-      !menuSemana?.placeholder && !!menuSemana?.menu?.id;
-
-    if (pedidoHistorial?.items?.length) {
-      const itemsExistentes = pedidoHistorial.items
-        .slice()
-        .sort((a, b) => ORDEN_DIAS.indexOf(a.dia) - ORDEN_DIAS.indexOf(b.dia));
-      const diasResumen = construirDiasResumenPedido(
-        itemsExistentes,
-        diasSemana,
-      );
-
-      return (
-        <Pantalla noScroll>
-          <HeaderUsuario empleado={empleado} />
-          <SelectorSemana
-            menus={menusDisponibles}
-            selIdx={semanaSelIdx}
-            onChange={setSemanaSelIdx}
-            noScroll
-          />
-          <PedidoConfirmadoCard
-            dias={diasResumen}
-            textoResumen={`${itemsExistentes.length} día${itemsExistentes.length !== 1 ? "s" : ""} · ${construirTextoResumenLimite({ semanaInicio })}`}
-          />
-        </Pantalla>
-      );
-    }
-
-    if (tieneMenuPublicado) {
-      return (
-        <Pantalla noScroll>
-          <HeaderUsuario empleado={empleado} />
-          <SelectorSemana
-            menus={menusDisponibles}
-            selIdx={semanaSelIdx}
-            onChange={setSemanaSelIdx}
-            noScroll
-          />
-          <MenuSemanalCard
-            menu={menuSemana.menu}
-            textoResumen={construirTextoResumenLimite({ semanaInicio })}
-          />
-        </Pantalla>
-      );
-    }
+  if (vistaPedido === VISTA_PEDIDO.SOLO_LECTURA_CON_PEDIDO) {
+    const itemsExistentes = ordenarItemsPedido(
+      menuSemana?.pedidoHistorial?.items ?? [],
+    );
+    const diasResumen = construirDiasResumenPedido(itemsExistentes, diasSemana);
+    const textoResumen = construirTextoResumenLimite({ semanaInicio });
 
     return (
-      <Pantalla noScroll>
-        <HeaderUsuario empleado={empleado} />
-        <SelectorSemana
-          menus={menusDisponibles}
-          selIdx={semanaSelIdx}
-          onChange={setSemanaSelIdx}
-          noScroll
+      <PedidoLayout
+        empleado={empleado}
+        menusDisponibles={menusDisponibles}
+        semanaSelIdx={semanaSelIdx}
+        onChangeSemana={setSemanaSelIdx}
+      >
+        <PedidoConfirmadoCard
+          dias={diasResumen}
+          textoResumen={textoCantidadDias(itemsExistentes.length, textoResumen)}
         />
+      </PedidoLayout>
+    );
+  }
+
+  if (vistaPedido === VISTA_PEDIDO.SOLO_LECTURA_CON_MENU) {
+    return (
+      <PedidoLayout
+        empleado={empleado}
+        menusDisponibles={menusDisponibles}
+        semanaSelIdx={semanaSelIdx}
+        onChangeSemana={setSemanaSelIdx}
+      >
+        <MenuSemanalCard
+          menu={menuSemana.menu}
+          textoResumen={construirTextoResumenLimite({ semanaInicio })}
+        />
+      </PedidoLayout>
+    );
+  }
+
+  if (vistaPedido === VISTA_PEDIDO.SOLO_LECTURA_SIN_MENU) {
+    return (
+      <PedidoLayout
+        empleado={empleado}
+        menusDisponibles={menusDisponibles}
+        semanaSelIdx={semanaSelIdx}
+        onChangeSemana={setSemanaSelIdx}
+      >
         <MenuNoDisponibleCard
           mensaje={
             menuSemana?.placeholder
@@ -210,7 +310,7 @@ export default function FormularioPedido({ empleado }) {
               : menuSemana?.mensaje || "Esta semana ya no acepta pedidos."
           }
         />
-      </Pantalla>
+      </PedidoLayout>
     );
   }
 
@@ -223,10 +323,8 @@ export default function FormularioPedido({ empleado }) {
     limiteEmpresa: menuSemana?.limiteEmpresa,
   });
 
-  if (tienePedidoGuardado && !modoEdicionPedido) {
-    const itemsExistentes = (pedidoVisible?.items ?? [])
-      .slice()
-      .sort((a, b) => ORDEN_DIAS.indexOf(a.dia) - ORDEN_DIAS.indexOf(b.dia));
+  if (vistaPedido === VISTA_PEDIDO.PEDIDO_GUARDADO) {
+    const itemsExistentes = ordenarItemsPedido(pedidoVisible?.items ?? []);
     const textoResumenPedido = construirTextoResumenLimite({
       semanaInicio,
       limiteEmpresa: menuSemana?.limiteEmpresa,
@@ -234,21 +332,25 @@ export default function FormularioPedido({ empleado }) {
     const diasResumen = construirDiasResumenPedido(itemsExistentes, diasSemana);
 
     return (
-      <Pantalla noScroll>
-        <HeaderUsuario empleado={empleado} />
-        <SelectorSemana
-          menus={menusDisponibles}
-          selIdx={semanaSelIdx}
-          onChange={setSemanaSelIdx}
-          noScroll
-        />
+      <PedidoLayout
+        empleado={empleado}
+        menusDisponibles={menusDisponibles}
+        semanaSelIdx={semanaSelIdx}
+        onChangeSemana={setSemanaSelIdx}
+      >
         <PedidoConfirmadoCard
           dias={diasResumen}
-          textoResumen={`${itemsExistentes.length} día${itemsExistentes.length !== 1 ? "s" : ""} · ${textoResumenPedido}`}
+          textoResumen={textoCantidadDias(
+            itemsExistentes.length,
+            textoResumenPedido,
+          )}
           onModificar={
             puedeModificarPedido
               ? () => {
-                  if (!pedidoExistente?.items?.length && cargandoPedidoExistente) {
+                  if (
+                    !pedidoExistente?.items?.length &&
+                    cargandoPedidoExistente
+                  ) {
                     toast.warning(
                       "Estamos cargando tu pedido. Probá de nuevo en unos segundos.",
                     );
@@ -260,20 +362,18 @@ export default function FormularioPedido({ empleado }) {
               : null
           }
         />
-      </Pantalla>
+      </PedidoLayout>
     );
   }
 
-  if (!tienePedidoGuardado && semanaSelIdx > 0 && !modoCreacionPedido) {
+  if (vistaPedido === VISTA_PEDIDO.PREVIEW_CREACION) {
     return (
-      <Pantalla noScroll>
-        <HeaderUsuario empleado={empleado} />
-        <SelectorSemana
-          menus={menusDisponibles}
-          selIdx={semanaSelIdx}
-          onChange={setSemanaSelIdx}
-          noScroll
-        />
+      <PedidoLayout
+        empleado={empleado}
+        menusDisponibles={menusDisponibles}
+        semanaSelIdx={semanaSelIdx}
+        onChangeSemana={setSemanaSelIdx}
+      >
         <MenuSemanalCard
           menu={menu}
           textoResumen={construirTextoResumenLimite({
@@ -285,11 +385,11 @@ export default function FormularioPedido({ empleado }) {
             setExpandidoDia(undefined);
           }}
         />
-      </Pantalla>
+      </PedidoLayout>
     );
   }
 
-  if (modoEdicionPedido && tienePedidoGuardado && !pedidoExistente?.items?.length) {
+  if (vistaPedido === VISTA_PEDIDO.CARGANDO_PEDIDO_EXISTENTE) {
     return (
       <PedidoCargandoState
         empleado={empleado}

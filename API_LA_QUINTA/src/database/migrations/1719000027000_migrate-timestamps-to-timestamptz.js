@@ -1,83 +1,55 @@
 const TZ = `'America/Argentina/Buenos_Aires'`;
 
+const TIMESTAMP_COLUMNS = [
+  ['pedidos', 'created_at'],
+  ['pedidos', 'updated_at'],
+  ['pedido_items', 'created_at'],
+  ['pedido_items', 'updated_at'],
+  ['pedido_eventos', 'created_at'],
+  ['menus_semanales', 'created_at'],
+  ['menus_semanales', 'updated_at'],
+  ['menus_semanales', 'publicado_at'],
+  ['menus_semanales', 'cerrado_at'],
+  ['menus_semanales', 'fecha_limite_pedidos'],
+  ['platos', 'created_at'],
+  ['platos', 'updated_at'],
+  ['empleados', 'created_at'],
+  ['empleados', 'updated_at'],
+  ['empresas', 'created_at'],
+  ['empresas', 'updated_at'],
+  ['historial_uso_platos', 'created_at'],
+];
+
+function alterIfExistsSql(targetType) {
+  return TIMESTAMP_COLUMNS.map(([table, column]) => `
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = '${table}'
+        AND column_name = '${column}'
+    ) THEN
+      ALTER TABLE ${table}
+        ALTER COLUMN ${column} TYPE ${targetType}
+        USING ${column} AT TIME ZONE ${TZ};
+    END IF;
+  `).join('\n');
+}
+
 export const up = (pgm) => {
   pgm.sql(`
-    -- pedidos
-    ALTER TABLE pedidos
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE ${TZ};
-
-    -- pedido_items
-    ALTER TABLE pedido_items
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE ${TZ};
-
-    -- pedido_eventos
-    ALTER TABLE pedido_eventos
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ};
-
-    -- menus_semanales
-    ALTER TABLE menus_semanales
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE ${TZ},
-      ALTER COLUMN publicado_at TYPE timestamptz USING publicado_at AT TIME ZONE ${TZ},
-      ALTER COLUMN cerrado_at TYPE timestamptz USING cerrado_at AT TIME ZONE ${TZ},
-      ALTER COLUMN fecha_limite_pedidos TYPE timestamptz USING fecha_limite_pedidos AT TIME ZONE ${TZ};
-
-    -- platos
-    ALTER TABLE platos
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE ${TZ};
-
-    -- empleados
-    ALTER TABLE empleados
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE ${TZ};
-
-    -- empresas
-    ALTER TABLE empresas
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE ${TZ};
-
-    -- historial_uso_platos
-    ALTER TABLE historial_uso_platos
-      ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE ${TZ};
+    DO $$
+    BEGIN
+      ${alterIfExistsSql('timestamptz')}
+    END $$;
   `);
 };
 
 export const down = (pgm) => {
   pgm.sql(`
-    ALTER TABLE pedidos
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamp USING updated_at AT TIME ZONE ${TZ};
-
-    ALTER TABLE pedido_items
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamp USING updated_at AT TIME ZONE ${TZ};
-
-    ALTER TABLE pedido_eventos
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ};
-
-    ALTER TABLE menus_semanales
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamp USING updated_at AT TIME ZONE ${TZ},
-      ALTER COLUMN publicado_at TYPE timestamp USING publicado_at AT TIME ZONE ${TZ},
-      ALTER COLUMN cerrado_at TYPE timestamp USING cerrado_at AT TIME ZONE ${TZ},
-      ALTER COLUMN fecha_limite_pedidos TYPE timestamp USING fecha_limite_pedidos AT TIME ZONE ${TZ};
-
-    ALTER TABLE platos
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamp USING updated_at AT TIME ZONE ${TZ};
-
-    ALTER TABLE empleados
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamp USING updated_at AT TIME ZONE ${TZ};
-
-    ALTER TABLE empresas
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ},
-      ALTER COLUMN updated_at TYPE timestamp USING updated_at AT TIME ZONE ${TZ};
-
-    ALTER TABLE historial_uso_platos
-      ALTER COLUMN created_at TYPE timestamp USING created_at AT TIME ZONE ${TZ};
+    DO $$
+    BEGIN
+      ${alterIfExistsSql('timestamp')}
+    END $$;
   `);
 };

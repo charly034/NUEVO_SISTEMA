@@ -39,7 +39,7 @@ export default function FormularioPedidoEditable({
   mutation,
 }) {
   return (
-    <Pantalla>
+    <Pantalla noScroll>
       <HeaderUsuario empleado={empleado} />
 
       <SelectorSemana

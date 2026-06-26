@@ -8,10 +8,10 @@ start "API La Quinta" cmd /k "cd /d "%~dp0API_LA_QUINTA" && node src/server.js"
 timeout /t 3 /nobreak >nul
 
 echo [2/3] Panel Admin (puerto 5174)...
-start "Admin La Quinta" cmd /k "cd /d "%~dp0front_menu" && npm run dev"
+start "Admin La Quinta" cmd /k "cd /d "%~dp0front_menu" && npm run dev -- --host 0.0.0.0"
 
 echo [3/3] App Clientes (puerto 5175)...
-start "Clientes La Quinta" cmd /k "cd /d "%~dp0front_clientes" && npm run dev"
+start "Clientes La Quinta" cmd /k "cd /d "%~dp0front_clientes" && npm run dev -- --host 0.0.0.0"
 
 echo.
 echo Listo. Abriendo en 5 segundos...

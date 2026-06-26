@@ -2,7 +2,7 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "./hooks/useAuth.js";
 import PrivateRoute from "./components/layout/PrivateRoute.jsx";
-import BottomNav from "./components/layout/BottomNav.jsx";
+import BottomNavigation from "./components/ui/BottomNavigation.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegistroPage from "./pages/RegistroPage.jsx";
 import RecuperarPage from "./pages/RecuperarPage.jsx";
@@ -54,7 +54,7 @@ function RouteGuard({ empleado, checking, children }) {
   return (
     <PrivateRoute empleado={empleado} checking={checking}>
       {children}
-      <BottomNav />
+      <BottomNavigation />
     </PrivateRoute>
   );
 }

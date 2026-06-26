@@ -1,14 +1,17 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
+import AuthLayout from "../compartido/layout/AuthLayout.jsx";
+import Alerta from "../compartido/ui/Alerta.jsx";
+import Boton from "../compartido/ui/Boton.jsx";
+import CampoPassword from "../compartido/ui/CampoPassword.jsx";
+import CampoTexto from "../compartido/ui/CampoTexto.jsx";
+import Pasos from "../compartido/ui/Pasos.jsx";
 import { authApi, saveClientSession } from "../services/api.js";
-import styles from "./RegistroScreen.module.css";
-
-// ── Utilidades ─────────────────────────────────────────────────────────────────
 
 function slugify(str) {
   return str
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
 
@@ -24,12 +27,10 @@ function normalizarCodigo(value) {
   return value.replace(/[\s-]/g, "").toUpperCase().slice(0, 8);
 }
 
-// ── Componente principal ────────────────────────────────────────────────────────
-
 export default function RegistroScreen({ onRegistrado, onVolver }) {
   const [paso, setPaso] = useState(1);
   const [codigo, setCodigo] = useState("");
-  const [empresa, setEmpresa] = useState(null); // { id, nombre }
+  const [empresa, setEmpresa] = useState(null);
   const [loadingCodigo, setLoadingCodigo] = useState(false);
   const [errorCodigo, setErrorCodigo] = useState("");
 
@@ -41,15 +42,11 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
   const [nacimiento, setNacimiento] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
-  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const codigoErrorId = errorCodigo ? "registro-codigo-error" : undefined;
   const registroErrorId = error ? "registro-form-error" : undefined;
-
   const codigoRef = useRef(null);
-
-  // ── Paso 1: verificar código ──────────────────────────────────────────────────
 
   const handleCodigo = async (e) => {
     e.preventDefault();
@@ -69,21 +66,20 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
     }
   };
 
-  // Actualizar email sugerido cuando cambian nombre/apellido (solo si no lo editó manualmente)
-  const handleNombre = (v) => {
-    setNombre(v);
-    if (!emailManual) setEmail(emailSugerido(v, apellido, empresa?.nombre));
-  };
-  const handleApellido = (v) => {
-    setApellido(v);
-    if (!emailManual) setEmail(emailSugerido(nombre, v, empresa?.nombre));
-  };
-  const handleEmail = (v) => {
-    setEmail(v);
-    setEmailManual(true);
+  const handleNombre = (value) => {
+    setNombre(value);
+    if (!emailManual) setEmail(emailSugerido(value, apellido, empresa?.nombre));
   };
 
-  // ── Paso 2: crear cuenta ──────────────────────────────────────────────────────
+  const handleApellido = (value) => {
+    setApellido(value);
+    if (!emailManual) setEmail(emailSugerido(nombre, value, empresa?.nombre));
+  };
+
+  const handleEmail = (value) => {
+    setEmail(value);
+    setEmailManual(true);
+  };
 
   const handleRegistro = async (e) => {
     e.preventDefault();
@@ -111,308 +107,177 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────────
-
   return (
-    <div className={styles.wrap}>
-      <div className={styles.card}>
-        <div className={styles.logo}>🌿</div>
-        <h1 className={styles.titulo}>La Quinta</h1>
-        <p className={styles.sub}>Crear cuenta</p>
-
-        {/* Indicador de pasos */}
-        <div className={styles.pasos}>
-          <div
-            className={`${styles.paso} ${paso >= 1 ? styles.pasoActivo : ""}`}
-          >
-            <span className={styles.pasoNum}>1</span>
-            <span className={styles.pasoLabel}>Código</span>
-          </div>
-          <div className={styles.pasoDivider} />
-          <div
-            className={`${styles.paso} ${paso >= 2 ? styles.pasoActivo : ""}`}
-          >
-            <span className={styles.pasoNum}>2</span>
-            <span className={styles.pasoLabel}>Tus datos</span>
-          </div>
-        </div>
-
-        {/* ── Paso 1 ── */}
-        {paso === 1 && (
-          <form
-            onSubmit={handleCodigo}
-            className={styles.form}
-            aria-busy={loadingCodigo}
-          >
-            <p className={styles.instruccion}>
-              Ingresá el código de tu empresa para continuar. Si no lo tenés,
-              pedíselo al responsable de comedor o RR. HH.
-            </p>
-
-            <label className={styles.label}>
-              Código de empresa
-              <input
-                ref={codigoRef}
-                className={`${styles.input} ${styles.inputCodigo}`}
-                value={codigo}
-                onChange={(e) => setCodigo(normalizarCodigo(e.target.value))}
-                placeholder="ABC123"
-                autoFocus
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={8}
-                required
-                aria-invalid={!!errorCodigo}
-                aria-describedby={codigoErrorId}
-              />
-            </label>
-
-            {errorCodigo && (
-              <p
-                id="registro-codigo-error"
-                role="alert"
-                className={styles.error}
-              >
-                {errorCodigo}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className={styles.btn}
-              disabled={loadingCodigo || codigo.length < 4}
-            >
-              {loadingCodigo ? "Verificando…" : "Continuar →"}
-            </button>
-
-            <button type="button" onClick={onVolver} className={styles.linkBtn}>
-              ← Volver al inicio de sesión
-            </button>
-          </form>
-        )}
-
-        {/* ── Paso 2 ── */}
-        {paso === 2 && empresa && (
-          <form
-            onSubmit={handleRegistro}
-            className={styles.form}
-            aria-busy={loading}
-          >
-            {/* Empresa confirmada */}
-            <div className={styles.empresaBanner}>
-              ✅ Empresa encontrada: <strong>{empresa.nombre}</strong>
-            </div>
-
-            <div className={styles.fila2}>
-              <label className={styles.label}>
-                Nombre
-                <input
-                  className={styles.input}
-                  value={nombre}
-                  onChange={(e) => handleNombre(e.target.value)}
-                  required
-                  autoFocus
-                  placeholder="Martín"
-                />
-              </label>
-              <label className={styles.label}>
-                Apellido
-                <input
-                  className={styles.input}
-                  value={apellido}
-                  onChange={(e) => handleApellido(e.target.value)}
-                  required
-                  placeholder="García"
-                />
-              </label>
-            </div>
-
-            <label className={styles.label}>
-              Email
-              <input
-                className={styles.input}
-                type="email"
-                value={email}
-                onChange={(e) => handleEmail(e.target.value)}
-                required
-                placeholder="tu@email.com"
-                autoComplete="username"
-                inputMode="email"
-              />
-              {!emailManual && email && (
-                <span className={styles.hint}>Sugerido — podés cambiarlo</span>
-              )}
-            </label>
-
-            <label className={styles.label}>
-              Teléfono <span className={styles.opcional}>(opcional)</span>
-              <input
-                className={styles.input}
-                type="tel"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="+54 261 555-0000"
-                inputMode="tel"
-              />
-            </label>
-
-            <label className={styles.label}>
-              Fecha de nacimiento{" "}
-              <span className={styles.opcional}>(opcional)</span>
-              <input
-                className={styles.input}
-                type="date"
-                value={nacimiento}
-                onChange={(e) => setNacimiento(e.target.value)}
-              />
-            </label>
-
-            <label className={styles.label}>
-              Contraseña
-              <div className={styles.passWrap}>
-                <input
-                  className={`${styles.input} ${styles.inputConIcono}`}
-                  type={showPass ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="Mínimo 8 caracteres"
-                  autoComplete="new-password"
-                  aria-invalid={!!error}
-                  aria-describedby={registroErrorId}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className={styles.eyeBtn}
-                  aria-label={showPass ? "Ocultar" : "Ver"}
-                  aria-pressed={showPass}
-                >
-                  {showPass ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-
-            <label className={styles.label}>
-              Confirmar contraseña
-              <div className={styles.passWrap}>
-                <input
-                  className={`${styles.input} ${styles.inputConIcono} ${password2 && password2 !== password ? styles.inputError : ""}`}
-                  type={showPass ? "text" : "password"}
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
-                  required
-                  placeholder="Repetí la contraseña"
-                  autoComplete="new-password"
-                  aria-invalid={
-                    !!error || (password2 !== "" && password2 !== password)
-                  }
-                  aria-describedby={registroErrorId}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className={styles.eyeBtn}
-                  aria-label={showPass ? "Ocultar" : "Ver"}
-                  aria-pressed={showPass}
-                >
-                  {showPass ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className={styles.eyeIco}
-                    >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-
-            {error && (
-              <p id="registro-form-error" role="alert" className={styles.error}>
-                {error}
-              </p>
-            )}
-
-            <button type="submit" className={styles.btn} disabled={loading}>
-              {loading ? (
-                <span className={styles.loadingRow}>
-                  <svg
-                    className={styles.spinner}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className={styles.spinnerTrack}
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="white"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className={styles.spinnerFill}
-                      fill="white"
-                      d="M4 12a8 8 0 018-8v8z"
-                    />
-                  </svg>
-                  Creando cuenta…
-                </span>
-              ) : (
-                "Crear mi cuenta"
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPaso(1)}
-              className={styles.linkBtn}
-            >
-              ← Cambiar código de empresa
-            </button>
-          </form>
-        )}
+    <AuthLayout subtitulo="Crear cuenta" className="max-w-[420px]">
+      <div className="mb-6">
+        <Pasos pasos={["Código", "Tus datos"]} pasoActual={paso} />
       </div>
-    </div>
+
+      {paso === 1 && (
+        <form
+          onSubmit={handleCodigo}
+          className="flex flex-col gap-3.5 text-left"
+          aria-busy={loadingCodigo}
+        >
+          <p className="text-center text-sm leading-snug text-slate-500">
+            Ingresá el código de tu empresa para continuar. Si no lo tenés,
+            pedíselo al responsable de comedor o RR. HH.
+          </p>
+
+          <CampoTexto
+            ref={codigoRef}
+            id="registro-codigo"
+            label="Código de empresa"
+            value={codigo}
+            onChange={(e) => setCodigo(normalizarCodigo(e.target.value))}
+            placeholder="ABC123"
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={8}
+            required
+            aria-invalid={!!errorCodigo}
+            aria-describedby={codigoErrorId}
+            inputClassName="text-center text-xl font-bold uppercase tracking-[0.18em]"
+          />
+
+          {errorCodigo && (
+            <Alerta id="registro-codigo-error" variante="error">
+              {errorCodigo}
+            </Alerta>
+          )}
+
+          <Boton
+            type="submit"
+            anchoCompleto
+            cargando={loadingCodigo}
+            disabled={codigo.length < 4}
+          >
+            {loadingCodigo ? "Verificando..." : "Continuar →"}
+          </Boton>
+
+          <Boton
+            type="button"
+            variante="fantasma"
+            className="min-h-7 py-1 text-sm font-medium"
+            onClick={onVolver}
+            anchoCompleto
+          >
+            Volver al inicio de sesión
+          </Boton>
+        </form>
+      )}
+
+      {paso === 2 && empresa && (
+        <form
+          onSubmit={handleRegistro}
+          className="flex flex-col gap-3.5 text-left"
+          aria-busy={loading}
+        >
+          <Alerta variante="exito">
+            Empresa encontrada: <strong>{empresa.nombre}</strong>
+          </Alerta>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CampoTexto
+              id="registro-nombre"
+              label="Nombre"
+              value={nombre}
+              onChange={(e) => handleNombre(e.target.value)}
+              required
+              autoFocus
+              placeholder="Martín"
+            />
+            <CampoTexto
+              id="registro-apellido"
+              label="Apellido"
+              value={apellido}
+              onChange={(e) => handleApellido(e.target.value)}
+              required
+              placeholder="García"
+            />
+          </div>
+
+          <CampoTexto
+            id="registro-email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => handleEmail(e.target.value)}
+            required
+            placeholder="tu@email.com"
+            autoComplete="username"
+            inputMode="email"
+            ayuda={!emailManual && email ? "Sugerido, podés cambiarlo" : null}
+          />
+
+          <CampoTexto
+            id="registro-telefono"
+            label="Teléfono (opcional)"
+            type="tel"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            placeholder="+54 261 555-0000"
+            inputMode="tel"
+          />
+
+          <CampoTexto
+            id="registro-nacimiento"
+            label="Fecha de nacimiento (opcional)"
+            type="date"
+            value={nacimiento}
+            onChange={(e) => setNacimiento(e.target.value)}
+          />
+
+          <CampoPassword
+            id="registro-password"
+            label="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="Mínimo 8 caracteres"
+            autoComplete="new-password"
+            aria-invalid={!!error}
+            aria-describedby={registroErrorId}
+          />
+
+          <CampoPassword
+            id="registro-password-confirmacion"
+            label="Confirmar contraseña"
+            value={password2}
+            onChange={(e) => setPassword2(e.target.value)}
+            required
+            placeholder="Repetí la contraseña"
+            autoComplete="new-password"
+            error={password2 && password2 !== password ? "No coincide" : null}
+            aria-invalid={
+              !!error || (password2 !== "" && password2 !== password)
+            }
+            aria-describedby={registroErrorId}
+          />
+
+          {error && (
+            <Alerta id="registro-form-error" variante="error">
+              {error}
+            </Alerta>
+          )}
+
+          <Boton type="submit" anchoCompleto cargando={loading}>
+            {loading ? "Creando cuenta..." : "Crear mi cuenta"}
+          </Boton>
+
+          <Boton
+            type="button"
+            variante="fantasma"
+            className="min-h-7 py-1 text-sm font-medium"
+            onClick={() => setPaso(1)}
+            anchoCompleto
+          >
+            Cambiar código de empresa
+          </Boton>
+        </form>
+      )}
+    </AuthLayout>
   );
 }

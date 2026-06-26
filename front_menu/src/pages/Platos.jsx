@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { usePlatos, usePlatoTags, useCreatePlato, useUpdatePlato, useDeletePlato } from '../hooks/usePlatos.js';
-import { useGuarniciones, useCreateGuarnicion, useUpdateGuarnicion, useDeleteGuarnicion } from '../hooks/useGuarniciones.js';
+import { useGuarniciones, useUpdateGuarnicion, useDeleteGuarnicion } from '../hooks/useGuarniciones.js';
 import { useHistorialPlato } from '../hooks/useHistorial.js';
 import Modal from '../components/ui/Modal.jsx';
 import PlatoForm from '../components/platos/PlatoForm.jsx';
@@ -375,7 +375,6 @@ export default function Platos() {
 
   const handleSearchChange = (e) => { setSearch(e.target.value); setPage(1); };
   const handleFiltroEstado = (val) => { setActivo(val); setPage(1); };
-  const handleFiltroTag = (tag) => { setTagFilter((t) => t === tag ? null : tag); setPage(1); };
   const handleFiltroTipo = (val) => { setTipoFilter(val); setPage(1); };
 
   return (
