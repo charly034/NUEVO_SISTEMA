@@ -14,7 +14,7 @@ export async function obtenerSemanasPedido({
   empresaId,
   fechaReferencia,
 } = {}) {
-  const params = crearParams({ empresaId, limit: 999 });
+  const params = crearParams({ empresaId });
 
   if (import.meta.env.VITE_USAR_ENDPOINT_LEGACY_PEDIDOS === "true") {
     const [menuData, historial, guarniciones] = await Promise.all([
@@ -40,11 +40,6 @@ export async function obtenerSemanasPedido({
     },
   );
   return Array.isArray(respuesta) ? respuesta : respuesta?.semanas || [];
-}
-
-export function obtenerPedidoPorSemana({ empresaId, usuarioId, semanaId }) {
-  const params = crearParams({ empresaId, usuarioId, semanaId });
-  return apiGet(`/pedidos/por-semana?${params.toString()}`);
 }
 
 export function crearPedido(payload) {
@@ -74,23 +69,14 @@ export function confirmarPedido(pedidoId) {
   );
 }
 
-export function cancelarPedido(pedidoId) {
-  return apiPatch(`/pedidos/${pedidoId}/cancelar`, {
-    estado: "cancelado",
-  });
-}
-
-export function obtenerHistorialPedidos({ empresaId, usuarioId } = {}) {
-  const params = crearParams({ empresaId, usuarioId });
-  return apiGet(`/pedidos/historial?${params.toString()}`);
+export function guardarSugerenciaPedido(payload) {
+  return apiPost("/pedidos/sugerencias", payload, { requiereAuth: true });
 }
 
 export const pedidoService = {
   actualizarPedido,
-  cancelarPedido,
   confirmarPedido,
   crearPedido,
-  obtenerHistorialPedidos,
-  obtenerPedidoPorSemana,
+  guardarSugerenciaPedido,
   obtenerSemanasPedido,
 };

@@ -1,5 +1,8 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import jwt from 'jsonwebtoken';
+import { env } from '../src/config/env.js';
+import { query } from '../src/database/connection.js';
 import {
   cerrarPoolDb,
   contarPedidosFixture,
@@ -41,6 +44,27 @@ test('POST /api/v1/pedidos sin token devuelve 401', async () => {
   assert.equal(respuesta.body.success, false);
 });
 
+test('GET /api/v1/users responde 410 para modulo legacy retirado', async () => {
+  const email = `users-legacy-${Date.now()}@test.local`;
+  const admin = (await query(
+    `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol, activo)
+     VALUES ('Admin', 'Legacy', $1, 'test', 'superadmin', true)
+     RETURNING id`,
+    [email],
+  )).rows[0];
+  const token = jwt.sign({ sub: admin.id, tipo: 'admin' }, env.JWT_SECRET, { expiresIn: '1h' });
+
+  try {
+    const respuesta = await requestJson(servidor.baseUrl, 'GET', '/users', { token });
+
+    assert.equal(respuesta.status, 410);
+    assert.equal(respuesta.body.success, false);
+    assert.match(respuesta.body.message, /legacy/i);
+  } finally {
+    await query('DELETE FROM usuarios_admin WHERE id = $1', [admin.id]);
+  }
+});
+
 test('POST /api/v1/pedidos crea pedido valido y persiste items', async () => {
   await conFixture({}, async (fixture) => {
     const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
@@ -65,6 +89,21 @@ test('POST /api/v1/pedidos crea pedido valido y persiste items', async () => {
     assert.equal(lunes.guarnicion_id, fixture.guarnicion.id);
     assert.equal(Boolean(martes.sin_pedido), true);
     assert.equal(martes.origen, 'usuario');
+  });
+});
+
+test('POST permite guardar si la empresa esta en plazo aunque el menu tenga limite vencido', async () => {
+  await conFixture({
+    fechaLimitePedidos: '2026-01-01T12:00:00-03:00',
+  }, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture),
+    });
+
+    assert.equal(respuesta.status, 201);
+    assert.equal(respuesta.body.success, true);
+    assert.equal(await contarPedidosFixture(fixture), 1);
   });
 });
 
@@ -176,6 +215,35 @@ test('POST duplicado actualiza el mismo pedido de la semana', async () => {
   });
 });
 
+test('POST /api/v1/pedidos/sugerencias guarda sugerencias sin exigir dias de pedido', async () => {
+  await conFixture({ semanaInicio: '2026-07-13' }, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos/sugerencias', {
+      token: fixture.token,
+      payload: {
+        semana_inicio: fixture.semanaInicio,
+        ideas: ['Milanesa con pure', 'Pollo al horno'],
+        comentario: 'Opciones livianas para esa semana',
+      },
+    });
+
+    assert.equal(respuesta.status, 201);
+    assert.equal(respuesta.body.success, true);
+    assert.deepEqual(respuesta.body.data.sugerencia.recomendacionesUsuario, [
+      'Milanesa con pure',
+      'Pollo al horno',
+    ]);
+
+    const semanas = await requestJson(servidor.baseUrl, 'GET', '/pedidos/semanas', {
+      token: fixture.token,
+    });
+    const semana = semanas.body.data.semanas.find((item) => item.id === fixture.semanaInicio);
+
+    assert.ok(semana);
+    assert.deepEqual(semana.recomendacionesUsuario, ['Milanesa con pure', 'Pollo al horno']);
+    assert.equal(semana.comentarioRecomendacion, 'Opciones livianas para esa semana');
+  });
+});
+
 test('PUT /api/v1/pedidos/:pedidoId sin token devuelve 401', async () => {
   await conFixture({}, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture);
@@ -256,8 +324,13 @@ test('PUT pedido de otra empresa devuelve 403', async () => {
   });
 });
 
-test('PUT fuera de plazo semanal devuelve 409 y conserva el pedido anterior', async () => {
-  await conFixture({ fechaLimitePedidos: '2026-01-01T12:00:00-03:00' }, async (fixture) => {
+test('PUT fuera de plazo semanal por regla de empresa devuelve 409 y conserva el pedido anterior', async () => {
+  await conFixture({
+    semanaInicio: '2026-06-22',
+    fechaLimitePedidos: '2099-01-01T12:00:00-03:00',
+    limiteDiaSemana: 'lunes',
+    limiteHora: '00:01',
+  }, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture, {
       items: [{
         dia: 'lunes',

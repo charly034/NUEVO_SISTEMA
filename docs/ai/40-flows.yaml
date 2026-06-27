@@ -1,0 +1,190 @@
+schema: la_quinta_flows_v2
+updated_at: "2026-06-27"
+
+flows:
+  local_start:
+    status: verified_in_repo
+    sequence:
+      - "API: cd API_LA_QUINTA && npm run dev"
+      - "Admin: cd front_menu && npm run dev"
+      - "Clientes: cd front_clientes && npm run dev"
+      - "Alternativa Windows: .\\iniciar.bat"
+    manual_smoke_checks:
+      - "GET http://localhost:3000/api/v1/health"
+      - "Abrir http://localhost:5174 y verificar pantalla/login admin"
+      - "Abrir http://localhost:5175 y verificar pantalla login cliente"
+
+  docker_start:
+    status: verified_in_repo
+    sequence:
+      - "Copiar .env.docker.example o .env.example a .env segun flujo usado"
+      - "Completar POSTGRES_PASSWORD, JWT_SECRET, CORS_ORIGINS sin commitear secretos"
+      - "docker compose up --build -d"
+      - "API depende de db healthy"
+      - "admin/clientes dependen de api healthy"
+    manual_smoke_checks:
+      - "docker compose ps"
+      - "GET http://localhost:3000/api/v1/health"
+      - "http://localhost:5174"
+      - "http://localhost:5175"
+
+  cliente_auth:
+    status: verified_in_repo
+    files:
+      - "front_clientes/src/services/api.js"
+      - "front_clientes/src/hooks/useAuth.js"
+      - "API_LA_QUINTA/src/modules/auth"
+    sequence:
+      - "POST /api/v1/auth/login con email, password, remember"
+      - "API valida empleado activo y empresa activa"
+      - "API firma JWT con sub, empresa_id, nombre, apellido, rol"
+      - "front_clientes guarda token/empleado en localStorage si remember=true, si no en sessionStorage"
+      - "requests agregan Authorization Bearer"
+      - "ante 401 se limpia sesion y se emite cliente:unauthorized"
+    error_behavior:
+      - "credenciales invalidas -> 401 con success=false"
+      - "empresa inactiva o usuario inactivo -> 401"
+    manual_smoke_checks:
+      - "Login valido redirige a /pedido-semanal"
+      - "Login invalido muestra error visible"
+      - "Refresh mantiene sesion si storage contiene token valido"
+
+  admin_auth:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/auth.js"
+      - "front_menu/src/lib/apiClient.js"
+      - "API_LA_QUINTA/src/modules/admin-auth"
+      - "API_LA_QUINTA/src/modules/usuarios-admin"
+    sequence:
+      - "POST /api/v1/admin/auth/login"
+      - "API valida usuario_admin activo y firma JWT con tipo=admin"
+      - "front_menu guarda admin_token/admin_user"
+      - "App llama /admin/auth/me si hay token sin usuario guardado"
+      - "ante 401 apiClient limpia storage y emite admin:unauthorized"
+    manual_smoke_checks:
+      - "Admin valido entra al dashboard"
+      - "Admin sin token ve AdminLogin"
+      - "Superadmin puede abrir /administradores"
+
+  admin_empresas_empleados:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/App.jsx"
+      - "front_menu/src/pages/Empresas.jsx"
+      - "front_menu/src/hooks/useEmpresas.js"
+      - "front_menu/src/hooks/useEmpleados.js"
+    sequence:
+      - "Admin abre /empresas para gestionar empresas."
+      - "La gestion de empleados vive como panel dentro de Empresas.jsx segun empresa activa."
+      - "La ruta /empleados renderiza Empresas.jsx para evitar pantalla en blanco y llevar al panel que contiene empleados."
+    manual_smoke_checks:
+      - "Abrir /empresas y verificar lista de empresas y panel de empleados."
+      - "Abrir /empleados y verificar que no queda pantalla vacia."
+
+  cliente_pedido_semanal:
+    status: verified_in_repo
+    source_docs:
+      - "docs/pedidos-cliente.md"
+    files:
+      - "front_clientes/src/hooks/usePedidoSemanal.js"
+      - "front_clientes/src/services/pedidoService.js"
+      - "front_clientes/src/services/menuService.js"
+      - "front_clientes/src/mappers/pedidoMapper.js"
+      - "front_clientes/src/components/pedido"
+      - "API_LA_QUINTA/src/modules/pedidos"
+      - "API_LA_QUINTA/src/modules/menu"
+    sequence:
+      - "usePedidoSemanal llama obtenerSemanasPedido"
+      - "GET /api/v1/pedidos/semanas devuelve semanas para empleado/empresa del token"
+      - "Al editar, menuService consulta GET /api/v1/menu/semanas/:semanaId/opciones"
+      - "El usuario selecciona plato por dia y guarnicion si aplica"
+      - "crear pedido: POST /api/v1/pedidos"
+      - "si se creo y vuelve id, usePedidoSemanal confirma con PATCH /api/v1/pedidos/:id/confirmar"
+      - "modificar pedido: PUT /api/v1/pedidos/:id"
+      - "si la semana no tiene menu publicado, SemanaCardRecomendacion guarda con POST /api/v1/pedidos/sugerencias"
+      - "si la semana sin menu ya tiene recomendacionesUsuario o comentarioRecomendacion, SemanaCardLectura muestra agradecimiento y no muestra CTA de sugerir"
+      - "backend registra eventos y devuelve pedido normalizado"
+    hard_rules:
+      - "Frontend no debe enviar usuarioId ni empresaId como autoridad para guardar."
+      - "Backend usa req.empleado.sub y req.empleado.empresa_id."
+      - "Backend valida dias laborales, dia sin servicio, plazo, plato, opcion y guarnicion."
+      - "El plazo de POST/PUT lo define la empresa; menus_semanales.fecha_limite_pedidos no bloquea el pedido cliente."
+      - "Si sin_pedido=true no se permite plato_id ni guarnicion_id."
+      - "Transaccion debe hacer rollback ante error."
+      - "La pantalla de sugerencias no debe reutilizar guardar pedido ni exigir dias seleccionados."
+    error_behavior:
+      - "401 carga pedido -> mensaje de iniciar sesion nuevamente"
+      - "otros errores carga -> mensaje generico de intentar nuevamente"
+      - "error guardado -> errorGuardar.message o mensaje generico"
+    manual_smoke_checks:
+      - "Iniciar sesion como empleado"
+      - "Abrir /pedido-semanal"
+      - "Ver semanas reales"
+      - "Abrir semana actual/proxima editable"
+      - "Elegir plato sin guarnicion y guardar"
+      - "Elegir plato con guarnicion y verificar bloqueo si falta guarnicion"
+      - "Confirmar pedido, recargar pagina y verificar persistencia"
+      - "Modificar pedido existente y verificar pedido_eventos"
+      - "Probar dia sin servicio y semana fuera de plazo"
+      - "Enviar sugerencia en semana sin menu y verificar que no aparezca validacion de dias de pedido"
+      - "Volver a la semana sin menu con sugerencia enviada y verificar que solo aparezca el agradecimiento"
+
+  admin_menu_semanal:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/Semanas.jsx"
+      - "front_menu/src/pages/SemanaDetalle.jsx"
+      - "front_menu/src/hooks/useMenus.js"
+      - "API_LA_QUINTA/src/modules/menus-semanales"
+    sequence:
+      - "Admin crea menu semanal"
+      - "Admin agrega platos por dia/opcion"
+      - "Admin puede marcar dia sin servicio"
+      - "Admin cambia estado del menu"
+      - "Al reabrir un menu desde front_menu, se publica con fecha_limite_pedidos=null para no arrastrar un limite vencido."
+      - "Cliente consume menu publicado desde pedidos/menu"
+    manual_smoke_checks:
+      - "Crear semana con fecha_inicio/fecha_fin validas"
+      - "Agregar opcion A para lunes"
+      - "Marcar un dia sin servicio"
+      - "Publicar/cambiar estado si UI lo permite"
+      - "Verificar que cliente vea opciones o sin servicio"
+
+  admin_pedidos:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/PedidosAdmin.jsx"
+      - "front_menu/src/pages/PedidosHoy.jsx"
+      - "front_menu/src/hooks/usePedidos.js"
+      - "API_LA_QUINTA/src/modules/pedidos"
+    sequence:
+      - "Admin lista pedidos con GET /api/v1/pedidos"
+      - "Admin puede ver detalle GET /api/v1/pedidos/:id"
+      - "Admin cambia estado PATCH /api/v1/pedidos/:id/estado"
+      - "Backend registra pedido_eventos tipo estado_cambiado"
+    manual_smoke_checks:
+      - "Crear pedido desde cliente"
+      - "Verlo en panel admin"
+      - "Cambiar estado a en_proceso/listo"
+      - "Verificar que el cambio persiste"
+
+  cliente_historial_perfil:
+    status: verified_in_repo
+    files:
+      - "front_clientes/src/pages/HistorialPage.jsx"
+      - "front_clientes/src/pages/PerfilPage.jsx"
+      - "front_clientes/src/services/api.js"
+    sequence:
+      - "Historial usa endpoints cliente autenticados"
+      - "Perfil usa authApi.actualizarPerfil y authApi.cambiarPassword"
+    manual_smoke_checks:
+      - "Abrir /mis-pedidos con sesion cliente"
+      - "Abrir /mi-cuenta y editar perfil"
+      - "Cambiar password con validacion visible"
+
+from_chat_summary_flows:
+  - id: "post_hacer_o_modificar_pedido"
+    summary: "El flujo actual a desarrollar es posterior a Hacer pedido o Modificar pedido."
+  - id: "lunes_domingo_sin_servicio_menu_faltante"
+    summary: "Debe contemplar empresas lunes-domingo, dias sin servicio, menu especial faltante y separacion fijos/especiales."

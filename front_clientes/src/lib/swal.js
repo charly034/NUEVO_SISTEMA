@@ -1,24 +1,43 @@
-import Swal from 'sweetalert2';
+let swalPromise;
+let toastInstance;
 
-const Toast = Swal.mixin({
-  toast: true,
-  position: 'top-end',
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-  didOpen: (t) => {
-    t.addEventListener('mouseenter', Swal.stopTimer);
-    t.addEventListener('mouseleave', Swal.resumeTimer);
-  },
-});
+async function cargarSwal() {
+  if (!swalPromise) {
+    swalPromise = import('sweetalert2').then((modulo) => modulo.default || modulo);
+  }
+
+  return swalPromise;
+}
+
+async function obtenerToast() {
+  const Swal = await cargarSwal();
+
+  if (!toastInstance) {
+    toastInstance = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+      didOpen: (t) => {
+        t.addEventListener('mouseenter', Swal.stopTimer);
+        t.addEventListener('mouseleave', Swal.resumeTimer);
+      },
+    });
+  }
+
+  return toastInstance;
+}
 
 export const toast = {
-  success: (message) => Toast.fire({ icon: 'success', title: message }),
-  error: (message) => Toast.fire({ icon: 'error', title: message, timer: 4500 }),
-  warning: (message) => Toast.fire({ icon: 'warning', title: message }),
+  success: async (message) => (await obtenerToast()).fire({ icon: 'success', title: message }),
+  error: async (message) =>
+    (await obtenerToast()).fire({ icon: 'error', title: message, timer: 4500 }),
+  warning: async (message) => (await obtenerToast()).fire({ icon: 'warning', title: message }),
 };
 
 export async function confirmar({ titulo, texto, botonConfirmar = 'Confirmar', color = '#e53e3e' } = {}) {
+  const Swal = await cargarSwal();
   const result = await Swal.fire({
     title: titulo,
     text: texto,
@@ -35,6 +54,7 @@ export async function confirmar({ titulo, texto, botonConfirmar = 'Confirmar', c
 }
 
 export async function preguntarDiasIncompletos(faltanDias) {
+  const Swal = await cargarSwal();
   const result = await Swal.fire({
     title: `Faltan ${faltanDias} día${faltanDias !== 1 ? 's' : ''} sin elegir`,
     text: '¿Querés enviar el pedido igual con los días que completaste?',

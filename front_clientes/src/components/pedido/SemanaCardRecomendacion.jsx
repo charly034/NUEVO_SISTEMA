@@ -14,6 +14,7 @@ const ideasRapidas = [
 ];
 
 export default function SemanaCardRecomendacion({
+  guardando = false,
   onCancelar,
   onGuardar,
   semana,
@@ -50,7 +51,7 @@ export default function SemanaCardRecomendacion({
   }
 
   function enviarSugerencias() {
-    if (!puedeEnviar || yaEnviada) return;
+    if (!puedeEnviar || yaEnviada || guardando) return;
 
     onGuardar?.({
       ...semana,
@@ -156,13 +157,13 @@ export default function SemanaCardRecomendacion({
       </section>
 
       <div className="mt-auto grid shrink-0 grid-cols-[0.8fr_1.2fr] gap-2 pt-1 max-[700px]:pt-0">
-        <Boton variante="secundario" onClick={onCancelar}>
+        <Boton variante="secundario" onClick={onCancelar} disabled={guardando}>
           Cancelar
         </Boton>
-        <Boton onClick={enviarSugerencias} disabled={!puedeEnviar}>
+        <Boton onClick={enviarSugerencias} disabled={!puedeEnviar || guardando}>
           <span className="inline-flex items-center gap-2">
             <Send className="h-4 w-4" aria-hidden="true" />
-            Enviar
+            {guardando ? "Enviando..." : "Enviar"}
           </span>
         </Boton>
       </div>

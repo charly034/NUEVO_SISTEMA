@@ -48,6 +48,15 @@ export const guardarPedido = asyncHandler(async (req, res) => {
   sendCreated(res, pedido, 'Pedido guardado exitosamente');
 });
 
+export const guardarSugerenciaPedido = asyncHandler(async (req, res) => {
+  const sugerencia = await service.guardarSugerenciaPedido(
+    req.empleado.sub,
+    req.empleado.empresa_id,
+    req.body,
+  );
+  sendCreated(res, sugerencia, 'Sugerencia guardada exitosamente');
+});
+
 export const actualizarPedido = asyncHandler(async (req, res) => {
   const pedido = await service.actualizarPedidoEmpleado(
     req.empleado.sub,
@@ -79,6 +88,10 @@ export const confirmarPedido = asyncHandler(async (req, res) => {
 
 export const getPedidos = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getPedidos(req.query), 'Pedidos obtenidos');
+});
+
+export const getSugerenciasPedidoAdmin = asyncHandler(async (req, res) => {
+  sendSuccess(res, await service.getSugerenciasPedidoAdmin(req.query), 'Sugerencias obtenidas');
 });
 
 export const getPedidoById = asyncHandler(async (req, res) => {

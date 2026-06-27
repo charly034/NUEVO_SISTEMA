@@ -9,7 +9,7 @@
  *   ✓ 3 empresas de prueba + 1 empresa TEST
  *   ✓ 5 empleados por empresa (nombres únicos)
  *   ✓ Pedidos realistas en 2 semanas pasadas, semana actual y próxima
- *   ✓ Usuario TEST: test@test.com / 12345678
+ *   ✓ Usuario TEST: test@test.com / password configurada por TEST_USER_PASSWORD
  *
  * Uso: node scripts/seed-full-reset.js
  * ⚠ BORRA TODO. Solo para entornos de desarrollo/testing.
@@ -30,6 +30,29 @@ if (process.env.NODE_ENV === 'production') {
   console.error('❌  Este seed no puede ejecutarse en producción.');
   process.exit(1);
 }
+
+if (process.env.SEED_FULL_RESET_CONFIRM !== 'RESET_DEV_DATABASE') {
+  console.error('❌  SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE es requerido para ejecutar este reset destructivo.');
+  process.exit(1);
+}
+
+function requireSeedSecret(name) {
+  const value = process.env[name];
+  if (!value || value.length < 12) {
+    console.error(`❌  ${name} es requerido y debe tener al menos 12 caracteres.`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL;
+if (!SUPERADMIN_EMAIL) {
+  console.error('❌  SUPERADMIN_EMAIL es requerido para seed-full-reset.');
+  process.exit(1);
+}
+const SUPERADMIN_PASSWORD = requireSeedSecret('SUPERADMIN_PASSWORD');
+const DEFAULT_DEMO_PASSWORD = requireSeedSecret('DEFAULT_DEMO_PASSWORD');
+const TEST_USER_PASSWORD = requireSeedSecret('TEST_USER_PASSWORD');
 
 // ─── Helpers de fechas ────────────────────────────────────────────────────────
 function getLunes(offsetSemanas = 0) {
@@ -288,7 +311,7 @@ const EMPRESAS = [
     plan: 'con_postre',
     modo_pedido: 'semanal',
     empleados: [
-      { nombre: 'Test',    apellido: 'Usuario',  email: 'test@test.com',         password: '12345678' },
+      { nombre: 'Test',    apellido: 'Usuario',  email: 'test@test.com',         password: TEST_USER_PASSWORD },
       { nombre: 'María',   apellido: 'Prueba',   email: 'maria.prueba@test.test' },
       { nombre: 'Roberto', apellido: 'Demo',     email: 'roberto.demo@test.test' },
       { nombre: 'Laura',   apellido: 'Ejemplo',  email: 'laura.ejemplo@test.test' },
@@ -325,8 +348,8 @@ async function main() {
 
     // ── 2. Superadmin ──────────────────────────────────────────────────────────
     console.log('👤  Creando superadmin...');
-    const adminEmail = process.env.SUPERADMIN_EMAIL || 'admin@laquinta.com';
-    const adminPass  = process.env.SUPERADMIN_PASSWORD || 'admin12345';
+    const adminEmail = SUPERADMIN_EMAIL;
+    const adminPass  = SUPERADMIN_PASSWORD;
     const adminHash  = await bcrypt.hash(adminPass, 10);
     await client.query(
       `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol)
@@ -514,9 +537,7 @@ async function main() {
       menuItems.set(menuId, diasRes.rows);
     }
 
-    const defaultHash = await bcrypt.hash('Laquinta2024!', 10);
-    const testHash    = await bcrypt.hash('12345678', 10);
-
+    const defaultHash = await bcrypt.hash(DEFAULT_DEMO_PASSWORD, 10);
     for (const emp of EMPRESAS) {
       console.log(`🏢  ${emp.nombre}`);
 
@@ -536,7 +557,7 @@ async function main() {
           [empresaId, persona.nombre, persona.apellido, persona.email, hash]
         );
         empleadosCreados.push(emlRes.rows[0]);
-        const tag = persona.password ? ` 🔑 ${persona.password}` : '';
+        const tag = persona.password ? ' (password desde env)' : '';
         console.log(`    👤 ${persona.nombre} ${persona.apellido} — ${persona.email}${tag}`);
       }
 
@@ -617,12 +638,12 @@ async function main() {
     console.log(`  Pedidos           : ${pdT.rows[0].count} (4 semanas × 4 empresas)`);
     console.log('─'.repeat(58));
     console.log('  👑 SUPERADMIN');
-    console.log(`     ${adminEmail}  /  ${process.env.SUPERADMIN_PASSWORD ? '(env)' : adminPass}`);
+    console.log(`     ${adminEmail}  /  (env SUPERADMIN_PASSWORD)`);
     console.log('─'.repeat(58));
     console.log('  🧪 USUARIO TEST');
-    console.log('     test@test.com  /  12345678  (empresa: TEST)');
+    console.log('     test@test.com  /  (env TEST_USER_PASSWORD)  (empresa: TEST)');
     console.log('─'.repeat(58));
-    console.log('  👥 Otros empleados: nombre.apellido@empresa.test  /  Laquinta2024!');
+    console.log('  👥 Otros empleados: nombre.apellido@empresa.test  /  (env DEFAULT_DEMO_PASSWORD)');
     console.log('═'.repeat(58));
 
   } catch (err) {

@@ -156,15 +156,21 @@ function construirSeleccionPedido(item, opciones) {
           String(item.guarnicion_nombre).toLowerCase(),
       )
     : null;
+  const guarnicion = item.guarnicion_id || guarnicionPorNombre
+    ? {
+        id: item.guarnicion_id || guarnicionPorNombre.id,
+        nombre: item.guarnicion_nombre || guarnicionPorNombre.nombre,
+      }
+    : "";
 
   return {
     plato,
-    guarnicion: item.guarnicion_id || guarnicionPorNombre
-      ? {
-          id: item.guarnicion_id || guarnicionPorNombre.id,
-          nombre: item.guarnicion_nombre || guarnicionPorNombre.nombre,
-        }
-      : "",
+    guarnicion,
+    platoId: plato.platoId,
+    nombrePlato: plato.nombre,
+    guarnicionId: guarnicion ? guarnicion.id : null,
+    nombreGuarnicion: guarnicion ? guarnicion.nombre : "",
+    sinPedido: false,
   };
 }
 

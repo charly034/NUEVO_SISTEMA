@@ -1,0 +1,137 @@
+schema: la_quinta_debt_v2
+updated_at: "2026-06-27"
+
+technical_debt:
+  - id: "debt-users-module-legacy"
+    status: resolved
+    area: "API_LA_QUINTA"
+    evidence:
+      - "API_LA_QUINTA/src/modules/users existe y esta montado en /api/v1/users como endpoint retirado."
+      - "API_LA_QUINTA/src/database/migrations/1719000029000_drop-users-table.js intenta dropear users si esta vacia."
+      - "API_LA_QUINTA/src/modules/users/users.routes.js responde 410 Gone detras de requireAdmin y no consulta la tabla users."
+    risk: "Bajo; si un consumidor externo dependia de /users, debe migrar a /empleados o /admin/auth/usuarios."
+    recommended_cut: "Mantener /users retirado durante la release; eliminar modulo completo solo con confirmacion explicita."
+
+  - id: "debt-frontend-references-unverified-endpoints"
+    status: resolved
+    area: "front_clientes"
+    evidence:
+      - "front_clientes/src/services/pedidoService.js ya no exporta llamadas a /pedidos/por-semana, /pedidos/historial ni PATCH /pedidos/:id/cancelar."
+      - "front_clientes/src/services/menuService.js ya no exporta llamada a /menu/guarniciones."
+      - "El flujo actual usa /pedidos/semanas, /pedidos, /pedidos/:id, /pedidos/:id/confirmar, /pedidos/sugerencias y /menu/semanas/:semanaId/opciones."
+    risk: "Bajo; queda codigo mock legacy en apiCliente.js para VITE_USAR_MOCKS_PEDIDO."
+    recommended_cut: "Mantener mocks hasta decidir si el modo mock sigue siendo requerido."
+
+  - id: "debt-menu-options-cache"
+    status: resolved
+    area: "front_clientes"
+    evidence:
+      - "front_clientes/src/services/menuService.js ya no guarda promesas manuales."
+      - "front_clientes/src/hooks/useOpcionesMenu.js usa React Query con queryKey ['opciones-menu-semana', empresaId, semanaId], staleTime 10 minutos y gcTime 30 minutos."
+    risk: "Opciones pueden quedar stale hasta 10 minutos si admin modifica/publica menu durante la sesion."
+    recommended_cut: "Bajar staleTime o invalidar por evento si se requiere actualizacion inmediata desde admin."
+
+  - id: "debt-lottie-eval"
+    status: resolved
+    area: "front_clientes"
+    evidence:
+      - "front_clientes/src/components/pedido/ConfirmacionPedido.jsx usa SVG/CSS liviano."
+      - "front_clientes/package.json ya no incluye lottie-react."
+      - "cd front_clientes && npm run build del 2026-06-27 no muestra warning de eval."
+    risk: "Sin riesgo CSP conocido por lottie-web en el flujo de confirmacion."
+    recommended_cut: "Mantener confirmacion sin dependencias de animacion que usen eval."
+
+  - id: "debt-vite-large-chunk"
+    status: partially_resolved
+    area: "front_clientes"
+    evidence:
+      - "front_clientes/src/lib/swal.js usa import dinamico de sweetalert2."
+      - "cd front_clientes && npm run build del 2026-06-27 genero sweetalert2 en chunk separado y no mostro warning de chunk mayor a 500 kB."
+      - "front_clientes/src/App.jsx carga paginas con React.lazy."
+      - "ConfirmacionPedido sigue lazy y pesa aproximadamente 1.10 kB en build."
+    risk: "Performance inicial en mobile puede volver a degradarse si crecen pantallas/componentes pesados."
+    recommended_cut: "Mantener lazy loading por pantallas/componentes y evaluar manualChunks solo si reaparece el warning."
+
+  - id: "debt-admin-vite-large-chunk"
+    status: resolved
+    area: "front_menu"
+    evidence:
+      - "Antes de Etapa 7, front_menu build generaba dist/assets/index-DSVQoGrd.js de 803.10 kB y warning de chunk mayor a 500 kB."
+      - "front_menu/src/App.jsx usa React.lazy y Suspense para paginas admin."
+      - "Despues de Etapa 7, front_menu build genera index-BwTvgrzM.js de 256.25 kB y el mayor chunk lazy es PedidosAdmin-DtfyTO4r.js de 321.16 kB."
+      - "El build ya no muestra warning de chunk mayor a 500 kB."
+    risk: "Riesgo residual bajo; queda warning de PLUGIN_TIMINGS por vite:css."
+    recommended_cut: "Revisar CSS solo si el tiempo de build se vuelve problema operativo."
+
+  - id: "debt-docs-mojibake"
+    status: open
+    area: "documentacion"
+    evidence:
+      - "Varias lecturas de README/docs muestran caracteres mojibake para acentos."
+    risk: "Documentacion dificil de leer o copiar."
+    recommended_cut: "Normalizar encoding a UTF-8 en una tarea separada sin tocar codigo funcional."
+
+  - id: "debt-qa-regresion-outdated"
+    status: resolved
+    area: "front_clientes"
+    evidence:
+      - "front_clientes/QA_REGRESION.md documenta npm run lint, npm run build, npm test y npm run test:e2e."
+      - "La guia usa la ruta canonica /pedido-semanal."
+      - "La guia registra que Playwright puede quedar colgado aunque el smoke inicie/avance."
+    risk: "Bajo; queda pendiente estabilizar el runner e2e."
+    recommended_cut: "Investigar Playwright/Vite preview si el e2e sigue colgando en CI."
+
+  - id: "debt-client-e2e-runner-timeout"
+    status: open
+    area: "front_clientes"
+    evidence:
+      - "npm run test:e2e mostro el smoke de login como ok/iniciado pero el proceso no finalizo antes de 180 segundos."
+      - "No quedo puerto 4173 escuchando despues del timeout."
+    risk: "No bloquea lint/build/unit, pero impide usar e2e como gate automatico confiable."
+    recommended_cut: "Revisar configuracion Playwright webServer/Vite preview y salida del runner antes de usarlo en CI."
+
+  - id: "debt-api-graceful-shutdown"
+    status: resolved
+    area: "API_LA_QUINTA"
+    evidence:
+      - "API_LA_QUINTA/src/server.js conserva la instancia server."
+      - "API_LA_QUINTA/src/server.js maneja SIGTERM/SIGINT."
+      - "Shutdown cierra servidor HTTP y pool PostgreSQL con timeout de 10 segundos."
+    risk: "Riesgo residual bajo; no hay test automatizado especifico de senales."
+    recommended_cut: "Validar en entorno de deploy real durante smoke test."
+
+  - id: "debt-db-pool-config"
+    status: resolved
+    area: "API_LA_QUINTA"
+    evidence:
+      - "API_LA_QUINTA/src/config/env.js define DB_POOL_MAX, DB_IDLE_TIMEOUT_MS y DB_CONNECTION_TIMEOUT_MS."
+      - "API_LA_QUINTA/src/config/database.js aplica esos valores en dbConfig."
+      - ".env.example, .env.docker.example, API_LA_QUINTA/.env.example, compose.yaml y README.md documentan las variables."
+    risk: "Riesgo residual bajo; los valores productivos definitivos dependen del limite real de PostgreSQL."
+    recommended_cut: "Ajustar DB_POOL_MAX segun max_connections del proveedor y cantidad de replicas API."
+
+  - id: "debt-dangerous-demo-seeds"
+    status: resolved
+    area: "API_LA_QUINTA"
+    evidence:
+      - "API_LA_QUINTA/scripts/seed-full-reset.js ejecuta TRUNCATE ... RESTART IDENTITY CASCADE."
+      - "seed-full-reset.js bloquea NODE_ENV=production y requiere SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
+      - "seed-full-reset.js exige SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, DEFAULT_DEMO_PASSWORD y TEST_USER_PASSWORD por env."
+      - "seed-test-data.js exige TEST_DATA_PASSWORD por env."
+      - "API_LA_QUINTA/.env.example y .env.example usan placeholders para passwords demo/dev."
+    risk: "Riesgo residual medio: seed-full-reset sigue siendo destructivo si se confirma explicitamente en dev/test."
+    recommended_cut: "No ejecutar seed-full-reset en produccion; usar solo seed-admin con credenciales provistas por env si hace falta."
+
+deferred_cleanup:
+  - "Alinear endpoints legacy del cliente antes de agregar UI nueva."
+  - "Precisar payloads de todos los endpoints admin solo si se van a tocar."
+  - "Separar o consolidar menu vs menus-semanales solo con decision de arquitectura."
+  - "Revisar duplicidad de endpoint opciones: /pedidos/menu/semanas/:semanaId/opciones y /menu/semanas/:semanaId/opciones."
+  - "Definir si API_LA_QUINTA/scripts/seed-full-reset.js debe quedar disponible, renombrarse como dev-only o requerir confirmacion adicional."
+
+do_not_mix_with_functional_changes:
+  - "Normalizacion de encoding en docs."
+  - "Eliminacion del modulo users."
+  - "Reestructuracion de carpetas de menu."
+  - "Optimizacion de chunks/lazy loading general."
+  - "Cambio de estrategia de cache."

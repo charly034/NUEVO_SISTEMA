@@ -4,8 +4,8 @@ import {
   getMenuHoy, getMenuSemana, getMenuActivo,
   getOpcionesMenuSemana,
   getSemanasPedido,
-  getMiPedido, guardarPedido, actualizarPedido, confirmarPedido, cancelarMiPedido, getMiHistorial,
-  getPedidos, getPedidoById, updateEstado,
+  getMiPedido, guardarPedido, guardarSugerenciaPedido, actualizarPedido, confirmarPedido, cancelarMiPedido, getMiHistorial,
+  getPedidos, getSugerenciasPedidoAdmin, getPedidoById, updateEstado,
 } from './pedidos.controller.js';
 
 const router = Router();
@@ -19,6 +19,7 @@ router.get('/menu/semanas/:semanaId/opciones', optionalAuth, getOpcionesMenuSema
 // Requieren login del empleado
 router.get('/semanas', requireAuth, getSemanasPedido);
 router.get('/mi-pedido', requireAuth, getMiPedido);
+router.post('/sugerencias', requireAuth, guardarSugerenciaPedido);
 router.post('/', requireAuth, guardarPedido);
 router.put('/:id', requireAuth, actualizarPedido);
 router.patch('/:id/confirmar', requireAuth, confirmarPedido);
@@ -27,6 +28,7 @@ router.get('/mi-historial', requireAuth, getMiHistorial);
 
 // Admin
 router.get('/', requireAdmin, getPedidos);
+router.get('/sugerencias', requireAdmin, getSugerenciasPedidoAdmin);
 router.get('/:id', requireAdmin, getPedidoById);
 router.patch('/:id/estado', requireAdmin, updateEstado);
 

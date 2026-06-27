@@ -8,6 +8,7 @@ const PAGE_TITLES = {
   '/estadisticas': 'Estadísticas',
   '/sugeridor':    'Sugeridor',
   '/pedidos':      'Pedidos',
+  '/recomendaciones-menu': 'Recomendaciones',
   '/empresas':     'Empresas',
   '/guarniciones': 'Guarniciones',
   '/administradores': 'Administradores',

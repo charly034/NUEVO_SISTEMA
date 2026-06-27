@@ -1,0 +1,182 @@
+schema: la_quinta_modules_v2
+updated_at: "2026-06-27"
+
+modules:
+  - owner_module: "API_LA_QUINTA.auth"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/auth"
+      - "API_LA_QUINTA/src/middlewares/auth.middleware.js"
+    routes_file: "API_LA_QUINTA/src/modules/auth/auth.routes.js"
+    owns: ["login cliente", "me cliente", "registro", "verificar codigo empresa", "reset code", "perfil cliente"]
+    boundaries:
+      - "No administra usuarios admin; eso vive en admin-auth/usuarios-admin."
+      - "No debe confiar en usuarioId enviado por cliente para pedidos."
+
+  - owner_module: "API_LA_QUINTA.admin-auth"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/admin-auth"
+      - "API_LA_QUINTA/src/modules/usuarios-admin"
+      - "API_LA_QUINTA/src/middlewares/auth.middleware.js"
+    routes_file: "API_LA_QUINTA/src/modules/admin-auth/admin-auth.routes.js"
+    owns: ["login admin", "me admin", "CRUD usuarios admin/superadmin"]
+    boundaries:
+      - "Usa tokens con payload tipo=admin."
+      - "requireSuperAdmin protege administracion de usuarios."
+
+  - owner_module: "API_LA_QUINTA.pedidos"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/pedidos"
+      - "API_LA_QUINTA/test/pedidos.validation.test.js"
+      - "API_LA_QUINTA/test/pedidos.http-db.test.js"
+      - "API_LA_QUINTA/test_helpers"
+    routes_file: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
+    owns: ["semanas de pedido", "menu activo/hoy/semana legacy", "crear pedido", "modificar pedido", "confirmar", "sugerencias cliente para semanas sin menu", "listar sugerencias cliente para admin", "cancelar mi pedido", "historial", "estado admin"]
+    boundaries:
+      - "Reglas de plazo, empresa, empleado, dia sin servicio, plato y guarnicion deben vivir en backend."
+      - "Crear/modificar usa transacciones y upsert por empleado + semana."
+
+  - owner_module: "API_LA_QUINTA.menu"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/menu"
+    routes_file: "API_LA_QUINTA/src/modules/menu/menu.routes.js"
+    owns: ["endpoint canonico de opciones de menu por semana para cliente"]
+    boundaries:
+      - "La logica actual reutiliza pedidos.controller/getOpcionesMenuSemana."
+      - "No contiene CRUD admin de menus; eso vive en menus-semanales."
+
+  - owner_module: "API_LA_QUINTA.menus-semanales"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/menus-semanales"
+      - "API_LA_QUINTA/src/database/migrations"
+    routes_file: "API_LA_QUINTA/src/modules/menus-semanales/menus-semanales.routes.js"
+    owns: ["CRUD menus semanales", "dias/opciones", "sin servicio", "estado de menu", "historial de uso"]
+    boundaries:
+      - "No debe asumir identidad de empleado cliente."
+      - "Publicacion/cierre de menu afecta opciones vistas por cliente."
+
+  - owner_module: "API_LA_QUINTA.platos"
+    status: verified_in_repo
+    kind: api_module
+    paths: ["API_LA_QUINTA/src/modules/platos"]
+    routes_file: "API_LA_QUINTA/src/modules/platos/platos.routes.js"
+    owns: ["CRUD platos", "tags", "tipo fijo/especial/ambos", "tiene_guarnicion"]
+
+  - owner_module: "API_LA_QUINTA.guarniciones"
+    status: verified_in_repo
+    kind: api_module
+    paths: ["API_LA_QUINTA/src/modules/guarniciones"]
+    routes_file: "API_LA_QUINTA/src/modules/guarniciones/guarniciones.routes.js"
+    owns: ["listado publico de guarniciones", "CRUD admin de guarniciones"]
+
+  - owner_module: "API_LA_QUINTA.empresas"
+    status: verified_in_repo
+    kind: api_module
+    paths: ["API_LA_QUINTA/src/modules/empresas"]
+    routes_file: "API_LA_QUINTA/src/modules/empresas/empresas.routes.js"
+    owns: ["empresas", "plan", "modo_pedido", "dias_laborales", "limites de pedido", "codigo_registro", "override de plazo"]
+
+  - owner_module: "API_LA_QUINTA.empleados"
+    status: verified_in_repo
+    kind: api_module
+    paths: ["API_LA_QUINTA/src/modules/empleados"]
+    routes_file: "API_LA_QUINTA/src/modules/empleados/empleados.routes.js"
+    owns: ["empleados", "reset code empleado", "activo/empresa/rol"]
+
+  - owner_module: "API_LA_QUINTA.estadisticas"
+    status: verified_in_repo
+    kind: api_module
+    paths: ["API_LA_QUINTA/src/modules/estadisticas"]
+    routes_file: "API_LA_QUINTA/src/modules/estadisticas/estadisticas.routes.js"
+    owns: ["resumen", "platos mas usados", "distribucion tags", "uso por dia", "tendencia mensual", "top por dia"]
+
+  - owner_module: "API_LA_QUINTA.sugerencias"
+    status: verified_in_repo
+    kind: api_module
+    paths: ["API_LA_QUINTA/src/modules/sugerencias"]
+    routes_file: "API_LA_QUINTA/src/modules/sugerencias/sugerencias.routes.js"
+    owns: ["sugerencias de semana para admin"]
+
+  - owner_module: "API_LA_QUINTA.users"
+    status: retired
+    kind: api_module_legacy
+    paths: ["API_LA_QUINTA/src/modules/users"]
+    routes_file: "API_LA_QUINTA/src/modules/users/users.routes.js"
+    owns: ["endpoint legacy retirado"]
+    note: "Las rutas /api/v1/users responden 410 Gone detras de requireAdmin; usar /api/v1/empleados o /api/v1/admin/auth/usuarios."
+    risk: "No depende de la tabla users aunque migration 1719000029000_drop-users-table.js la haya eliminado."
+
+  - owner_module: "front_menu.admin"
+    status: verified_in_repo
+    kind: frontend_app
+    paths:
+      - "front_menu/src"
+      - "front_menu/public"
+      - "front_menu/nginx/default.conf.template"
+    owns: ["dashboard", "platos", "semanas", "historial", "estadisticas", "sugeridor", "recomendaciones-menu", "pedidos", "empresas", "guarniciones", "administradores", "sidebar admin con grupo desplegable Menu semanal"]
+    boundaries:
+      - "Sesion admin debe pasar por front_menu/src/auth.js y front_menu/src/lib/apiClient.js."
+
+  - owner_module: "front_clientes.auth"
+    status: verified_in_repo
+    kind: frontend_module
+    paths:
+      - "front_clientes/src/hooks/useAuth.js"
+      - "front_clientes/src/services/api.js"
+      - "front_clientes/src/components/LoginScreen.jsx"
+      - "front_clientes/src/components/RegistroScreen.jsx"
+      - "front_clientes/src/components/RecuperarPassword.jsx"
+      - "front_clientes/src/components/PerfilCliente.jsx"
+    owns: ["login", "registro", "recuperar acceso", "perfil", "storage token/empleado"]
+
+  - owner_module: "front_clientes.pedido"
+    status: verified_in_repo
+    kind: frontend_module
+    paths:
+      - "front_clientes/src/components/pedido"
+      - "front_clientes/src/hooks/usePedidoSemanal.js"
+      - "front_clientes/src/hooks/useOpcionesMenu.js"
+      - "front_clientes/src/hooks/useSeleccionDia.js"
+      - "front_clientes/src/services/pedidoService.js"
+      - "front_clientes/src/services/menuService.js"
+      - "front_clientes/src/mappers/pedidoMapper.js"
+      - "front_clientes/src/utils/reglasSeleccionPedido.js"
+      - "front_clientes/src/utils/reglasModificacionPedido.js"
+    owns: ["pedido semanal mobile", "seleccion por dia", "guarniciones", "crear/modificar/confirmar", "sugerencias de semana sin menu", "estado local de semana"]
+
+safe_refactor_zones:
+  verified_in_repo:
+    - path: "front_clientes/src/components/pedido"
+      note: "Componentes de UI de pedido; validar con lint/build/tests cliente."
+    - path: "front_menu/src/hooks"
+      note: "Hooks admin por dominio; mantener contratos con apiClient."
+    - path: "API_LA_QUINTA/src/modules/*/*.service.js"
+      note: "Logica de negocio; no mover SQL aqui si ya vive en repository."
+
+must_not_move_without_dependency_review:
+  verified_in_repo:
+    - "API_LA_QUINTA/src/routes/v1.routes.js"
+    - "API_LA_QUINTA/src/app.js"
+    - "API_LA_QUINTA/src/middlewares/auth.middleware.js"
+    - "API_LA_QUINTA/src/database/migrations"
+    - "front_menu/src/auth.js"
+    - "front_menu/src/lib/apiClient.js"
+    - "front_clientes/src/routes/rutasCliente.js"
+    - "front_clientes/src/services/api.js"
+    - "front_clientes/src/services/apiCliente.js"
+    - "front_clientes/src/mappers/pedidoMapper.js"
+
+architecture_notes:
+  from_chat_summary:
+    - "Los modulos de menu deben mantenerse dentro de una carpeta contenedora de menu."
+  needs_user_confirmation:
+    - "El repo actual tiene API_LA_QUINTA/src/modules/menu y API_LA_QUINTA/src/modules/menus-semanales separados; confirmar si se desea una carpeta contenedora comun antes de reestructurar."

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { iniciarMedicionPerformance } from '../utils/performance.js';
 
 const TOKEN_KEY   = 'token';
 const EMPLEADO_KEY = 'empleado';
@@ -38,12 +39,29 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = getClientToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  config.metadata = {
+    ...(config.metadata || {}),
+    finalizarMedicion: iniciarMedicionPerformance('request:axios', {
+      metodo: String(config.method || 'get').toUpperCase(),
+      recurso: String(config.url || '').split('?')[0],
+    }),
+  };
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    response.config.metadata?.finalizarMedicion?.({
+      estado: 'ok',
+      status: response.status,
+    });
+    return response;
+  },
   (error) => {
+    error.config?.metadata?.finalizarMedicion?.({
+      estado: 'error',
+      status: error.response?.status,
+    });
     if (error.response?.status === 401) {
       clearClientSession();
       window.dispatchEvent(new Event('cliente:unauthorized'));

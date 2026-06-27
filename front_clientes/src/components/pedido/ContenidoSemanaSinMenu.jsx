@@ -1,6 +1,20 @@
-import { Lightbulb } from "lucide-react";
+import { CheckCircle2, Lightbulb } from "lucide-react";
 
-export default function ContenidoSemanaSinMenu({ onSugerir }) {
+export default function ContenidoSemanaSinMenu({ onSugerir, sugerenciaEnviada = false }) {
+  if (sugerenciaEnviada) {
+    return (
+      <section className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl border border-[#d8e6d4] bg-[#f0f7ee] px-5 py-6 text-center text-[#2d5a27]">
+        <CheckCircle2 className="h-9 w-9" aria-hidden="true" />
+        <h3 className="mt-3 text-xl font-black leading-tight">
+          Gracias por tu sugerencia
+        </h3>
+        <p className="mt-1 text-sm font-bold leading-snug text-[#4f7448]">
+          Ya la registramos para esta semana.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <button
       type="button"

@@ -28,6 +28,9 @@ export default function SemanaCardLectura({
       : "bloqueado";
   const mostrarAviso = ["confirmado", "cerrado", "fuera_de_plazo"].includes(semana.estado);
   const esSemanaSugerencias = Boolean(semana.metadata?.esSemanaSugerencias);
+  const sugerenciaEnviada =
+    (semana.recomendacionesUsuario || []).length > 0 ||
+    Boolean(semana.comentarioRecomendacion);
   const mostrarMenuPublicado = ["sin_pedido", "pendiente"].includes(semana.estado);
   const mostrarPedidoConfirmado = ["confirmado", "cerrado", "fuera_de_plazo"].includes(semana.estado);
 
@@ -61,7 +64,10 @@ export default function SemanaCardLectura({
         <AvisoModificacion mensaje={mensajeLimite} tono={tonoAviso} />
       )}
       {esSemanaSugerencias ? (
-        <ContenidoSemanaSinMenu onSugerir={onRecomendar} />
+        <ContenidoSemanaSinMenu
+          onSugerir={onRecomendar}
+          sugerenciaEnviada={sugerenciaEnviada}
+        />
       ) : (
         <ListaDiasPedido
           dias={semana.dias}

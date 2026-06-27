@@ -121,13 +121,7 @@ export async function obtenerOpcionesMenuPorDia({ empresaId, semanaId, diaId }) 
   return dia?.opciones || [];
 }
 
-export function obtenerGuarnicionesPorPlato({ platoId }) {
-  const params = crearParams({ platoId });
-  return apiGet(`/menu/guarniciones?${params.toString()}`);
-}
-
 export const menuService = {
-  obtenerGuarnicionesPorPlato,
   obtenerOpcionesMenuPorDia,
   obtenerOpcionesMenuPorSemana,
 };

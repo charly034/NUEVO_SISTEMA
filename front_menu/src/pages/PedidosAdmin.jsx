@@ -993,7 +993,7 @@ export default function PedidosAdmin() {
   const domingoSemana = addDias(semana, 6);
 
   return (
-    <div className="px-4 pt-0 pb-4 md:p-6 max-w-5xl mx-auto">
+    <div className="px-4 pt-0 pb-4 md:p-6 max-w-7xl mx-auto">
 
       {/* ── Header mobile (sticky) ── */}
       <div className="md:hidden sticky top-0 z-20 bg-green-700 text-white px-4 py-3 -mx-4 -mt-0 mb-4 print:hidden flex items-center gap-2">

@@ -1,4 +1,15 @@
+import sonidoPedidoUrl from "../assets/sonidos/sonido-confirmacion-pedido.mp3";
+
 export function reproducirSonidoConfirmacion() {
+  const audio = new Audio(sonidoPedidoUrl);
+  audio.volume = 0.9;
+
+  audio.play().catch(() => {
+    reproducirTonoConfirmacionFallback();
+  });
+}
+
+function reproducirTonoConfirmacionFallback() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return;
 

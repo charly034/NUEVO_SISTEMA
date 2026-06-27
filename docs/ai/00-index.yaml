@@ -1,0 +1,142 @@
+schema: la_quinta_ai_memory_index_v2
+updated_at: "2026-06-27"
+language: es
+
+repo_summary:
+  status: verified_in_repo
+  name: "La Quinta"
+  type: "monorepo web mobile-first para menus y pedidos semanales"
+  main_apps:
+    - id: api
+      path: "API_LA_QUINTA"
+      stack: "Node.js + Express + PostgreSQL"
+      base_api: "/api/v1"
+    - id: admin
+      path: "front_menu"
+      stack: "React 18 + Vite + Tailwind 3"
+      purpose: "panel administrativo"
+    - id: clientes
+      path: "front_clientes"
+      stack: "React 19 + Vite + Tailwind 4"
+      purpose: "app de empleados/clientes"
+  product_context:
+    status: from_chat_summary
+    summary: "App mobile-first para pedidos semanales de La Quinta con navegacion inferior Pedido / Mis pedidos / Mi cuenta."
+
+entrypoints:
+  verified_in_repo:
+    api:
+      server: "API_LA_QUINTA/src/server.js"
+      app: "API_LA_QUINTA/src/app.js"
+      routes: "API_LA_QUINTA/src/routes/index.js"
+      v1_routes: "API_LA_QUINTA/src/routes/v1.routes.js"
+    admin:
+      app: "front_menu/src/App.jsx"
+      auth: "front_menu/src/auth.js"
+      api_client: "front_menu/src/lib/apiClient.js"
+    clientes:
+      app: "front_clientes/src/App.jsx"
+      routes: "front_clientes/src/routes/rutasCliente.js"
+      auth_hook: "front_clientes/src/hooks/useAuth.js"
+      pedido_hook: "front_clientes/src/hooks/usePedidoSemanal.js"
+
+main_commands:
+  verified_in_repo:
+    api:
+      install: "cd API_LA_QUINTA && npm ci"
+      dev: "cd API_LA_QUINTA && npm run dev"
+      start: "cd API_LA_QUINTA && npm start"
+      migrate: "cd API_LA_QUINTA && npm run migrate"
+      rollback: "cd API_LA_QUINTA && npm run migrate:rollback"
+      test: "cd API_LA_QUINTA && npm test"
+      lint: "cd API_LA_QUINTA && npm run lint"
+      seed_admin: "cd API_LA_QUINTA && npm run seed:admin"
+      seed_demo: "cd API_LA_QUINTA && npm run seed:demo"
+    admin:
+      install: "cd front_menu && npm ci"
+      dev: "cd front_menu && npm run dev"
+      build: "cd front_menu && npm run build"
+      lint: "cd front_menu && npm run lint"
+    clientes:
+      install: "cd front_clientes && npm ci"
+      dev: "cd front_clientes && npm run dev"
+      build: "cd front_clientes && npm run build"
+      lint: "cd front_clientes && npm run lint"
+      test: "cd front_clientes && npm test"
+      e2e: "cd front_clientes && npm run test:e2e"
+    root_helpers:
+      start_all_windows: ".\\iniciar.bat"
+      stop_all_windows: ".\\detener.bat"
+      restart_all_windows: ".\\reiniciar.bat"
+      diagnostic_windows: ".\\diagnostico.bat"
+
+source_of_truth:
+  verified_in_repo:
+    - "codigo real del repositorio"
+    - "AGENTS.md"
+    - "README.md"
+    - "docs/pedidos-cliente.md"
+    - "package.json de cada app"
+    - "API_LA_QUINTA/src/modules/**/*.routes.js"
+    - "API_LA_QUINTA/src/database/migrations"
+  from_chat_summary:
+    - "diseno aprobado mobile-first: fondo calido, verde oliva, card semanal centrada, navegacion inferior"
+    - "flujo actual posterior a Hacer pedido o Modificar pedido"
+
+recommended_read_order:
+  always:
+    - "AGENTS.md"
+    - "docs/ai/00-index.yaml"
+    - "docs/ai/05-admin.yaml"
+    - "docs/ai/10-system-map.yaml"
+    - "docs/ai/30-contracts.yaml"
+  by_task:
+    api:
+      - "docs/ai/20-modules.yaml"
+      - "docs/ai/40-flows.yaml"
+      - "docs/ai/50-guardrails.yaml"
+    pedido_cliente:
+      - "docs/pedidos-cliente.md"
+      - "docs/ai/40-flows.yaml"
+      - "docs/ai/60-debt.yaml"
+    frontend_admin:
+      - "docs/ai/05-admin.yaml"
+      - "docs/ai/20-modules.yaml"
+    refactor:
+      - "docs/ai/20-modules.yaml"
+      - "docs/ai/50-guardrails.yaml"
+      - "docs/ai/60-debt.yaml"
+    history:
+      - "docs/ai/70-project-history.yaml"
+
+quick_paths:
+  verified_in_repo:
+    backend_modules: "API_LA_QUINTA/src/modules"
+    migrations: "API_LA_QUINTA/src/database/migrations"
+    backend_tests: "API_LA_QUINTA/test"
+    admin_pages: "front_menu/src/pages"
+    admin_hooks: "front_menu/src/hooks"
+    cliente_pages: "front_clientes/src/pages"
+    cliente_pedido_components: "front_clientes/src/components/pedido"
+    cliente_services: "front_clientes/src/services"
+    cliente_tests: "front_clientes/src/**/*.test.*"
+    cliente_e2e: "front_clientes/e2e/smoke.spec.js"
+
+memory_update_rules:
+  update_docs_ai_when:
+    - "se agregan, eliminan o cambian endpoints"
+    - "cambian payloads o response shape"
+    - "cambian scripts, variables de entorno, puertos o Docker"
+    - "se mueven modulos, rutas, hooks, servicios o migraciones"
+    - "cambia el flujo de pedido, login, registro, admin o deploy"
+    - "se resuelve deuda tecnica documentada"
+  never_store:
+    - "valores reales de .env"
+    - "tokens"
+    - "passwords"
+    - "datos personales reales innecesarios"
+  marking_policy:
+    verified_in_repo: "solo lo comprobado en archivos del repo"
+    from_chat_summary: "contexto historico dado por el usuario"
+    needs_verification: "existe indicio en repo pero falta validar comportamiento"
+    needs_user_confirmation: "decision de producto o arquitectura no verificable en codigo"

@@ -1,6 +1,7 @@
 import { opcionesMenuPorDia } from "../data/opcionesMenuMock.js";
 import { pedidoMock } from "../data/pedidoMock.js";
 import { semanasMock } from "../data/semanasMock.js";
+import { iniciarMedicionPerformance } from "../utils/performance.js";
 import { clearClientSession, getClientToken } from "./api.js";
 
 const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "");
@@ -91,6 +92,11 @@ function crearErrorAutenticacion(mensaje = "No pudimos cargar tu pedido. Inicia 
 
 async function pedirApi(recurso, opciones = {}) {
   const { requiereAuth = false, ...opcionesFetch } = opciones;
+  const metodo = opcionesFetch.method || "GET";
+  const finalizarMedicion = iniciarMedicionPerformance("request:fetch", {
+    metodo,
+    recurso: recurso.split("?")[0],
+  });
   const headers = {
     Accept: "application/json",
     ...(opcionesFetch.body ? { "Content-Type": "application/json" } : {}),
@@ -111,10 +117,12 @@ async function pedirApi(recurso, opciones = {}) {
       headers,
     });
   } catch {
+    finalizarMedicion({ estado: "error_red" });
     throw new Error("No pudimos conectar con la API. Revisa que el backend este levantado.");
   }
 
   const data = await parsearRespuestaJson(response);
+  finalizarMedicion({ estado: response.ok ? "ok" : "error", status: response.status });
 
   if (!response.ok) {
     const error = new Error(extraerMensajeError(data, response.status));

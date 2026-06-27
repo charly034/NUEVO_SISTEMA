@@ -1,0 +1,152 @@
+.
+|-- AGENTS.md
+|   Reglas de trabajo para agentes: idioma, docs/ai primero, edicion, validacion.
+|-- README.md
+|   Setup local, Docker Compose y despliegue Easypanel.
+|-- compose.yaml
+|   Servicios db, api, admin y clientes.
+|-- .env.example
+|-- .env.docker.example
+|   Templates de variables. No guardar secretos reales.
+|-- iniciar.bat
+|-- iniciar-servicios.ps1
+|-- detener.bat
+|-- reiniciar.bat
+|-- diagnostico.bat
+|-- diagnostico.ps1
+|-- abrir_puertos.bat
+|-- cerrar_puertos.bat
+|   Helpers Windows para levantar, detener y diagnosticar puertos 3000/5174/5175.
+|
+|-- docs/
+|   |-- pedidos-cliente.md
+|   |   Flujo detallado del pedido semanal cliente.
+|   |-- contexto-proyecto.md
+|   |   Memoria narrativa inicial.
+|   `-- ai/
+|       |-- 00-index.yaml
+|       |   Indice y orden de lectura de la memoria tecnica.
+|       |-- 05-admin.yaml
+|       |   Guia operativa para mantenimiento y diagnostico.
+|       |-- 10-system-map.yaml
+|       |   Mapa de runtime, estado, storage, env y carga.
+|       |-- 20-modules.yaml
+|       |   Owners de modulos, limites y zonas de edicion.
+|       |-- 30-contracts.yaml
+|       |   Endpoints, payloads, storage, puertos e invariantes.
+|       |-- 40-flows.yaml
+|       |   Flujos principales y smoke checks.
+|       |-- 50-guardrails.yaml
+|       |   Invariantes, riesgos y validaciones requeridas.
+|       |-- 60-debt.yaml
+|       |   Deuda tecnica y cortes recomendados.
+|       |-- 70-project-history.yaml
+|       |   Historia del producto, estado y proximos pasos.
+|       `-- project-structure.txt
+|           Arbol conciso del repo.
+|
+|-- API_LA_QUINTA/
+|   |-- package.json
+|   |   Scripts API: dev, start, migrate, seed, test, lint.
+|   |-- Dockerfile
+|   |-- database.json
+|   |-- scripts/
+|   |   Seeds, import CSV, reset admin y backfill historial.
+|   |-- test/
+|   |   Tests node:test de pedidos.
+|   |-- test_helpers/
+|   `-- src/
+|       |-- server.js
+|       |-- app.js
+|       |   Express app: middlewares, rate limits y rutas.
+|       |-- config/
+|       |   env, database, cors.
+|       |-- constants/
+|       |-- database/
+|       |   |-- connection.js
+|       |   |-- migrations/
+|       |   `-- seeds/
+|       |-- middlewares/
+|       |   auth, validation, request logger, not found, error.
+|       |-- routes/
+|       |   index.js y v1.routes.js.
+|       |-- utils/
+|       |   response, asyncHandler, ApiError, fecha.
+|       `-- modules/
+|           |-- admin-auth/
+|           |-- auth/
+|           |-- empleados/
+|           |-- empresas/
+|           |-- estadisticas/
+|           |-- guarniciones/
+|           |-- health/
+|           |-- menu/
+|           |-- menus-semanales/
+|           |-- pedidos/
+|           |-- platos/
+|           |-- sugerencias/
+|           |-- users/
+|           `-- usuarios-admin/
+|
+|-- front_menu/
+|   |-- package.json
+|   |   Scripts admin: dev, build, lint, preview.
+|   |-- Dockerfile
+|   |-- index.html
+|   |-- nginx/
+|   |   Template Nginx para proxy API_UPSTREAM.
+|   |-- public/
+|   `-- src/
+|       |-- App.jsx
+|       |-- auth.js
+|       |-- main.jsx
+|       |-- index.css
+|       |-- components/
+|       |   Layout, UI, forms y login admin.
+|       |-- hooks/
+|       |   Hooks por dominio admin.
+|       |-- lib/
+|       |   apiClient, confirm, queryClient, toast.
+|       |-- pages/
+|       |   Dashboard, Platos, Semanas, SemanaDetalle, Historial, Estadisticas,
+|       |   Sugeridor, PedidosAdmin, PedidosHoy, Empresas, Guarniciones,
+|       |   Administradores.
+|       `-- services/
+|
+`-- front_clientes/
+    |-- package.json
+    |   Scripts cliente: dev, build, lint, test, test:e2e.
+    |-- Dockerfile
+    |-- index.html
+    |-- playwright.config.js
+    |-- QA_REGRESION.md
+    |-- nginx/
+    |   Template Nginx para proxy API_UPSTREAM.
+    |-- public/
+    |-- e2e/
+    |   Smoke Playwright.
+    `-- src/
+        |-- App.jsx
+        |-- main.jsx
+        |-- index.css
+        |-- assets/
+        |-- components/
+        |   Login, registro, perfil, historial, layout, UI y pedido.
+        |-- components/pedido/
+        |   Flujo mobile de pedido semanal.
+        |-- compartido/
+        |   UI/layout compartidos.
+        |-- constants/
+        |-- data/
+        |-- hooks/
+        |   useAuth, usePedidoSemanal, useOpcionesMenu, useSeleccionDia.
+        |-- lib/
+        |-- mappers/
+        |   pedidoMapper.js.
+        |-- pages/
+        |-- routes/
+        |   rutasCliente.js.
+        |-- services/
+        |   api.js, apiCliente.js, pedidoService.js, menuService.js.
+        |-- tests/
+        `-- utils/

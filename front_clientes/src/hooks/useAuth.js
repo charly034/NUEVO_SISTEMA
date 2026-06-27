@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { authApi, saveClientSession, clearClientSession } from '../services/api.js';
+import { medirPromesaPerformance } from '../utils/performance.js';
 
 function readStoredEmpleado() {
   try {
@@ -35,10 +36,9 @@ export function useAuth() {
 
   useEffect(() => {
     if (!hasToken()) {
-      setChecking(false);
       return;
     }
-    authApi.me()
+    medirPromesaPerformance('auth:check-sesion', () => authApi.me())
       .then((data) => {
         const remember = isRemembered();
         saveClientSession({ token: localStorage.getItem('token') || sessionStorage.getItem('token'), empleado: data }, remember);
@@ -49,7 +49,9 @@ export function useAuth() {
   }, [logout]);
 
   const login = useCallback(async (email, password, remember = false) => {
-    const data = await authApi.login(email, password, remember);
+    const data = await medirPromesaPerformance('auth:login', () =>
+      authApi.login(email, password, remember),
+    );
     saveClientSession({ token: data.token, empleado: data.empleado }, remember);
     setEmpleado(data.empleado);
     return data.empleado;

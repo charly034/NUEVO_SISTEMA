@@ -1,20 +1,36 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Platos from './pages/Platos.jsx';
-import Semanas from './pages/Semanas.jsx';
-import SemanaDetalle from './pages/SemanaDetalle.jsx';
-import Historial from './pages/Historial.jsx';
-import Estadisticas from './pages/Estadisticas.jsx';
-import Sugeridor from './pages/Sugeridor.jsx';
-import Empresas from './pages/Empresas.jsx';
-import Guarniciones from './pages/Guarniciones.jsx';
-import PedidosAdmin from './pages/PedidosAdmin.jsx';
-import PedidosHoy from './pages/PedidosHoy.jsx';
-import Administradores from './pages/Administradores.jsx';
 import AdminLogin from './components/AdminLogin.jsx';
 import { adminAuth } from './auth.js';
+
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Platos = lazy(() => import('./pages/Platos.jsx'));
+const Semanas = lazy(() => import('./pages/Semanas.jsx'));
+const SemanaDetalle = lazy(() => import('./pages/SemanaDetalle.jsx'));
+const Historial = lazy(() => import('./pages/Historial.jsx'));
+const Estadisticas = lazy(() => import('./pages/Estadisticas.jsx'));
+const Sugeridor = lazy(() => import('./pages/Sugeridor.jsx'));
+const Empresas = lazy(() => import('./pages/Empresas.jsx'));
+const Guarniciones = lazy(() => import('./pages/Guarniciones.jsx'));
+const PedidosAdmin = lazy(() => import('./pages/PedidosAdmin.jsx'));
+const PedidosHoy = lazy(() => import('./pages/PedidosHoy.jsx'));
+const RecomendacionesMenu = lazy(() => import('./pages/RecomendacionesMenu.jsx'));
+const Administradores = lazy(() => import('./pages/Administradores.jsx'));
+
+function PageFallback() {
+  return (
+    <div className="min-h-[320px] animate-pulse rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="h-6 w-48 rounded bg-gray-200" />
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <div className="h-24 rounded bg-gray-100" />
+        <div className="h-24 rounded bg-gray-100" />
+        <div className="h-24 rounded bg-gray-100" />
+      </div>
+      <div className="mt-6 h-48 rounded bg-gray-100" />
+    </div>
+  );
+}
 
 export default function App() {
   const [admin, setAdmin] = useState(() => adminAuth.storedUser());
@@ -28,7 +44,6 @@ export default function App() {
 
   useEffect(() => {
     if (!adminAuth.hasToken()) {
-      setChecking(false);
       return;
     }
     adminAuth.me()
@@ -55,18 +70,20 @@ export default function App() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route element={<Layout admin={admin} onLogout={logout} />}>
-          <Route index element={<Dashboard />} />
-          <Route path="platos" element={<Platos />} />
-          <Route path="semanas" element={<Semanas />} />
-          <Route path="semanas/:id" element={<SemanaDetalle />} />
-          <Route path="historial" element={<Historial />} />
-          <Route path="estadisticas" element={<Estadisticas />} />
-          <Route path="sugeridor" element={<Sugeridor />} />
-          <Route path="pedidos" element={<PedidosAdmin />} />
-          <Route path="pedidos-hoy" element={<PedidosHoy />} />
-          <Route path="empresas" element={<Empresas />} />
-          <Route path="guarniciones" element={<Guarniciones />} />
-          <Route path="administradores" element={<Administradores />} />
+          <Route index element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
+          <Route path="platos" element={<Suspense fallback={<PageFallback />}><Platos /></Suspense>} />
+          <Route path="semanas" element={<Suspense fallback={<PageFallback />}><Semanas /></Suspense>} />
+          <Route path="semanas/:id" element={<Suspense fallback={<PageFallback />}><SemanaDetalle /></Suspense>} />
+          <Route path="historial" element={<Suspense fallback={<PageFallback />}><Historial /></Suspense>} />
+          <Route path="estadisticas" element={<Suspense fallback={<PageFallback />}><Estadisticas /></Suspense>} />
+          <Route path="sugeridor" element={<Suspense fallback={<PageFallback />}><Sugeridor /></Suspense>} />
+          <Route path="pedidos" element={<Suspense fallback={<PageFallback />}><PedidosAdmin /></Suspense>} />
+          <Route path="pedidos-hoy" element={<Suspense fallback={<PageFallback />}><PedidosHoy /></Suspense>} />
+          <Route path="recomendaciones-menu" element={<Suspense fallback={<PageFallback />}><RecomendacionesMenu /></Suspense>} />
+          <Route path="empresas" element={<Suspense fallback={<PageFallback />}><Empresas /></Suspense>} />
+          <Route path="empleados" element={<Suspense fallback={<PageFallback />}><Empresas /></Suspense>} />
+          <Route path="guarniciones" element={<Suspense fallback={<PageFallback />}><Guarniciones /></Suspense>} />
+          <Route path="administradores" element={<Suspense fallback={<PageFallback />}><Administradores /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -13,6 +13,8 @@ export default function SemanaContainer({
   onActualizarSemana,
   onCambiarModoSemana,
   onDirtyChange,
+  onGuardarSugerencia,
+  onIndiceActivoChange,
   semanas,
 }) {
   const [indiceActivo, setIndiceActivo] = useState(indiceInicial);
@@ -27,8 +29,10 @@ export default function SemanaContainer({
 
   const actualizarIndice = useCallback(() => {
     if (!emblaApi) return;
-    setIndiceActivo(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
+    const nuevoIndice = emblaApi.selectedScrollSnap();
+    setIndiceActivo(nuevoIndice);
+    onIndiceActivoChange?.(nuevoIndice);
+  }, [emblaApi, onIndiceActivoChange]);
 
   const irAnterior = useCallback(() => {
     emblaApi?.scrollPrev();
@@ -46,24 +50,16 @@ export default function SemanaContainer({
 
   useEffect(() => {
     if (!emblaApi) return undefined;
-    const fijarIndiceInicial = () => {
-      emblaApi.reInit();
-      emblaApi.scrollTo(indiceInicial, true);
-      actualizarIndice();
-    };
-    const primerIntento = window.setTimeout(fijarIndiceInicial, 50);
-    const segundoIntento = window.setTimeout(fijarIndiceInicial, 180);
-
+    const frameInicial = window.requestAnimationFrame(actualizarIndice);
     emblaApi.on("select", actualizarIndice);
     emblaApi.on("reInit", actualizarIndice);
 
     return () => {
-      window.clearTimeout(primerIntento);
-      window.clearTimeout(segundoIntento);
+      window.cancelAnimationFrame(frameInicial);
       emblaApi.off("select", actualizarIndice);
       emblaApi.off("reInit", actualizarIndice);
     };
-  }, [actualizarIndice, emblaApi, indiceInicial, semanas.length]);
+  }, [actualizarIndice, emblaApi]);
 
   useEffect(() => {
     window.addEventListener("pedido:ir-semana-actual", irSemanaActual);
@@ -99,6 +95,7 @@ export default function SemanaContainer({
                     }
                   }}
                   onActualizarSemana={onActualizarSemana}
+                  onGuardarSugerencia={onGuardarSugerencia}
                 />
               </div>
             ))}

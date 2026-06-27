@@ -1,0 +1,310 @@
+schema: la_quinta_contracts_v2
+updated_at: "2026-06-27"
+
+api_base:
+  verified_in_repo: "/api/v1"
+
+response_contract:
+  verified_in_repo:
+    success_helper:
+      file: "API_LA_QUINTA/src/utils/response.js"
+      shape:
+        success: true
+        message: "string"
+        data: "any"
+    created_helper:
+      status: 201
+      shape: "igual a success_helper"
+    no_content_helper:
+      status: 204
+      body: null
+    error_helper:
+      shape:
+        success: false
+        message: "string"
+        errors: "array"
+    exceptions:
+      - endpoint_area: "estadisticas"
+        shape: "{ data }"
+        files: ["API_LA_QUINTA/src/modules/estadisticas/estadisticas.controller.js"]
+      - endpoint_area: "sugerencias"
+        shape: "{ data }"
+        files: ["API_LA_QUINTA/src/modules/sugerencias/sugerencias.controller.js"]
+      - endpoint_area: "auth/admin auth manual bad requests"
+        shape: "{ success: false, message }"
+
+auth_contracts:
+  verified_in_repo:
+    cliente:
+      header: "Authorization: Bearer <token>"
+      token_payload_has: ["sub", "empresa_id", "nombre", "apellido", "rol"]
+      middleware: "requireAuth"
+      request_owner: "front_clientes/src/services/api.js"
+      storage_keys: ["token", "empleado"]
+    admin:
+      header: "Authorization: Bearer <token>"
+      token_payload_has: ["sub", "tipo=admin", "nombre", "apellido", "rol"]
+      middleware: "requireAdminAuth"
+      request_owner: "front_menu/src/lib/apiClient.js"
+      storage_keys: ["admin_token", "admin_user"]
+
+endpoints:
+  verified_in_repo:
+    health:
+      - "GET /api/v1/health"
+    auth_cliente:
+      - "POST /api/v1/auth/login"
+      - "GET /api/v1/auth/me"
+      - "GET /api/v1/auth/verificar-codigo/:codigo"
+      - "POST /api/v1/auth/registro"
+      - "POST /api/v1/auth/usar-reset-code"
+      - "POST /api/v1/auth/cambiar-password"
+      - "PATCH /api/v1/auth/perfil"
+    auth_admin:
+      - "POST /api/v1/admin/auth/login"
+      - "GET /api/v1/admin/auth/me"
+      - "GET /api/v1/admin/auth/usuarios"
+      - "POST /api/v1/admin/auth/usuarios"
+      - "PATCH /api/v1/admin/auth/usuarios/:id"
+      - "DELETE /api/v1/admin/auth/usuarios/:id"
+    pedidos:
+      - "GET /api/v1/pedidos/menu-hoy"
+      - "GET /api/v1/pedidos/menu-semana?fecha_inicio=YYYY-MM-DD"
+      - "GET /api/v1/pedidos/menu-activo"
+      - "GET /api/v1/pedidos/menu/semanas/:semanaId/opciones"
+      - "GET /api/v1/pedidos/semanas"
+      - "GET /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
+      - "POST /api/v1/pedidos"
+      - "PUT /api/v1/pedidos/:id"
+      - "PATCH /api/v1/pedidos/:id/confirmar"
+      - "POST /api/v1/pedidos/sugerencias"
+      - "GET /api/v1/pedidos/sugerencias"
+      - "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
+      - "GET /api/v1/pedidos/mi-historial"
+      - "GET /api/v1/pedidos"
+      - "GET /api/v1/pedidos/:id"
+      - "PATCH /api/v1/pedidos/:id/estado"
+    menu:
+      - "GET /api/v1/menu/semanas/:semanaId/opciones"
+    menus_semanales:
+      - "GET /api/v1/menus-semanales"
+      - "GET /api/v1/menus-semanales/:id"
+      - "POST /api/v1/menus-semanales"
+      - "PUT /api/v1/menus-semanales/:id"
+      - "DELETE /api/v1/menus-semanales/:id"
+      - "PATCH /api/v1/menus-semanales/:id/estado"
+      - "GET /api/v1/menus-semanales/:id/dias/:dia"
+      - "POST /api/v1/menus-semanales/:id/dias"
+      - "DELETE /api/v1/menus-semanales/:id/dias/:dia/:opcion"
+      - "POST /api/v1/menus-semanales/:id/sin-servicio"
+      - "DELETE /api/v1/menus-semanales/:id/sin-servicio/:dia"
+      - "GET /api/v1/menus-semanales/historial/plato/:platoId"
+      - "GET /api/v1/menus-semanales/historial/usados"
+      - "GET /api/v1/menus-semanales/historial/no-usados"
+    platos:
+      - "GET /api/v1/platos/tags"
+      - "GET /api/v1/platos"
+      - "GET /api/v1/platos/:id"
+      - "POST /api/v1/platos"
+      - "PUT /api/v1/platos/:id"
+      - "DELETE /api/v1/platos/:id"
+    guarniciones:
+      - "GET /api/v1/guarniciones"
+      - "POST /api/v1/guarniciones"
+      - "PATCH /api/v1/guarniciones/:id"
+      - "DELETE /api/v1/guarniciones/:id"
+    empresas:
+      - "GET /api/v1/empresas"
+      - "GET /api/v1/empresas/:id"
+      - "POST /api/v1/empresas"
+      - "PATCH /api/v1/empresas/:id"
+      - "DELETE /api/v1/empresas/:id"
+      - "POST /api/v1/empresas/:id/reabrir-plazo"
+      - "DELETE /api/v1/empresas/:id/reabrir-plazo"
+      - "POST /api/v1/empresas/:id/regenerar-codigo"
+    empleados:
+      - "GET /api/v1/empleados"
+      - "GET /api/v1/empleados/:id"
+      - "POST /api/v1/empleados"
+      - "PATCH /api/v1/empleados/:id"
+      - "DELETE /api/v1/empleados/:id"
+      - "POST /api/v1/empleados/:id/reset-code"
+    estadisticas:
+      - "GET /api/v1/estadisticas/resumen"
+      - "GET /api/v1/estadisticas/platos-mas-usados"
+      - "GET /api/v1/estadisticas/distribucion-tags"
+      - "GET /api/v1/estadisticas/uso-por-dia"
+      - "GET /api/v1/estadisticas/tendencia-mensual"
+      - "GET /api/v1/estadisticas/top-por-dia"
+    sugerencias:
+      - "GET /api/v1/sugerencias/semana"
+    users_legacy:
+      - "ALL /api/v1/users -> 410 Gone"
+      - "ALL /api/v1/users/:id -> 410 Gone"
+  from_chat_summary:
+    - "GET /api/v1/menu/semanas fue mencionado como agregado"
+  needs_verification:
+    - "No existe ruta exacta GET /api/v1/menu/semanas en el repo; existe GET /api/v1/menu/semanas/:semanaId/opciones."
+
+payload_formats:
+  verified_in_repo:
+    pedido_create_or_update:
+      accepted_fields:
+        - "semana_inicio: YYYY-MM-DD"
+        - "semanaId: alias legacy aceptado por normalizador"
+        - "menu_semanal_id: integer opcional"
+        - "menuSemanalId: alias legacy aceptado por normalizador"
+        - "observaciones: string|null opcional"
+        - "items: array"
+        - "dias: array legacy normalizado a items"
+      item_fields:
+        - "dia: lunes|martes|miercoles|jueves|viernes|sabado|domingo"
+        - "plato_id: integer positivo requerido si sin_pedido=false"
+        - "opcion: letra A-Z para plato especial; null para fijo"
+        - "guarnicion_id: integer|null"
+        - "sin_pedido: boolean"
+        - "origen: usuario|default opcional si sin_pedido=true"
+        - "notas: string <=300 opcional"
+      invariants:
+        - "items debe tener 1 a 7 dias"
+        - "dias no pueden repetirse"
+        - "sin_pedido=true exige plato_id null/undefined y guarnicion_id null/undefined"
+        - "un pedido por empleado y semana: UNIQUE (empleado_id, semana_inicio)"
+        - "pedido_items unico por pedido_id + dia"
+        - "el plazo de POST/PUT se valida con la configuracion de empresa; menus_semanales.fecha_limite_pedidos no debe bloquear el pedido cliente"
+    pedido_estado_admin:
+      endpoint: "PATCH /api/v1/pedidos/:id/estado"
+      body: "{ estado: pendiente|en_proceso|listo|entregado|cancelado }"
+    pedido_sugerencia_cliente:
+      endpoint: "POST /api/v1/pedidos/sugerencias"
+      body: "{ semana_inicio: YYYY-MM-DD, ideas?: string[], comentario?: string }"
+      invariants:
+        - "requiere Authorization Bearer cliente"
+        - "backend usa req.empleado.sub y req.empleado.empresa_id"
+        - "ideas maximo 12 items; cada item <=120 caracteres"
+        - "comentario <=500 caracteres"
+        - "debe llegar al menos una idea o comentario"
+        - "un registro por empleado y semana: UNIQUE (empleado_id, semana_inicio)"
+    pedido_sugerencias_admin:
+      endpoint: "GET /api/v1/pedidos/sugerencias"
+      query: "{ semana_inicio?: YYYY-MM-DD, empresa_id?: integer, limit?: integer, offset?: integer }"
+      response_data: "array de sugerencias con empleado, empresa, semana_inicio, ideas, comentario, created_at y updated_at"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "debe declararse antes de GET /api/v1/pedidos/:id para no colisionar con parametro id"
+    menu_semanal_create:
+      body: "{ nombre, fecha_inicio: YYYY-MM-DD, fecha_fin: YYYY-MM-DD }"
+    menu_dia_add:
+      body: "{ dia, opcion?: A-Z default A, plato_id }"
+    menu_sin_servicio:
+      body: "{ dia, motivo?: string <=200 }"
+    menu_estado:
+      endpoint: "PATCH /api/v1/menus-semanales/:id/estado"
+      body: "{ estado: borrador|publicado|cerrado, fecha_limite_pedidos?: timestamptz|null }"
+      note: "front_menu envia fecha_limite_pedidos=null al reabrir para limpiar limites vencidos; el pedido cliente usa el plazo de empresa."
+    plato_create:
+      body: "{ nombre, descripcion?, tags?, tipo?: fijo|especial|ambos, tiene_guarnicion?: boolean }"
+    empresa_create:
+      body: "{ nombre, slug, plan?, modo_pedido?, dias_laborales?, limite_hora?, limite_dia_semana?, limite_anticipacion_dias?, email?, telefono? }"
+      enums:
+        plan: ["basico", "con_postre", "con_postre_bebida"]
+        modo_pedido: ["semanal", "diario", "ambos"]
+        dias_laborales: ["lunes_viernes", "lunes_sabado", "lunes_domingo"]
+
+runtime_events:
+  verified_in_repo:
+    browser_events:
+      - name: "cliente:unauthorized"
+        emitted_by: "front_clientes/src/services/api.js"
+        effect: "limpia sesion cliente ante 401"
+      - name: "admin:unauthorized"
+        emitted_by: "front_menu/src/lib/apiClient.js"
+        effect: "limpia sesion admin ante 401"
+    db_events:
+      table: "pedido_eventos"
+      examples: ["pedido_creado", "pedido_actualizado", "pedido_confirmado", "pedido_cancelado", "estado_cambiado"]
+
+ports:
+  verified_in_repo:
+    api: 3000
+    admin_dev: 5174
+    clientes_dev: 5175
+    frontend_container: 8080
+    postgres: 5432
+
+env_vars:
+  verified_in_repo:
+    api: ["NODE_ENV", "PORT", "DATABASE_URL", "DB_SSL", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "JWT_SECRET", "JWT_EXPIRES_IN", "JWT_EXPIRES_IN_SHORT", "JWT_EXPIRES_IN_REMEMBER", "APP_TIMEZONE", "TRUST_PROXY_HOPS", "CORS_ORIGINS", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DEMO_ADMIN_EMAIL", "DEMO_ADMIN_PASSWORD", "DEMO_CLIENT_PASSWORD", "TEST_DATA_PASSWORD", "SEED_FULL_RESET_CONFIRM", "SUPERADMIN_EMAIL", "SUPERADMIN_PASSWORD", "DEFAULT_DEMO_PASSWORD", "TEST_USER_PASSWORD", "ADMIN_EMAIL", "ADMIN_NEW_PASSWORD"]
+    docker_root: ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "JWT_SECRET", "JWT_EXPIRES_IN", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "CORS_ORIGINS", "APP_TIMEZONE"]
+    frontends: ["VITE_API_URL", "VITE_USAR_ENDPOINT_LEGACY_PEDIDOS", "VITE_DEBUG_PERFORMANCE", "API_UPSTREAM"]
+
+frontend_references_to_unverified_endpoints:
+  resolved_2026_06_27:
+    - endpoint: "GET /api/v1/pedidos/por-semana"
+      previous_reference: "front_clientes/src/services/pedidoService.js"
+      note: "Referencia eliminada de pedidoService.js en Etapa 2; no existe en backend."
+    - endpoint: "GET /api/v1/pedidos/historial"
+      previous_reference: "front_clientes/src/services/pedidoService.js"
+      note: "Referencia eliminada de pedidoService.js en Etapa 2; la API verificada expone GET /api/v1/pedidos/mi-historial."
+    - endpoint: "PATCH /api/v1/pedidos/:id/cancelar"
+      previous_reference: "front_clientes/src/services/pedidoService.js"
+      note: "Referencia eliminada de pedidoService.js en Etapa 2; la API verificada expone DELETE /api/v1/pedidos/mi-pedido?semana_inicio=..."
+    - endpoint: "GET /api/v1/menu/guarniciones"
+      previous_reference: "front_clientes/src/services/menuService.js"
+      note: "Referencia eliminada de menuService.js en Etapa 2; la API verificada expone GET /api/v1/guarniciones."
+
+contract_audit_2026_06_27:
+  verified_in_repo:
+    ok:
+      - method: "GET"
+        endpoint: "/api/v1/pedidos/semanas"
+        backend: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
+        cliente: "front_clientes/src/services/pedidoService.js"
+        estado: "OK"
+      - method: "GET"
+        endpoint: "/api/v1/menu/semanas/:semanaId/opciones"
+        backend: "API_LA_QUINTA/src/modules/menu/menu.routes.js"
+        cliente: "front_clientes/src/services/menuService.js"
+        estado: "OK"
+      - method: "GET"
+        endpoint: "/api/v1/pedidos/mi-historial"
+        backend: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
+        cliente: "front_clientes/src/services/api.js"
+        estado: "OK"
+      - method: "GET"
+        endpoint: "/api/v1/guarniciones"
+        backend: "API_LA_QUINTA/src/modules/guarniciones/guarniciones.routes.js"
+        consumers:
+          - "front_clientes/src/services/api.js"
+          - "front_menu/src/hooks/useGuarniciones.js"
+        estado: "OK"
+    legacy_or_compat:
+      - method: "GET"
+        endpoint: "/api/v1/pedidos/menu/semanas/:semanaId/opciones"
+        backend: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
+        note: "Duplica el endpoint canonico /api/v1/menu/semanas/:semanaId/opciones para compatibilidad."
+        estado: "legacy"
+      - method: "GET"
+        endpoint: "/api/v1/users"
+        backend: "API_LA_QUINTA/src/modules/users/users.routes.js"
+        note: "Modulo legacy retirado; responde 410 Gone detras de requireAdmin."
+        estado: "retired"
+    resolved_2026_06_27:
+      - method: "GET"
+        endpoint: "/api/v1/pedidos/por-semana"
+        previous_reference: "front_clientes/src/services/pedidoService.js"
+        estado: "referencia frontend eliminada"
+      - method: "GET"
+        endpoint: "/api/v1/pedidos/historial"
+        previous_reference: "front_clientes/src/services/pedidoService.js"
+        estado: "referencia frontend eliminada"
+      - method: "PATCH"
+        endpoint: "/api/v1/pedidos/:id/cancelar"
+        previous_reference: "front_clientes/src/services/pedidoService.js"
+        replacement: "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
+        estado: "referencia frontend eliminada"
+      - method: "GET"
+        endpoint: "/api/v1/menu/guarniciones"
+        previous_reference: "front_clientes/src/services/menuService.js"
+        replacement: "GET /api/v1/guarniciones"
+        estado: "referencia frontend eliminada"

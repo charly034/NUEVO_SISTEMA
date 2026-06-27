@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { ChevronDown } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSeleccionDia } from "../../hooks/useSeleccionDia.js";
 import { platoRequiereGuarnicion } from "../../utils/reglasSeleccionPedido.js";
+import { iniciarMedicionPerformance } from "../../utils/performance.js";
 import BottomSheet from "../ui/BottomSheet.jsx";
 import Boton from "../ui/Boton.jsx";
 import Buscador from "../ui/Buscador.jsx";
@@ -21,6 +23,7 @@ export default function BottomSheetSeleccionDia({
 }) {
   const guarnicionRef = useRef(null);
   const scrollRef = useRef(null);
+  const [hayMasOpcionesAbajo, setHayMasOpcionesAbajo] = useState(false);
   const indiceDiaActivo = dias.findIndex((item) => item.clave === dia?.clave);
   const totalDias = dias.length || 1;
   const numeroDiaActivo = indiceDiaActivo >= 0 ? indiceDiaActivo + 1 : 1;
@@ -33,7 +36,6 @@ export default function BottomSheetSeleccionDia({
     filtrosPlatos,
     filtroActivo,
     mensajeMenu,
-    mensajeValidacion,
     opcionNoPedir,
     opcionesDia,
     opcionesFiltradas,
@@ -49,11 +51,42 @@ export default function BottomSheetSeleccionDia({
     semanaId,
   });
 
+  const actualizarIndicadorScroll = useCallback(() => {
+    const contenedor = scrollRef.current;
+    if (!contenedor) return;
+
+    const distanciaAlFinal =
+      contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
+    setHayMasOpcionesAbajo(distanciaAlFinal > 24);
+  }, []);
+
+  useEffect(() => {
+    if (!abierto) return undefined;
+    const finalizar = iniciarMedicionPerformance("bottom-sheet:apertura", {
+      dia: dia?.clave || dia?.dia || "sin_dia",
+    });
+    const frame = requestAnimationFrame(() => finalizar({ estado: "abierto" }));
+    return () => cancelAnimationFrame(frame);
+  }, [abierto, dia]);
+
   useEffect(() => {
     window.requestAnimationFrame(() => {
-      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = 0;
+        actualizarIndicadorScroll();
+      }
     });
-  }, [dia]);
+  }, [actualizarIndicadorScroll, dia]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(actualizarIndicadorScroll);
+    window.addEventListener("resize", actualizarIndicadorScroll);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", actualizarIndicadorScroll);
+    };
+  }, [actualizarIndicadorScroll, opcionesFiltradas.length, seleccion?.plato]);
 
   useEffect(() => {
     if (!seleccion?.plato || !platoRequiereGuarnicion(seleccion.plato)) return;
@@ -75,7 +108,11 @@ export default function BottomSheetSeleccionDia({
       subtitulo={`${opcionesDia.length || 0} opciones disponibles`}
       onCerrar={onCerrar}
     >
-      <div ref={scrollRef} className="min-h-0 flex-1 scroll-smooth overflow-y-auto px-4 py-2">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 scroll-smooth overflow-y-auto px-4 py-2"
+        onScroll={actualizarIndicadorScroll}
+      >
         <section
           aria-live="polite"
           className="mb-3 rounded-3xl border border-[#cde5c8] bg-[#f0f7ee] p-3 text-[#2d5a27]"
@@ -178,15 +215,18 @@ export default function BottomSheetSeleccionDia({
             }
           />
         </div>
+        {hayMasOpcionesAbajo && (
+          <div className="sticky bottom-0 z-10 -mx-4 mt-2 bg-gradient-to-t from-[#faf8f4] via-[#faf8f4] to-transparent px-4 pb-2 pt-7">
+            <div className="mx-auto flex w-fit items-center gap-1.5 rounded-full border border-[#d8e6d4] bg-white px-3 py-1.5 text-xs font-black text-[#2d5a27] shadow-[0_8px_20px_rgba(45,90,39,0.12)]">
+              <span>Deslizá para ver más opciones</span>
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </div>
+          </div>
+        )}
       </div>
 
       <footer className="shrink-0 border-t border-[#eee8df] bg-[#faf8f4] px-4 py-3">
         <ResumenSeleccionDia seleccion={seleccion} />
-        {mensajeValidacion && (
-          <p className="mt-2 text-[0.8rem] font-extrabold text-[#8a4b12]">
-            {mensajeValidacion}
-          </p>
-        )}
         <div className="mt-3">
           <Boton variante="secundario" onClick={onCerrar}>
             Cancelar

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { confirmar } from "../../lib/swal.js";
 import { obtenerEstadoVisualDia } from "../../utils/reglasModificacionPedido.js";
 import { contarSeleccionesValidas } from "../../utils/reglasSeleccionPedido.js";
@@ -34,7 +34,7 @@ export default function SemanaCardEditable({
   const [diaActivo, setDiaActivo] = useState(null);
   const [mensajeError, setMensajeError] = useState("");
   const aperturaInicialRealizada = useRef(false);
-  const diasInicialesRef = useRef(serializarDias(semana.dias));
+  const [diasIniciales] = useState(() => serializarDias(semana.dias));
   const modoCreacion = ["sin_pedido", "pendiente"].includes(semana.estado);
 
   const diasSeleccionados = useMemo(
@@ -42,8 +42,8 @@ export default function SemanaCardEditable({
     [diasEditados],
   );
   const cambiosSinGuardar = useMemo(
-    () => serializarDias(diasEditados) !== diasInicialesRef.current,
-    [diasEditados],
+    () => serializarDias(diasEditados) !== diasIniciales,
+    [diasEditados, diasIniciales],
   );
   const mensajeAyudaEdicion = modoCreacion
     ? "Completá los días que quieras. Te abrimos el primer día editable para empezar."
@@ -55,12 +55,12 @@ export default function SemanaCardEditable({
 
   useEffect(() => () => {
     onDirtyChange?.(false);
-  }, []);
+  }, [onDirtyChange]);
 
-  function puedeEditarDia(dia) {
+  const puedeEditarDia = useCallback((dia) => {
     const estadoVisual = obtenerEstadoVisualDia(dia, semana, fechaActual);
     return !["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual);
-  }
+  }, [fechaActual, semana]);
 
   function obtenerSiguienteDiaEditable(dias, claveActual) {
     const indiceActual = dias.findIndex((dia) => dia.clave === claveActual);
@@ -74,9 +74,11 @@ export default function SemanaCardEditable({
     const primerDiaEditable = diasEditados.find((dia) => puedeEditarDia(dia));
     if (!primerDiaEditable) return;
 
-    aperturaInicialRealizada.current = true;
-    setDiaActivo(primerDiaEditable);
-  }, [diasEditados, modoCreacion]);
+    queueMicrotask(() => {
+      aperturaInicialRealizada.current = true;
+      setDiaActivo(primerDiaEditable);
+    });
+  }, [diasEditados, modoCreacion, puedeEditarDia]);
 
   function abrirSeleccionDia(dia, estadoVisual) {
     if (["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual)) return;

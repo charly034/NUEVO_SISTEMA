@@ -9,6 +9,7 @@ import {
   platoRequiereGuarnicion,
   seleccionDiaEsValida,
 } from "../utils/reglasSeleccionPedido.js";
+import { medirBloquePerformance } from "../utils/performance.js";
 
 const filtrosIniciales = [
   { id: "todos", label: "Todos" },
@@ -59,10 +60,13 @@ export function useSeleccionDia({
 
   useEffect(() => {
     let activo = true;
-    setBusqueda("");
-    setFiltroActivo("todos");
-    setOpcionesDia(dia?.opciones || []);
-    setSeleccion(obtenerSeleccionInicial(dia, dia?.opciones || []));
+    queueMicrotask(() => {
+      if (!activo) return;
+      setBusqueda("");
+      setFiltroActivo("todos");
+      setOpcionesDia(dia?.opciones || []);
+      setSeleccion(obtenerSeleccionInicial(dia, dia?.opciones || []));
+    });
 
     obtenerOpcionesDia(dia).then((opciones) => {
       if (!activo || opciones.length === 0) return;
@@ -78,16 +82,22 @@ export function useSeleccionDia({
   }, [dia, obtenerOpcionesDia]);
 
   const opcionesFiltradas = useMemo(() => {
-    const termino = busqueda.trim().toLowerCase();
-    return opcionesDia
-      .filter((plato) => plato.id !== SIN_PEDIDO_ID)
-      .filter((plato) => coincideFiltro(plato, filtroActivo))
-      .filter((plato) => {
-        if (!termino) return true;
-        return `${plato.nombre} ${plato.descripcion} ${plato.etiquetas?.join(" ")}`
-          .toLowerCase()
-          .includes(termino);
-      });
+    return medirBloquePerformance("busqueda:filtrado-platos", () => {
+      const termino = busqueda.trim().toLowerCase();
+      return opcionesDia
+        .filter((plato) => plato.id !== SIN_PEDIDO_ID)
+        .filter((plato) => coincideFiltro(plato, filtroActivo))
+        .filter((plato) => {
+          if (!termino) return true;
+          return `${plato.nombre} ${plato.descripcion} ${plato.etiquetas?.join(" ")}`
+            .toLowerCase()
+            .includes(termino);
+        });
+    }, {
+      cantidadOpciones: opcionesDia.length,
+      filtroActivo,
+      tieneBusqueda: Boolean(busqueda.trim()),
+    });
   }, [busqueda, filtroActivo, opcionesDia]);
 
   const especialesDia = useMemo(

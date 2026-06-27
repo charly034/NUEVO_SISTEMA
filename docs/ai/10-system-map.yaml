@@ -1,0 +1,209 @@
+schema: la_quinta_system_map_v2
+updated_at: "2026-06-27"
+
+runtime_surfaces:
+  verified_in_repo:
+    api:
+      path: "API_LA_QUINTA"
+      process: "node src/server.js"
+      dev_process: "nodemon src/server.js"
+      port_env: "PORT"
+      default_port: 3000
+      base_path: "/api/v1"
+      database: "PostgreSQL"
+    admin:
+      path: "front_menu"
+      process: "vite"
+      local_port: 5174
+      docker_port: 8080
+      api_base: "/api/v1"
+    clientes:
+      path: "front_clientes"
+      process: "vite"
+      local_port: 5175
+      docker_port: 8080
+      api_base: "import.meta.env.VITE_API_URL || /api/v1"
+    docker_compose:
+      file: "compose.yaml"
+      services: ["db", "api", "admin", "clientes"]
+
+load_order:
+  verified_in_repo:
+    api:
+      - "API_LA_QUINTA/src/server.js importa app y env"
+      - "API_LA_QUINTA/src/app.js configura trust proxy"
+      - "helmet"
+      - "cors(corsOptions)"
+      - "express.json y express.urlencoded con limite 10kb"
+      - "morgan solo en development"
+      - "requestLoggerMiddleware"
+      - "rateLimit global en /api"
+      - "loginLimiter en /api/v1/auth/login y /api/v1/admin/auth/login"
+      - "registroLimiter en /api/v1/auth/registro y /api/v1/auth/usar-reset-code"
+      - "routes montadas bajo /api"
+      - "GET / raiz informativa"
+      - "notFoundMiddleware"
+      - "errorMiddleware"
+    admin:
+      - "front_menu/src/main.jsx monta App"
+      - "front_menu/src/App.jsx restaura adminAuth.storedUser"
+      - "si hay token sin usuario guardado llama adminAuth.me"
+      - "sin admin renderiza AdminLogin"
+      - "con admin monta BrowserRouter y Layout"
+    clientes:
+      - "front_clientes/src/main.jsx monta App"
+      - "QueryClientProvider envuelve HashRouter"
+      - "useAuth maneja sesion cliente"
+      - "PrivateRoute protege Pedido / Mis pedidos / Mi cuenta"
+
+load_order_contracts:
+  verified_in_repo:
+    - "errorMiddleware debe quedar al final de app.js"
+    - "rutas versionadas deben seguir colgando de /api/v1 salvo decision explicita"
+    - "middlewares requireAuth/requireAdminAuth pueblan req.empleado o req.adminUser antes de controladores protegidos"
+    - "front_menu depende de apiClient para Authorization y manejo de 401"
+    - "front_clientes depende de services/api.js y apiCliente.js para Authorization y manejo de 401"
+
+state_owners:
+  verified_in_repo:
+    database:
+      owner: "PostgreSQL"
+      connection: "API_LA_QUINTA/src/database/connection.js"
+      migrations: "API_LA_QUINTA/src/database/migrations"
+    api_env:
+      owner: "API_LA_QUINTA/src/config/env.js"
+    cliente_session:
+      owner: "front_clientes/src/services/api.js"
+      keys: ["token", "empleado"]
+    admin_session:
+      owner: "front_menu/src/auth.js"
+      keys: ["admin_token", "admin_user"]
+    cliente_query_cache:
+      owner: "front_clientes/src/App.jsx"
+      library: "@tanstack/react-query"
+      config: "retry 1, staleTime 5 minutos, gcTime 30 minutos, refetchOnWindowFocus false"
+    menu_options_cache:
+      owner: "front_clientes/src/hooks/useOpcionesMenu.js"
+      library: "@tanstack/react-query"
+      key_format: "empresaId:semanaId"
+      status: verified_in_repo
+      note: "Usa queryKey ['opciones-menu-semana', empresaId, semanaId] con staleTime 10 minutos y gcTime 30 minutos."
+
+storage_owners:
+  verified_in_repo:
+    localStorage:
+      cliente: ["token", "empleado"]
+      admin: ["admin_token", "admin_user"]
+    sessionStorage:
+      cliente: ["token", "empleado"]
+      admin: ["admin_token", "admin_user"]
+    postgres_tables_key_domains:
+      - "empleados"
+      - "empresas"
+      - "usuarios_admin"
+      - "menus_semanales"
+      - "menu_semanal_dias"
+      - "menu_semanal_sin_servicio"
+      - "platos"
+      - "guarniciones"
+      - "pedidos"
+      - "pedido_items"
+      - "pedido_eventos"
+      - "pedido_sugerencias"
+
+global_variables_and_env:
+  verified_in_repo:
+    api_env_names:
+      - "NODE_ENV"
+      - "PORT"
+      - "DB_HOST"
+      - "DB_PORT"
+      - "DB_NAME"
+      - "DB_USER"
+      - "DB_PASSWORD"
+      - "DB_SSL"
+      - "DB_POOL_MAX"
+      - "DB_IDLE_TIMEOUT_MS"
+      - "DB_CONNECTION_TIMEOUT_MS"
+      - "DATABASE_URL"
+      - "JWT_SECRET"
+      - "JWT_EXPIRES_IN"
+      - "JWT_EXPIRES_IN_SHORT"
+      - "JWT_EXPIRES_IN_REMEMBER"
+      - "APP_TIMEZONE"
+      - "TRUST_PROXY_HOPS"
+      - "CORS_ORIGINS"
+      - "DEMO_ADMIN_EMAIL"
+      - "DEMO_ADMIN_PASSWORD"
+      - "DEMO_CLIENT_PASSWORD"
+      - "TEST_DATA_PASSWORD"
+      - "SEED_FULL_RESET_CONFIRM"
+      - "SUPERADMIN_EMAIL"
+      - "SUPERADMIN_PASSWORD"
+      - "DEFAULT_DEMO_PASSWORD"
+      - "TEST_USER_PASSWORD"
+      - "ADMIN_EMAIL"
+      - "ADMIN_NEW_PASSWORD"
+    root_docker_env_names:
+      - "POSTGRES_DB"
+      - "POSTGRES_USER"
+      - "POSTGRES_PASSWORD"
+      - "JWT_SECRET"
+      - "JWT_EXPIRES_IN"
+      - "DB_POOL_MAX"
+      - "DB_IDLE_TIMEOUT_MS"
+      - "DB_CONNECTION_TIMEOUT_MS"
+      - "CORS_ORIGINS"
+      - "APP_TIMEZONE"
+    frontend_env_names:
+      - "VITE_API_URL"
+      - "VITE_USAR_ENDPOINT_LEGACY_PEDIDOS"
+      - "VITE_DEBUG_PERFORMANCE"
+      - "API_UPSTREAM"
+
+interface_limits:
+  verified_in_repo:
+    api_body_limit: "10kb"
+    api_timeout_frontends_ms: 10000
+    rate_limit_global: "1000 requests por IP cada 15 minutos en /api"
+    rate_limit_login: "10 intentos por IP cada 15 minutos"
+    rate_limit_registro_reset: "5 intentos por IP por hora"
+    pedido_items_max: 7
+    pedido_notas_max_chars: 300
+    menu_nombre_max_chars: 150
+    plato_nombre_max_chars: 150
+    plato_descripcion_max_chars: 1000
+  from_chat_summary:
+    opciones_por_dia_aproximadas: 15
+
+production_readiness:
+  verified_in_repo:
+    api_healthcheck:
+      endpoint: "GET /api/v1/health"
+      dockerfile: "API_LA_QUINTA/Dockerfile"
+      compose_dependency: "compose.yaml usa condition: service_healthy para admin/clientes"
+    nginx_frontends:
+      admin_template: "front_menu/nginx/default.conf.template"
+      clientes_template: "front_clientes/nginx/default.conf.template"
+      proxy_api: "location /api/ proxya a API_UPSTREAM"
+      static_assets_cache: "location /assets/ usa expires 1y y Cache-Control public, immutable"
+      index_cache: "location / usa Cache-Control no-cache"
+    server_shutdown:
+      status: "verified_in_repo"
+      evidence:
+        - "API_LA_QUINTA/src/server.js conserva la instancia server."
+        - "API_LA_QUINTA/src/server.js maneja SIGTERM/SIGINT, cierra servidor HTTP y pool PostgreSQL."
+    postgres_pool:
+      status: "verified_in_repo"
+      evidence:
+        - "API_LA_QUINTA/src/database/connection.js crea new Pool(dbConfig)."
+        - "API_LA_QUINTA/src/config/database.js configura max, idleTimeoutMillis y connectionTimeoutMillis."
+        - "Variables env: DB_POOL_MAX, DB_IDLE_TIMEOUT_MS, DB_CONNECTION_TIMEOUT_MS."
+
+service_ports:
+  verified_in_repo:
+    api: 3000
+    admin_dev: 5174
+    clientes_dev: 5175
+    frontend_container_port: 8080
+    postgres_container: 5432

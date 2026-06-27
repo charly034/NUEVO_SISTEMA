@@ -50,6 +50,13 @@ export function crearPrefijoTest() {
 
 export async function limpiarDatosTest(prefijo) {
   await query(
+    `DELETE FROM pedido_sugerencias ps
+     USING empresas e
+     WHERE ps.empresa_id = e.id
+       AND e.slug LIKE $1`,
+    [`${prefijo}%`],
+  );
+  await query(
     `DELETE FROM pedido_eventos pe
      USING pedidos p, empresas e
      WHERE pe.pedido_id = p.id

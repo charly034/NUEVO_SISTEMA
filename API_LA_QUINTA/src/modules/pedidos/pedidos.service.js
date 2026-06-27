@@ -265,6 +265,65 @@ function normalizarPedidoGuardado(pedido, mensaje = 'Pedido guardado correctamen
   };
 }
 
+function normalizarSugerenciaGuardada(sugerencia) {
+  return {
+    id: sugerencia?.id,
+    semanaId: fechaISO(sugerencia?.semana_inicio),
+    recomendacionesUsuario: Array.isArray(sugerencia?.ideas) ? sugerencia.ideas : [],
+    comentarioRecomendacion: sugerencia?.comentario || '',
+    fechaUltimaModificacion: sugerencia?.updated_at || sugerencia?.created_at || null,
+  };
+}
+
+function normalizarSugerenciaAdmin(sugerencia) {
+  return {
+    id: sugerencia?.id,
+    semanaId: fechaISO(sugerencia?.semana_inicio),
+    semana_inicio: fechaISO(sugerencia?.semana_inicio),
+    empleado_id: sugerencia?.empleado_id,
+    empresa_id: sugerencia?.empresa_id,
+    empleado_nombre: sugerencia?.empleado_nombre || '',
+    empleado_apellido: sugerencia?.empleado_apellido || '',
+    email: sugerencia?.email || '',
+    empresa_nombre: sugerencia?.empresa_nombre || '',
+    ideas: Array.isArray(sugerencia?.ideas) ? sugerencia.ideas : [],
+    comentario: sugerencia?.comentario || '',
+    created_at: sugerencia?.created_at || null,
+    updated_at: sugerencia?.updated_at || null,
+  };
+}
+
+function normalizarPayloadSugerencia(payload = {}) {
+  const semana_inicio = payload.semana_inicio || payload.semanaId;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(semana_inicio || '')) {
+    throw ApiError.badRequest('semana_inicio es requerido en formato YYYY-MM-DD');
+  }
+
+  const ideas = Array.isArray(payload.ideas)
+    ? payload.ideas.map((idea) => String(idea || '').trim()).filter(Boolean)
+    : [];
+  const comentario = String(payload.comentario || '').trim();
+
+  if (ideas.length === 0 && comentario.length === 0) {
+    throw ApiError.badRequest('Envia al menos una sugerencia o comentario');
+  }
+  if (ideas.length > 12) {
+    throw ApiError.badRequest('No se pueden enviar mas de 12 sugerencias');
+  }
+  if (ideas.some((idea) => idea.length > 120)) {
+    throw ApiError.badRequest('Cada sugerencia debe tener 120 caracteres o menos');
+  }
+  if (comentario.length > 500) {
+    throw ApiError.badRequest('El comentario debe tener 500 caracteres o menos');
+  }
+
+  return {
+    semana_inicio,
+    ideas: [...new Set(ideas)],
+    comentario,
+  };
+}
+
 function crearSugerenciasSemana(diasPedido) {
   const sugerenciasBase = [
     'Milanesa con pure de papas',
@@ -297,7 +356,7 @@ function fechaDeDia(semanaInicio, dia) {
  */
 function verificarLimiteEmpresa(empresa, semanaInicio, diasPedidos) {
   // Override activo: admin reabrio el plazo temporalmente
-  if (empresa.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta)) {
+  if (tienePlazoOverrideActivo(empresa)) {
     return null;
   }
 
@@ -345,6 +404,10 @@ function verificarLimiteEmpresa(empresa, semanaInicio, diasPedidos) {
   return null;
 }
 
+function tienePlazoOverrideActivo(empresa) {
+  return Boolean(empresa?.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta));
+}
+
 export const getMenuHoy = () => repo.menuHoy();
 
 export const getMenuSemana = (semanaInicio) => {
@@ -362,10 +425,6 @@ export const getMenuActivo = async (empresaId = null) => {
   const menus_disponibles = menus.map(menu => {
     if (menu.fecha_fin && new Date(menu.fecha_fin) < ahora) {
       return { disponible: false, cerrado: true, mensaje: 'Esta semana ya finalizo.', menu };
-    }
-
-    if (menu.fecha_limite_pedidos && new Date(menu.fecha_limite_pedidos) < ahora) {
-      return { disponible: false, cerrado: true, mensaje: 'El periodo de pedidos para esta semana ya cerro.', menu };
     }
 
     let limiteEmpresa = null;
@@ -390,10 +449,11 @@ export const getMenuActivo = async (empresaId = null) => {
 export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia = new Date() }) => {
   if (!empresaId) throw ApiError.badRequest('empresaId es requerido');
 
-  const [empresa, menus, historial, guarnicionesActivas] = await Promise.all([
+  const [empresa, menus, historial, sugerenciasUsuario, guarnicionesActivas] = await Promise.all([
     empresasRepo.findById(empresaId),
     repo.menusPublicadosList(),
     empleadoId ? repo.findHistorialByEmpleado(empleadoId, 24) : Promise.resolve([]),
+    empleadoId ? repo.findSugerenciasByEmpleado(empleadoId) : Promise.resolve([]),
     guarnicionesRepo.findAll(true),
   ]);
 
@@ -420,6 +480,9 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
       .filter((pedido) => pedido.estado !== 'cancelado')
       .map((pedido) => [fechaISO(pedido.semana_inicio), pedido]),
   );
+  const sugerenciasPorSemana = new Map(
+    sugerenciasUsuario.map((sugerencia) => [fechaISO(sugerencia.semana_inicio), sugerencia]),
+  );
   const fechas = new Set([...menusPorSemana.keys(), ...pedidosPorSemana.keys()]);
 
   if (fechas.size === 0) fechas.add(semanaActual);
@@ -437,6 +500,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
       dias_laborales: empresa.dias_laborales,
     };
     const pedidoVisible = pedidosPorSemana.get(semanaInicio) || null;
+    const sugerenciaVisible = sugerenciasPorSemana.get(semanaInicio) || null;
     const tipo = obtenerTipoSemana(semanaInicio, semanaActual);
     const estado = obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible });
     const fechaFin = addDias(semanaInicio, Math.max(diasPedido.length - 1, 0));
@@ -463,6 +527,8 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
       diasSeleccionados: pedidoVisible?.items?.length || 0,
       editable: ['sin_pedido', 'pendiente', 'confirmado'].includes(estado),
       sugerencias: esSemanaSugerencias ? crearSugerenciasSemana(diasPedido) : [],
+      recomendacionesUsuario: sugerenciaVisible?.ideas || [],
+      comentarioRecomendacion: sugerenciaVisible?.comentario || '',
       dias: diasPedido.map((dia, indice) => {
         const item = itemsPorDia.get(dia);
         const especiales = (menuSemana.menu?.variables || [])
@@ -512,6 +578,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
       metadata: {
         pedidoId: pedidoVisible?.id || null,
         pedido: pedidoVisible,
+        sugerenciaId: sugerenciaVisible?.id || null,
         cantidadDias: diasPedido.length,
         diasPedido,
         diasPorDefectoSinPedido,
@@ -531,6 +598,24 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
       diasPorDefectoSinPedido,
     },
     semanas,
+  };
+};
+
+export const guardarSugerenciaPedido = async (empleadoId, empresaId, payload) => {
+  const empresa = await empresasRepo.findById(empresaId);
+  if (!empresa) throw ApiError.notFound('Empresa no encontrada');
+
+  const sugerenciaNormalizada = normalizarPayloadSugerencia(payload);
+  const sugerencia = await repo.upsertSugerencia({
+    empleado_id: empleadoId,
+    empresa_id: empresaId,
+    ...sugerenciaNormalizada,
+  });
+
+  return {
+    ok: true,
+    mensaje: 'Gracias por tu sugerencia',
+    sugerencia: normalizarSugerenciaGuardada(sugerencia),
   };
 };
 
@@ -687,6 +772,11 @@ function construirInfoLimite(empresa, semanaInicio) {
 
 export const getPedidos = (filters) => repo.findAll(filters);
 
+export const getSugerenciasPedidoAdmin = async (filters) => {
+  const sugerencias = await repo.findSugerenciasAdmin(filters);
+  return sugerencias.map(normalizarSugerenciaAdmin);
+};
+
 export const getPedidoById = async (id) => {
   const pedido = await repo.findById(id);
   if (!pedido) throw ApiError.notFound(`Pedido con id ${id} no encontrado`);
@@ -701,8 +791,11 @@ export const getMiPedido = (empleadoId, semanaInicio) => {
 export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) => {
   const pedidoNormalizado = normalizarPayloadPedido(payload);
   const { semana_inicio, observaciones } = pedidoNormalizado;
-  let { menu_semanal_id, items } = pedidoNormalizado;
+  const { items } = pedidoNormalizado;
+  let { menu_semanal_id } = pedidoNormalizado;
   const diasUnicos = validarPedidoInput({ semana_inicio, menu_semanal_id, items });
+  const empresa = await empresasRepo.findById(empresaId);
+  if (!empresa) throw ApiError.notFound('Empresa no encontrada');
 
   const menuActivo = menu_semanal_id
     ? await repo.menuActivoPorId(menu_semanal_id)
@@ -713,13 +806,7 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
     if (fechaISO(menuActivo.fecha_inicio) !== semana_inicio) {
       throw ApiError.conflict('La semana indicada no coincide con el menu seleccionado.');
     }
-    if (menuActivo.fecha_limite_pedidos && new Date(menuActivo.fecha_limite_pedidos) < new Date()) {
-      throw ApiError.conflict('El periodo de pedidos ya cerro para esta semana.');
-    }
   }
-
-  const empresa = await empresasRepo.findById(empresaId);
-  if (!empresa) throw ApiError.notFound('Empresa no encontrada');
 
   const diasPermitidos = DIAS_LABORALES[empresa.dias_laborales] ?? DIAS_LABORALES.lunes_viernes;
   const diaFueraDeJornada = items.find((item) => !diasPermitidos.includes(item.dia));

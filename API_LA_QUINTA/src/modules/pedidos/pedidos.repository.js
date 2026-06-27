@@ -33,9 +33,15 @@ export const menuSemana = async (semanaInicio) => {
 };
 
 // Carga las variables y fijos de un menú dado su row de DB
-async function cargarDetallesMenu(menu, db = query) {
-  const [variablesRes, fijosRes] = await Promise.all([
-    execute(db,
+function cargarPlatosFijos(db = query) {
+  return execute(db,
+    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, tags, tiene_guarnicion
+     FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
+  );
+}
+
+async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null) {
+  const variablesRes = await execute(db,
       `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
               p.nombre AS plato_nombre, p.descripcion, p.tags, p.tiene_guarnicion,
               ms.id AS menu_semanal_id
@@ -45,13 +51,9 @@ async function cargarDetallesMenu(menu, db = query) {
        WHERE ms.id = $1 AND p.activo = true
        ORDER BY msd.dia::text, msd.opcion ASC`,
       [menu.id]
-    ),
-    execute(db,
-      `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, tags, tiene_guarnicion
-       FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
-    ),
-  ]);
-  return { ...menu, variables: variablesRes.rows, fijos: fijosRes.rows };
+    );
+  const fijos = fijosPrecargados || (await cargarPlatosFijos(db)).rows;
+  return { ...menu, variables: variablesRes.rows, fijos };
 }
 
 // Devuelve todos los menús publicados vigentes (fecha_fin >= hoy), ordenados por fecha_inicio
@@ -69,7 +71,8 @@ export const menusPublicadosList = async () => {
      ORDER BY fecha_inicio ASC`
   );
   // Cargar platos de todos los menús en paralelo
-  return Promise.all(result.rows.map(m => cargarDetallesMenu(m)));
+  const fijosRes = await cargarPlatosFijos();
+  return Promise.all(result.rows.map(m => cargarDetallesMenu(m, query, fijosRes.rows)));
 };
 
 // Devuelve un menú publicado específico por su ID (para validar al guardar pedido)
@@ -432,6 +435,72 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
     [empleadoId, limit]
   );
   return r.rows;
+};
+
+export const findSugerenciasByEmpleado = async (empleadoId) => {
+  const r = await query(
+    `SELECT id, empleado_id, empresa_id, semana_inicio, ideas, comentario, created_at, updated_at
+     FROM pedido_sugerencias
+     WHERE empleado_id = $1
+     ORDER BY semana_inicio DESC`,
+    [empleadoId]
+  );
+  return r.rows;
+};
+
+export const findSugerenciasAdmin = async ({ empresa_id, semana_inicio, limit = 100, offset = 0 } = {}) => {
+  const conds = [];
+  const vals = [];
+  if (empresa_id) { vals.push(empresa_id); conds.push(`ps.empresa_id = $${vals.length}`); }
+  if (semana_inicio) { vals.push(semana_inicio); conds.push(`ps.semana_inicio = $${vals.length}`); }
+
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  vals.push(limit, offset);
+
+  const r = await query(
+    `SELECT ps.id, ps.empleado_id, ps.empresa_id, ps.semana_inicio,
+            ps.ideas, ps.comentario, ps.created_at, ps.updated_at,
+            e.nombre AS empleado_nombre, e.apellido AS empleado_apellido, e.email,
+            emp.nombre AS empresa_nombre
+     FROM pedido_sugerencias ps
+     JOIN empleados e ON e.id = ps.empleado_id
+     JOIN empresas emp ON emp.id = ps.empresa_id
+     ${where}
+     ORDER BY ps.updated_at DESC, ps.created_at DESC
+     LIMIT $${vals.length - 1} OFFSET $${vals.length}`,
+    vals
+  );
+  return r.rows;
+};
+
+export const upsertSugerencia = async ({
+  empleado_id,
+  empresa_id,
+  semana_inicio,
+  ideas,
+  comentario,
+}, db = query) => {
+  const r = await execute(db,
+    `INSERT INTO pedido_sugerencias (
+       empleado_id, empresa_id, semana_inicio, ideas, comentario
+     )
+     VALUES ($1, $2, $3, $4::jsonb, $5)
+     ON CONFLICT (empleado_id, semana_inicio)
+     DO UPDATE SET
+       empresa_id = EXCLUDED.empresa_id,
+       ideas = EXCLUDED.ideas,
+       comentario = EXCLUDED.comentario,
+       updated_at = NOW()
+     RETURNING id, empleado_id, empresa_id, semana_inicio, ideas, comentario, created_at, updated_at`,
+    [
+      empleado_id,
+      empresa_id,
+      semana_inicio,
+      JSON.stringify(ideas || []),
+      comentario || null,
+    ]
+  );
+  return r.rows[0];
 };
 
 export const cancelarPedidoByEmpleado = async (empleadoId, semanaInicio, db = query) => {

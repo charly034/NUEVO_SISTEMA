@@ -1,0 +1,101 @@
+schema: la_quinta_project_history_v2
+updated_at: "2026-06-27"
+
+product_summary:
+  from_chat_summary:
+    - "La Quinta es una app web mobile-first para pedidos semanales."
+    - "El diseno aprobado usa fondo calido, verde oliva, card semanal centrada y navegacion inferior Pedido / Mis pedidos / Mi cuenta."
+    - "El flujo actual a desarrollar es posterior a Hacer pedido o Modificar pedido."
+    - "Cada dia puede tener hasta aproximadamente 15 opciones de plato."
+    - "Algunos platos requieren elegir guarnicion y otros no."
+    - "La empresa puede tener plan semanal lunes-domingo, dias sin servicio y reglas propias de modificacion."
+    - "Si el plan es semanal, la modificacion vence el lunes de esa semana salvo regla especifica."
+  verified_in_repo:
+    - "Backend Express + PostgreSQL con prefijo /api/v1."
+    - "front_clientes tiene rutas Pedido semanal, Mis pedidos y Mi cuenta."
+    - "front_clientes usa BottomNavigation dentro de rutas privadas."
+    - "API implementa empresas con modo_pedido, dias_laborales, limite_hora, limite_dia_semana y limite_anticipacion_dias."
+    - "API implementa dias sin servicio en menus semanales."
+
+confirmed_decisions:
+  verified_in_repo:
+    - "Monorepo con API_LA_QUINTA, front_menu y front_clientes."
+    - "Autenticacion separada cliente/admin mediante JWT."
+    - "Admin usa usuarios_admin; clientes usan empleados."
+    - "Pedidos usan cabecera pedidos e items pedido_items."
+    - "Un pedido por empleado y semana."
+    - "La memoria tecnica para IA vive en docs/ai."
+  from_chat_summary:
+    - "Mantener nombres del dominio en espanol."
+    - "Mantener UI cliente mobile-first."
+
+current_project_state:
+  verified_in_repo:
+    implemented:
+      - "API modular con rutas v1."
+      - "Migraciones PostgreSQL hasta 1719000031000_pedido-items-sin-pedido.js."
+      - "Auth cliente: login, me, registro, reset code, cambiar password, perfil."
+      - "Auth admin: login, me, CRUD usuarios admin protegido por superadmin."
+      - "CRUD admin para empresas, empleados, platos, guarniciones y menus semanales."
+      - "Pedidos cliente: semanas, crear, modificar, confirmar, cancelar mi pedido, historial."
+      - "Pedidos admin: listar, detalle, cambiar estado."
+      - "Menu cliente por semana con fijos, especiales, guarniciones y sin servicio."
+      - "Panel admin con dashboard, platos, semanas, historial, estadisticas, sugeridor, pedidos, empresas, guarniciones, administradores."
+      - "App cliente con login, registro, recuperar, pedido semanal, historial y perfil."
+      - "Docker Compose para db/api/admin/clientes."
+      - "Tests backend de pedidos y tests frontend cliente."
+    partially_implemented:
+      - "Memoria docs/ai creada y ampliada; debe mantenerse en cambios futuros."
+      - "Cache de opciones de menu sin politica de invalidacion completa."
+      - "QA cliente documentada pero con nota desactualizada sobre tests."
+      - "Funciones cliente legacy apuntan a endpoints no verificados."
+    pending:
+      - "Validar lint/build/test despues de cambios sin commit en front_clientes."
+      - "Confirmar estrategia de carpeta contenedora de menu."
+      - "Validar deploy real en Docker/Easypanel."
+      - "Actualizar docs/pedidos-cliente.md si cambia contrato final."
+
+conversation_decisions_or_context:
+  from_chat_summary:
+    - id: "menu_folder_container"
+      text: "Los modulos de menu deben mantenerse dentro de una carpeta contenedora de menu."
+      repo_status: "needs_user_confirmation"
+      note: "El repo actual usa API_LA_QUINTA/src/modules/menu y API_LA_QUINTA/src/modules/menus-semanales separados."
+    - id: "endpoint_menu_semanas"
+      text: "Ya se agrego GET /api/v1/menu/semanas."
+      repo_status: "needs_verification"
+      note: "Ruta verificada: GET /api/v1/menu/semanas/:semanaId/opciones."
+
+timeline:
+  verified_in_repo:
+    - date: "2026-06-27"
+      event: "Se crea docs/contexto-proyecto.md."
+    - date: "2026-06-27"
+      event: "Se crea AGENTS.md y paquete docs/ai inicial."
+    - date: "2026-06-27"
+      event: "Se amplia docs/ai con inspeccion del repo real, contratos, flujos, riesgos y contexto historico marcado por fuente."
+    - date: "2026-06-27"
+      event: "Working tree tiene cambios sin commit en front_clientes relacionados con carga/skeleton/lazy confirmacion/cache opciones."
+    - date: "2026-06-27"
+      event: "Auditoria Etapa 0 identifica endpoints cliente legacy sin backend, ausencia de graceful shutdown, pool PostgreSQL no configurable y seeds demo/destructivos."
+    - date: "2026-06-27"
+      event: "Etapa 2 elimina referencias exportadas no usadas del cliente a endpoints inexistentes: /pedidos/por-semana, /pedidos/historial, PATCH /pedidos/:id/cancelar y /menu/guarniciones."
+    - date: "2026-06-27"
+      event: "Etapa 6 agrega graceful shutdown en API y configuracion de pool PostgreSQL mediante DB_POOL_MAX, DB_IDLE_TIMEOUT_MS y DB_CONNECTION_TIMEOUT_MS."
+    - date: "2026-06-27"
+      event: "Etapa 7 aplica lazy loading en paginas de front_menu; build admin deja de emitir warning de chunk mayor a 500 kB."
+    - date: "2026-06-27"
+      event: "Release candidate retira /api/v1/users con 410 Gone y endurece seeds demo/destructivos con confirmacion y passwords por env."
+    - date: "2026-06-27"
+      event: "Release candidate actualiza QA_REGRESION.md; validaciones lint/build/test pasan y el smoke Playwright queda marcado como runner no confiable por timeout."
+
+needs_user_confirmation:
+  - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."
+  - "Confirmar si funciones legacy del cliente deben conservar compatibilidad o eliminarse."
+  - "Confirmar politica de cache de opciones de menu."
+  - "Confirmar entorno objetivo de deploy actual: Docker Compose local, Easypanel o ambos."
+
+recommended_next_steps:
+  - "Ejecutar validaciones: API lint/test, front_clientes lint/build/test, front_menu lint/build."
+  - "Probar flujo end-to-end: admin publica menu, cliente crea/modifica/confirma, admin cambia estado."
+  - "Actualizar QA_REGRESION.md y docs/pedidos-cliente.md con resultados de validacion."

@@ -1,17 +1,57 @@
 import { SIN_PEDIDO_ID, TIPOS_OPERACION_PEDIDO } from "../constants/estadosPedido.js";
 import { contarSeleccionesValidas } from "../utils/reglasSeleccionPedido.js";
-import { crearIdDesdeTexto } from "../utils/texto.js";
 
-function obtenerIdPlato(seleccion) {
-  return seleccion?.platoId || seleccion?.plato?.platoId || seleccion?.plato?.id || null;
+function normalizarTexto(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
-function obtenerIdGuarnicion(seleccion) {
-  if (seleccion?.guarnicionId) return seleccion.guarnicionId;
+function normalizarEnteroPositivo(valor) {
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
+function obtenerIdPlato(seleccion) {
+  const valor = seleccion?.platoId ?? seleccion?.plato_id ?? seleccion?.plato?.platoId ?? seleccion?.plato?.plato_id ?? seleccion?.plato?.id;
+  return normalizarEnteroPositivo(valor);
+}
+
+function obtenerIdGuarnicion(seleccion, dia) {
+  const valorDirecto = seleccion?.guarnicionId ?? seleccion?.guarnicion_id;
+  if (valorDirecto !== null && valorDirecto !== undefined && valorDirecto !== "") {
+    return normalizarEnteroPositivo(valorDirecto);
+  }
+
   const guarnicion = seleccion?.guarnicion;
-  if (!guarnicion) return null;
-  if (typeof guarnicion === "string") return crearIdDesdeTexto(guarnicion);
-  return guarnicion.id || null;
+  if (typeof guarnicion === "string") {
+    const idDesdeTextoNumerico = normalizarEnteroPositivo(guarnicion);
+    if (idDesdeTextoNumerico) return idDesdeTextoNumerico;
+  } else if (guarnicion) {
+    const idDesdeObjeto = normalizarEnteroPositivo(
+      guarnicion.id ?? guarnicion.guarnicionId ?? guarnicion.guarnicion_id,
+    );
+    if (idDesdeObjeto) return idDesdeObjeto;
+  }
+
+  const nombreGuarnicion = normalizarTexto(
+    seleccion?.nombreGuarnicion ||
+      seleccion?.guarnicion_nombre ||
+      (typeof guarnicion === "string" ? guarnicion : guarnicion?.nombre),
+  );
+  const textoDia = normalizarTexto(dia?.plato);
+  const guarnicionPorNombre = (seleccion?.plato?.guarniciones || []).find((opcion) => {
+    const nombre = normalizarTexto(opcion?.nombre ?? opcion?.guarnicion_nombre ?? opcion);
+    return nombre && (nombre === nombreGuarnicion || textoDia.includes(nombre));
+  });
+
+  return normalizarEnteroPositivo(
+    guarnicionPorNombre?.id ??
+      guarnicionPorNombre?.guarnicionId ??
+      guarnicionPorNombre?.guarnicion_id,
+  );
 }
 
 function mapearDiasPayload(semana) {
@@ -25,7 +65,7 @@ function mapearDiasPayload(semana) {
         diaId: dia.id || dia.clave,
         fecha: dia.fecha,
         platoId: sinPedido ? null : platoId,
-        guarnicionId: sinPedido ? null : obtenerIdGuarnicion(dia.seleccion),
+        guarnicionId: sinPedido ? null : obtenerIdGuarnicion(dia.seleccion, dia),
         sinPedido,
         origen: sinPedido ? dia.seleccion.origenSinPedido || "usuario" : null,
         opcion: sinPedido ? null : dia.seleccion?.plato?.opcion || null,

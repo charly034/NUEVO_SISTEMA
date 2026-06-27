@@ -26,6 +26,11 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
   - Requiere token.
   - Confirma un pedido propio.
 
+- `POST /api/v1/pedidos/sugerencias`
+  - Requiere token.
+  - Guarda sugerencias del empleado autenticado para una semana sin menú publicado.
+  - No debe recibir `usuarioId` ni `empresaId` desde el frontend.
+
 ## Payload de crear pedido
 
 ```json
@@ -63,6 +68,16 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 }
 ```
 
+## Payload de sugerencias
+
+```json
+{
+  "semana_inicio": "2026-07-06",
+  "ideas": ["Milanesa con pure", "Pollo al horno"],
+  "comentario": "Opciones livianas para esa semana"
+}
+```
+
 ## Reglas de negocio
 
 - El frontend no manda `usuarioId` ni `empresaId` al crear, modificar o confirmar. El backend usa el token.
@@ -77,6 +92,8 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Si un día no tiene menú especial, se pueden mostrar platos fijos con el aviso: "Todavía no hay menú especial para este día. Podés elegir un plato fijo".
 - Si un día no tiene servicio o está vencido, no se puede editar.
 - Si la semana está fuera de plazo, el backend debe rechazar POST/PUT aunque el frontend haya mostrado el botón por error.
+- El plazo vigente para POST/PUT lo define la empresa (`modo_pedido`, `limite_hora`, `limite_dia_semana`, `limite_anticipacion_dias` y `plazo_override_hasta` si aplica); `menus_semanales.fecha_limite_pedidos` no debe bloquear el pedido cliente.
+- En la pantalla de sugerencias no se debe llamar a crear/modificar pedido ni exigir días seleccionados; debe usar `POST /pedidos/sugerencias`.
 - `PATCH /pedidos/:pedidoId/confirmar` no revalida plazo en la implementación actual porque no cambia selecciones; solo registra confirmación del pedido propio.
 
 ## Validaciones backend críticas
@@ -120,5 +137,12 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 
 ## Warnings conocidos
 
-- `lottie-web` usa `eval` internamente. El warning aparece por la dependencia de animación de confirmación. Riesgo bajo en desarrollo; para producción con CSP estricta conviene reemplazar esa animación por SVG/CSS o revisar una alternativa sin `eval`.
-- Vite avisa por un chunk mayor a 500 kB. Riesgo medio de performance inicial si la app crece. No bloquea esta etapa; conviene resolver más adelante con lazy loading de pantallas/componentes pesados y, si hace falta, `manualChunks`.
+- La confirmacion de pedido usa SVG/CSS liviano; `lottie-react` fue removido para evitar el warning de `eval` de `lottie-web`.
+- El build del cliente separa `sweetalert2` por import dinamico y las paginas principales por `React.lazy`. En la validacion del 2026-06-27 no hubo warning de chunk mayor a 500 kB.
+
+## Medicion de performance cliente
+
+- `front_clientes/src/utils/performance.js` usa `performance.mark` y `performance.measure`.
+- Las metricas se loguean con `console.debug("[La Quinta perf]", ...)` solo en development o con `VITE_DEBUG_PERFORMANCE=true`.
+- Se miden auth/check sesion, login, carga de semanas, opciones por semana, navegacion bottom nav, apertura de bottom sheet, filtrado de busqueda, guardado de pedido, sugerencias y requests fetch/axios.
+- Los logs no incluyen tokens ni payloads completos; solo operacion, ruta sin query cuando aplica, metodo, status y duracion.

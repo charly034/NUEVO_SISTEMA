@@ -1,0 +1,152 @@
+schema: la_quinta_ai_admin_guide_v2
+updated_at: "2026-06-27"
+
+maintenance_guide:
+  status: verified_in_repo
+  principle: "Leer AGENTS.md y docs/ai antes de tocar codigo. Mantener cambios pequenos y verificables."
+  do_first:
+    - "git status --short --branch"
+    - "leer docs/ai/00-index.yaml"
+    - "leer docs/ai/10-system-map.yaml"
+    - "leer docs/ai/30-contracts.yaml"
+  do_after_code_changes:
+    - "actualizar docs/ai si cambio contrato, flujo, modulo, ruta, migracion, script o env"
+    - "ejecutar validacion del area modificada"
+
+start_here_by_task:
+  api_endpoint:
+    read:
+      - "API_LA_QUINTA/src/routes/v1.routes.js"
+      - "API_LA_QUINTA/src/modules/<modulo>/<modulo>.routes.js"
+      - "API_LA_QUINTA/src/modules/<modulo>/<modulo>.controller.js"
+      - "API_LA_QUINTA/src/modules/<modulo>/<modulo>.service.js"
+      - "API_LA_QUINTA/src/modules/<modulo>/<modulo>.repository.js"
+    docs:
+      - "docs/ai/20-modules.yaml"
+      - "docs/ai/30-contracts.yaml"
+      - "docs/ai/50-guardrails.yaml"
+  pedido_cliente:
+    read:
+      - "docs/pedidos-cliente.md"
+      - "front_clientes/src/hooks/usePedidoSemanal.js"
+      - "front_clientes/src/services/pedidoService.js"
+      - "front_clientes/src/services/menuService.js"
+      - "front_clientes/src/mappers/pedidoMapper.js"
+      - "API_LA_QUINTA/src/modules/pedidos"
+    docs:
+      - "docs/ai/30-contracts.yaml"
+      - "docs/ai/40-flows.yaml"
+      - "docs/ai/60-debt.yaml"
+  admin_ui:
+    read:
+      - "front_menu/src/App.jsx"
+      - "front_menu/src/auth.js"
+      - "front_menu/src/lib/apiClient.js"
+      - "front_menu/src/hooks"
+      - "front_menu/src/pages"
+    docs:
+      - "docs/ai/05-admin.yaml"
+      - "docs/ai/20-modules.yaml"
+  cliente_ui:
+    read:
+      - "front_clientes/src/App.jsx"
+      - "front_clientes/src/routes/rutasCliente.js"
+      - "front_clientes/src/components/layout"
+      - "front_clientes/src/components/ui/BottomNavigation.jsx"
+      - "front_clientes/src/components/pedido"
+    docs:
+      - "docs/ai/40-flows.yaml"
+      - "docs/ai/50-guardrails.yaml"
+  database:
+    read:
+      - "API_LA_QUINTA/src/database/migrations"
+      - "API_LA_QUINTA/src/database/connection.js"
+      - "API_LA_QUINTA/database.json"
+    docs:
+      - "docs/ai/30-contracts.yaml"
+      - "docs/ai/50-guardrails.yaml"
+
+symptom_routing:
+  verified_in_repo:
+    "401 cliente":
+      inspect:
+        - "front_clientes/src/services/api.js"
+        - "front_clientes/src/services/apiCliente.js"
+        - "API_LA_QUINTA/src/middlewares/auth.middleware.js"
+        - "API_LA_QUINTA/src/modules/auth"
+    "401 admin":
+      inspect:
+        - "front_menu/src/auth.js"
+        - "front_menu/src/lib/apiClient.js"
+        - "API_LA_QUINTA/src/modules/admin-auth"
+        - "API_LA_QUINTA/src/modules/usuarios-admin"
+    "pedido no guarda":
+      inspect:
+        - "front_clientes/src/hooks/usePedidoSemanal.js"
+        - "front_clientes/src/mappers/pedidoMapper.js"
+        - "API_LA_QUINTA/src/modules/pedidos/pedidos.validation.js"
+        - "API_LA_QUINTA/src/modules/pedidos/pedidos.service.js"
+    "menu u opciones no aparecen":
+      inspect:
+        - "front_clientes/src/services/menuService.js"
+        - "API_LA_QUINTA/src/modules/menu/menu.routes.js"
+        - "API_LA_QUINTA/src/modules/pedidos/pedidos.service.js"
+        - "API_LA_QUINTA/src/modules/menus-semanales"
+    "admin no ve datos":
+      inspect:
+        - "front_menu/src/lib/apiClient.js"
+        - "front_menu/src/hooks"
+        - "API_LA_QUINTA/src/middlewares/auth.middleware.js"
+    "deploy/proxy":
+      inspect:
+        - "compose.yaml"
+        - "front_menu/nginx/default.conf.template"
+        - "front_clientes/nginx/default.conf.template"
+        - "README.md"
+
+docs_to_consult_by_change:
+  endpoints: ["docs/ai/30-contracts.yaml", "docs/ai/40-flows.yaml"]
+  module_ownership: ["docs/ai/20-modules.yaml"]
+  risky_change: ["docs/ai/50-guardrails.yaml", "docs/ai/60-debt.yaml"]
+  product_decision: ["docs/ai/70-project-history.yaml"]
+  deploy_or_env: ["docs/ai/10-system-map.yaml", "docs/ai/30-contracts.yaml"]
+
+known_diagnostics:
+  verified_in_repo:
+    root:
+      - ".\\diagnostico.bat"
+      - ".\\diagnostico.ps1"
+      - ".\\iniciar.bat"
+      - ".\\detener.bat"
+    ports_checked_by_scripts: [3000, 5174, 5175]
+    manual_status:
+      - "git status --short --branch"
+      - "netstat -ano | Select-String ':3000|:5174|:5175'"
+    health:
+      - "GET http://localhost:3000/api/v1/health"
+
+test_access_notes:
+  from_user_provided:
+    purpose: "usuarios de prueba para validaciones manuales"
+    accounts:
+      - email: "test@test.com"
+        password: "not_persisted"
+      - email: "florencia.ruiz@sol.test"
+        password: "not_persisted"
+      - email: "admin@laquinta.com"
+        password: "not_persisted"
+        surface: "front_menu admin"
+    password_policy: "No guardar passwords en docs/ai; fueron provistas en chat para uso de la sesion actual."
+
+current_worktree_notes:
+  verified_in_repo:
+    branch: "test...origin/test"
+    dirty_files_at_last_inspection:
+      - "front_clientes/src/components/layout/PrivateRoute.jsx"
+      - "front_clientes/src/components/pedido/PedidoContainer.jsx"
+      - "front_clientes/src/components/pedido/SemanaPedidoCard.jsx"
+      - "front_clientes/src/services/menuService.js"
+      - "AGENTS.md"
+      - "docs/ai/"
+      - "docs/contexto-proyecto.md"
+    git_warning: "Permission denied al leer C:\\Users\\charl/.config/git/ignore"

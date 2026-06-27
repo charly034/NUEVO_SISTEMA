@@ -2,6 +2,7 @@ import { ClipboardList, UserRound, Utensils } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { unirClases } from "../../compartido/utils/clases.js";
 import { rutasCliente } from "../../routes/rutasCliente.js";
+import { iniciarMedicionPerformance } from "../../utils/performance.js";
 
 const itemsNavegacion = [
   { to: rutasCliente.misPedidos, label: "Mis pedidos", Icono: ClipboardList },
@@ -10,7 +11,9 @@ const itemsNavegacion = [
 ];
 
 export default function BottomNavigation() {
-  const manejarClick = (principal) => {
+  const manejarClick = (principal, destino) => {
+    const finalizar = iniciarMedicionPerformance("nav:bottom-tab", { destino });
+    requestAnimationFrame(() => finalizar({ estado: "click" }));
     if (!principal) return;
     window.dispatchEvent(new Event("pedido:ir-semana-actual"));
   };
@@ -26,7 +29,7 @@ export default function BottomNavigation() {
             key={to}
             to={to}
             aria-label={label}
-            onClick={() => manejarClick(principal)}
+            onClick={() => manejarClick(principal, to)}
             className={({ isActive }) =>
               unirClases(
                 "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 text-[12px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2d5a27] md:min-h-14 md:text-[13px]",

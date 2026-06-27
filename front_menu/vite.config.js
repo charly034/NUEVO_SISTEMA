@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: parseInt(env.PORT || "5174", 10),
       strictPort: false,
-      allowedHosts: [".ngrok-free.app", ".ngrok-free.dev", ".ngrok.io"],
+      allowedHosts: [".ngrok-free.app", ".ngrok-free.dev", ".ngrok.io", ".laquintacomidas.com"],
       proxy: {
         "/api": {
           target: env.VITE_API_PROXY_TARGET || "http://localhost:3000",

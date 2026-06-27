@@ -1,0 +1,84 @@
+schema: la_quinta_guardrails_v2
+updated_at: "2026-06-27"
+
+non_breakable_invariants:
+  verified_in_repo:
+    - "API publica bajo /api/v1."
+    - "No guardar secretos ni valores reales de .env."
+    - "Tokens cliente y admin no son intercambiables: admin lleva tipo=admin."
+    - "Pedidos cliente deben usar identidad desde req.empleado, no usuarioId/empresaId del body."
+    - "Un empleado no puede tener mas de un pedido por semana: UNIQUE (empleado_id, semana_inicio)."
+    - "pedido_items no puede repetir dia dentro del mismo pedido."
+    - "sin_pedido=true implica plato_id NULL segun constraint pedido_items_plato_o_sin_pedido_check."
+    - "Crear/modificar/confirmar/cancelar/cambiar estado de pedido usa transaccion."
+    - "errorMiddleware debe quedar despues de rutas."
+    - "front_clientes debe mantener rutas canonicas y redirects de compatibilidad salvo decision explicita."
+  from_chat_summary:
+    - "Mantener estilo mobile-first aprobado: fondo calido, verde oliva, card semanal centrada, navegacion inferior."
+    - "Usar nombres en espanol para dominio, funciones y estados cuando el proyecto ya lo hace."
+
+high_risk_areas:
+  verified_in_repo:
+    - area: "API_LA_QUINTA/src/modules/pedidos"
+      risk: "Reglas de negocio criticas, transacciones, validacion de plazo, guarniciones y eventos."
+    - area: "API_LA_QUINTA/src/database/migrations"
+      risk: "Schema historico; editar migraciones aplicadas puede romper DB existente."
+    - area: "API_LA_QUINTA/src/middlewares/auth.middleware.js"
+      risk: "Afecta auth cliente/admin y permisos."
+    - area: "front_clientes/src/hooks/usePedidoSemanal.js"
+      risk: "Orquesta carga, edicion, confirmacion y estado local del pedido."
+    - area: "front_clientes/src/mappers/pedidoMapper.js"
+      risk: "Puente entre contrato API y estado UI."
+    - area: "front_clientes/src/services/pedidoService.js"
+      risk: "Contiene referencias a endpoints no verificados."
+    - area: "front_clientes/src/services/menuService.js"
+      risk: "Cache de opciones puede quedar viejo."
+    - area: "front_menu/src/lib/apiClient.js"
+      risk: "Interceptors admin globales."
+
+recommended_blast_radius:
+  api_contract_change:
+    scope: "modulo API + cliente consumidor + docs/ai/30-contracts.yaml + tests del modulo"
+  pedido_business_rule:
+    scope: "pedidos.service/validation/repository + pedidoMapper/usePedidoSemanal + docs/pedidos-cliente.md + tests backend/cliente"
+  admin_ui_change:
+    scope: "pagina/hook especifico de front_menu; evitar tocar apiClient salvo necesario"
+  cliente_visual_change:
+    scope: "componentes de front_clientes; no cambiar contratos API"
+  migration_change:
+    scope: "nueva migracion + repository/service afectado + rollback pensado"
+
+required_validation_by_area:
+  verified_in_repo:
+    api:
+      - "cd API_LA_QUINTA && npm run lint"
+      - "cd API_LA_QUINTA && npm test"
+    front_menu:
+      - "cd front_menu && npm run lint"
+      - "cd front_menu && npm run build"
+    front_clientes:
+      - "cd front_clientes && npm run lint"
+      - "cd front_clientes && npm run build"
+      - "cd front_clientes && npm test"
+    cliente_e2e:
+      - "cd front_clientes && npm run test:e2e"
+
+safe_refactor_rules:
+  - "Separar cambios mecanicos de cambios funcionales."
+  - "No mover SQL fuera de repositories sin decision explicita."
+  - "No mover reglas de pedido al frontend como fuente de verdad."
+  - "No introducir endpoints paralelos si uno existente puede corregirse."
+  - "Actualizar docs/ai despues de cualquier cambio de contrato."
+  - "Agregar pruebas antes o junto con cambios de reglas de pedido."
+
+codex_must_not_assume:
+  - "No asumir que endpoints referenciados por frontend existen; verificar routes.js."
+  - "No asumir que tabla users existe en DB real."
+  - "No asumir que el deploy Easypanel esta funcionando."
+  - "No asumir que cambios sin commit son propios o descartables."
+  - "No asumir valores de variables de entorno."
+  - "No asumir que GET /api/v1/menu/semanas existe; la ruta verificada tiene :semanaId/opciones."
+
+known_local_issue:
+  verified_in_repo:
+    - "git status muestra warning por C:\\Users\\charl/.config/git/ignore Permission denied."

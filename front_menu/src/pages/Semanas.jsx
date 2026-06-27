@@ -415,7 +415,7 @@ export default function Semanas() {
   };
 
   const handleReabrir = async () => {
-    const ok = await handleEstado({ estado: 'publicado' });
+    const ok = await handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: null } });
     if (ok) setConfirmReabrir(false);
   };
 

@@ -15,6 +15,8 @@ const ESTADO_CONFIG = {
   entregado: { label: "Entregado", variante: "gris" },
   cancelado: { label: "Cancelado", variante: "rojo" },
 };
+const STALE_HISTORIAL_MS = 5 * 60 * 1000;
+const GC_HISTORIAL_MS = 30 * 60 * 1000;
 
 function formatSemana(fechaISO) {
   if (!fechaISO) return "";
@@ -76,13 +78,18 @@ export default function HistorialPedidos({ empleado }) {
   const { data: pedidos = [], isLoading } = useQuery({
     queryKey: ["mi-historial", empleado.id],
     queryFn: pedidoApi.miHistorial,
-    staleTime: 60 * 1000,
+    enabled: Boolean(empleado?.id),
+    staleTime: STALE_HISTORIAL_MS,
+    gcTime: GC_HISTORIAL_MS,
+    refetchOnWindowFocus: false,
   });
 
   const { data: menuData } = useQuery({
     queryKey: ["menus-publicados"],
     queryFn: menuApi.activo,
-    staleTime: 60 * 1000,
+    staleTime: STALE_HISTORIAL_MS,
+    gcTime: GC_HISTORIAL_MS,
+    refetchOnWindowFocus: false,
   });
 
   const menusPorSemana = new Map(
@@ -101,6 +108,7 @@ export default function HistorialPedidos({ empleado }) {
       queryClient.invalidateQueries({
         queryKey: ["mi-pedido", empleado.id, semanaInicio],
       });
+      queryClient.invalidateQueries({ queryKey: ["pedido-semanal", empleado.id] });
       queryClient.invalidateQueries({ queryKey: ["menus-publicados"] });
       setExpandido(null);
       toast.success(

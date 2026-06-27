@@ -14,7 +14,11 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── Configuración ─────────────────────────────────────────────────────────────
 
-const PASSWORD = '123';
+const PASSWORD = process.env.TEST_DATA_PASSWORD;
+if (!PASSWORD || PASSWORD.length < 12) {
+  console.error('TEST_DATA_PASSWORD es requerido y debe tener al menos 12 caracteres.');
+  process.exit(1);
+}
 
 const EMPRESAS = [
   { nombre: 'Banco Hipotecario', slug: 'banco-hipotecario', plan: 'con_postre',  modo_pedido: 'semanal', abrev: 'bh' },
@@ -191,7 +195,7 @@ async function main() {
 
   console.log('\n✅ Seed completado exitosamente');
   console.log('─────────────────────────────────');
-  console.log('Contraseña de todos los usuarios de prueba: 123');
+  console.log('Password de todos los usuarios de prueba: configurada mediante TEST_DATA_PASSWORD');
   console.log('Emails: nombre@abrev.com  (ej: ana@bh.com, lucia@sol.com, carlos@ef.com)');
   console.log('Empresas creadas:');
   for (const e of EMPRESAS) {

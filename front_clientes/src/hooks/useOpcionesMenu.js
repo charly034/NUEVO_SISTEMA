@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { menuService } from "../services/menuService.js";
+import { medirPromesaPerformance } from "../utils/performance.js";
+
+const STALE_OPCIONES_MENU_MS = 10 * 60 * 1000;
+const GC_OPCIONES_MENU_MS = 30 * 60 * 1000;
 
 export function useOpcionesMenu({
   empresaId = "empresa_demo",
   service = menuService,
   semanaId,
 } = {}) {
+  const queryClient = useQueryClient();
   const opcionesPorDiaRef = useRef({});
   const [opcionesPorDia, setOpcionesPorDia] = useState({});
   const [cargandoOpciones, setCargandoOpciones] = useState(false);
@@ -13,7 +19,7 @@ export function useOpcionesMenu({
 
   useEffect(() => {
     opcionesPorDiaRef.current = {};
-    setOpcionesPorDia({});
+    queueMicrotask(() => setOpcionesPorDia({}));
   }, [empresaId, semanaId]);
 
   const obtenerOpcionesDia = useCallback(
@@ -34,11 +40,18 @@ export function useOpcionesMenu({
           throw new Error("No pudimos identificar la semana para cargar opciones.");
         }
 
-        const opciones = await service.obtenerOpcionesMenuPorDia({
-          diaId,
-          empresaId,
-          semanaId,
+        const semana = await queryClient.fetchQuery({
+          queryKey: ["opciones-menu-semana", empresaId || "sin_empresa", semanaId],
+          queryFn: () => medirPromesaPerformance("menu:carga-opciones-semana", () =>
+            service.obtenerOpcionesMenuPorSemana({ empresaId, semanaId }),
+          ),
+          staleTime: STALE_OPCIONES_MENU_MS,
+          gcTime: GC_OPCIONES_MENU_MS,
         });
+        const diaSemana = (semana.dias || []).find(
+          (item) => String(item.diaId).toLowerCase() === String(diaId).toLowerCase(),
+        );
+        const opciones = diaSemana?.opciones || [];
 
         if (opciones.length === 0) {
           setErrorOpciones("No hay opciones disponibles para este dia.");
@@ -57,7 +70,7 @@ export function useOpcionesMenu({
         setCargandoOpciones(false);
       }
     },
-    [empresaId, semanaId, service],
+    [empresaId, queryClient, semanaId, service],
   );
 
   const recargarOpcionesDia = useCallback(

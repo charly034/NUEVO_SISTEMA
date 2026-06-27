@@ -4,6 +4,8 @@
 
 - `npm run lint`
 - `npm run build`
+- `npm test`
+- `npm run test:e2e` para smoke de pantalla de login; si el runner queda colgado, validar manualmente el login y revisar Playwright/Vite preview.
 
 ## Alcance minimo a revisar
 
@@ -18,7 +20,7 @@
 
 ### 1. Autenticacion
 
-- Ingresar con credenciales validas y confirmar redireccion a `/pedido`.
+- Ingresar con credenciales validas y confirmar redireccion a `/pedido-semanal`.
 - Ingresar con credenciales invalidas y confirmar mensaje visible de error.
 - Activar y desactivar visibilidad de contrasena con mouse y teclado.
 - Verificar que el checkbox de "Mantener sesion activa" conserve la sesion correcta.
@@ -29,7 +31,7 @@
 - Ingresar un codigo invalido y confirmar error.
 - Ingresar un codigo valido y confirmar paso 2 con empresa visible.
 - Completar alta con password distinta en confirmacion y validar error.
-- Completar alta correcta y confirmar alta de sesion y navegacion a `/pedido`.
+- Completar alta correcta y confirmar alta de sesion y navegacion a `/pedido-semanal`.
 
 ### 3. Recuperacion de contrasena
 
@@ -71,4 +73,4 @@
 
 - El flujo de pedido depende mucho de estado local y transiciones por semana.
 - La navegacion entre semanas y el reuso de pedidos anteriores merecen revision manual despues de cada refactor.
-- No hay framework de tests automatizados configurado hoy para este frontend.
+- Hay Vitest y Playwright configurados. En la validacion RC del 2026-06-27, Vitest paso en ejecucion aislada; Playwright mostro el smoke como iniciado/ok pero el comando no finalizo antes del timeout del runner.

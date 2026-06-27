@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { obtenerMensajeLimiteModificacion } from "../../utils/reglasModificacionPedido.js";
 import { reproducirSonidoConfirmacion } from "../../utils/sonidoConfirmacionPedido.js";
 import Card from "../ui/Card.jsx";
-import ConfirmacionPedido from "./ConfirmacionPedido.jsx";
 import { tieneJornadaExtendida } from "./adaptadoresPedido.js";
 import SemanaCardEditable from "./SemanaCardEditable.jsx";
 import SemanaCardDetalle from "./SemanaCardDetalle.jsx";
 import SemanaCardLectura from "./SemanaCardLectura.jsx";
 import SemanaCardRecomendacion from "./SemanaCardRecomendacion.jsx";
+
+const ConfirmacionPedido = lazy(() => import("./ConfirmacionPedido.jsx"));
 
 export default function SemanaPedidoCard({
   fechaActual,
@@ -15,6 +16,7 @@ export default function SemanaPedidoCard({
   onCambiarModo,
   onActualizarSemana,
   onDirtyChange,
+  onGuardarSugerencia,
   semana,
 }) {
   const [modoCardInterno, setModoCardInterno] = useState("lectura");
@@ -33,7 +35,9 @@ export default function SemanaPedidoCard({
   }
 
   useEffect(() => {
-    if (!onCambiarModo) setModoCardInterno("lectura");
+    if (!onCambiarModo) {
+      queueMicrotask(() => setModoCardInterno("lectura"));
+    }
   }, [onCambiarModo, semana.id]);
 
   useEffect(() => () => {
@@ -57,6 +61,28 @@ export default function SemanaPedidoCard({
       }, 1900);
     } catch (error) {
       setErrorGuardado(error.message || "No pudimos guardar el pedido.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function guardarRecomendacion(semanaActualizada) {
+    setGuardando(true);
+    setErrorGuardado("");
+
+    try {
+      await onGuardarSugerencia?.(semanaActualizada);
+      onDirtyChange?.(false);
+      cambiarModo("lectura", { forzar: true });
+      setConfirmacion(semanaActualizada.feedback || "Gracias por tu sugerencia");
+      reproducirSonidoConfirmacion();
+
+      window.clearTimeout(temporizadorConfirmacion.current);
+      temporizadorConfirmacion.current = window.setTimeout(() => {
+        setConfirmacion(null);
+      }, 1900);
+    } catch (error) {
+      setErrorGuardado(error.message || "No pudimos guardar la sugerencia.");
     } finally {
       setGuardando(false);
     }
@@ -89,9 +115,10 @@ export default function SemanaPedidoCard({
         ) : modoActual === "recomendacion" ? (
           <SemanaCardRecomendacion
             compacta={compacta}
+            guardando={guardando}
             semana={semana}
             onCancelar={() => cambiarModo("lectura")}
-            onGuardar={guardarSemana}
+            onGuardar={guardarRecomendacion}
           />
         ) : (
           <SemanaCardLectura
@@ -111,7 +138,11 @@ export default function SemanaPedidoCard({
         </p>
       )}
 
-      {confirmacion && <ConfirmacionPedido mensaje={confirmacion} />}
+      {confirmacion && (
+        <Suspense fallback={null}>
+          <ConfirmacionPedido mensaje={confirmacion} />
+        </Suspense>
+      )}
     </Card>
   );
 }

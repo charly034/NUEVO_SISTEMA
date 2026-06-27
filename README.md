@@ -23,6 +23,16 @@ npm run migrate
 npm run dev
 ```
 
+## Seeds y datos demo
+
+- No ejecutar `npm run seed:reset` ni `node scripts/seed-full-reset.js` en produccion.
+- `seed-full-reset.js` es destructivo y requiere `SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE`.
+- Los passwords de seeds demo/dev deben venir por variables de entorno:
+  `DEMO_ADMIN_PASSWORD`, `DEMO_CLIENT_PASSWORD`, `TEST_DATA_PASSWORD`,
+  `SUPERADMIN_PASSWORD`, `DEFAULT_DEMO_PASSWORD` y `TEST_USER_PASSWORD`.
+- Para crear un admin inicial en desarrollo/staging, usar `npm run seed:admin`
+  con `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD` configuradas.
+
 En terminales separadas:
 
 ```bash
@@ -84,6 +94,9 @@ DATABASE_URL=postgresql://...
 DB_SSL=false
 JWT_SECRET=un-secreto-largo-y-aleatorio
 JWT_EXPIRES_IN=7d
+DB_POOL_MAX=10
+DB_IDLE_TIMEOUT_MS=30000
+DB_CONNECTION_TIMEOUT_MS=5000
 APP_TIMEZONE=America/Argentina/Buenos_Aires
 TRUST_PROXY_HOPS=1
 CORS_ORIGINS=https://admin.example.com,https://pedidos.example.com
@@ -113,7 +126,7 @@ el dominio HTTPS público de la API.
 ```bash
 cd API_LA_QUINTA && npm run lint && npm test
 cd front_menu && npm run lint && npm run build
-cd front_clientes && npm run lint && npm run build
+cd front_clientes && npm run lint && npm run build && npm test
 ```
 
 Los archivos `.env`, dependencias, builds y configuración local de herramientas
