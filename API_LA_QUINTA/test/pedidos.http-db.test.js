@@ -87,6 +87,26 @@ test('POST plato con guarnicion obligatoria faltante devuelve 422 y no guarda pa
   });
 });
 
+test('POST con guarnicion indebida devuelve 422 y no guarda parcial', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'martes',
+          plato_id: fixture.platoSinGuarnicion.id,
+          opcion: 'A',
+          guarnicion_id: fixture.guarnicion.id,
+        }],
+      }),
+    });
+
+    assert.equal(respuesta.status, 422);
+    assert.match(respuesta.body.message, /no admite guarnicion/);
+    assert.equal(await contarPedidosFixture(fixture), 0);
+  });
+});
+
 test('POST sinPedido true con plato cargado devuelve 422 y no guarda parcial', async () => {
   await conFixture({}, async (fixture) => {
     const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
@@ -191,6 +211,8 @@ test('PUT pedido propio valido actualiza items', async () => {
     });
 
     assert.equal(respuesta.status, 200);
+    assert.equal(respuesta.body.data.pedido.id, pedido.id);
+    assert.equal(respuesta.body.data.pedido.estado, 'confirmado');
 
     const actualizado = await obtenerPedidoDb(pedido.id);
     assert.equal(actualizado.items.length, 1);
@@ -201,13 +223,24 @@ test('PUT pedido propio valido actualiza items', async () => {
 
 test('PUT pedido ajeno devuelve 403', async () => {
   await conFixture({}, async (fixture) => {
-    const pedido = await crearPedidoDirecto(fixture);
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
     const respuesta = await requestJson(servidor.baseUrl, 'PUT', `/pedidos/${pedido.id}`, {
       token: fixture.tokenAjeno,
       payload: payloadPedidoValido(fixture),
     });
 
     assert.equal(respuesta.status, 403);
+
+    const sinCambios = await obtenerPedidoDb(pedido.id);
+    assert.equal(sinCambios.items.length, 1);
+    assert.equal(sinCambios.items[0].dia, 'lunes');
   });
 });
 
@@ -329,6 +362,17 @@ test('PUT con guarnicion faltante cuando corresponde devuelve 422', async () => 
   });
 });
 
+test('PUT pedido inexistente devuelve 404', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'PUT', '/pedidos/2147483000', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture),
+    });
+
+    assert.equal(respuesta.status, 404);
+  });
+});
+
 test('PATCH /api/v1/pedidos/:pedidoId/confirmar sin token devuelve 401', async () => {
   await conFixture({}, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture);
@@ -349,6 +393,9 @@ test('PATCH pedido propio confirma y registra evento', async () => {
     assert.equal(respuesta.body.data.pedido.id, pedido.id);
 
     const confirmado = await obtenerPedidoDb(pedido.id);
+    assert.equal(confirmado.empleado_id, fixture.empleado.id);
+    assert.equal(confirmado.empresa_id, fixture.empresa.id);
+    assert.ok(confirmado.updated_at);
     assert.ok(confirmado.eventos.some((evento) => evento.tipo === 'pedido_confirmado'));
   });
 });
