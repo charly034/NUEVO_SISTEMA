@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { menuService } from "../services/menuService.js";
 
 export function useOpcionesMenu({
@@ -6,10 +6,15 @@ export function useOpcionesMenu({
   service = menuService,
   semanaId,
 } = {}) {
+  const opcionesPorDiaRef = useRef({});
   const [opcionesPorDia, setOpcionesPorDia] = useState({});
   const [cargandoOpciones, setCargandoOpciones] = useState(false);
   const [errorOpciones, setErrorOpciones] = useState("");
-  const [textoBusqueda, setTextoBusqueda] = useState("");
+
+  useEffect(() => {
+    opcionesPorDiaRef.current = {};
+    setOpcionesPorDia({});
+  }, [empresaId, semanaId]);
 
   const obtenerOpcionesDia = useCallback(
     async (dia, opcionesCarga = {}) => {
@@ -17,8 +22,8 @@ export function useOpcionesMenu({
       if (dia.opciones?.length && !opcionesCarga.forzar) return dia.opciones;
 
       const diaId = dia.id || dia.clave;
-      if (opcionesPorDia[diaId] && !opcionesCarga.forzar) {
-        return opcionesPorDia[diaId];
+      if (opcionesPorDiaRef.current[diaId] && !opcionesCarga.forzar) {
+        return opcionesPorDiaRef.current[diaId];
       }
 
       setCargandoOpciones(true);
@@ -39,10 +44,11 @@ export function useOpcionesMenu({
           setErrorOpciones("No hay opciones disponibles para este dia.");
         }
 
-        setOpcionesPorDia((actuales) => ({
-          ...actuales,
+        opcionesPorDiaRef.current = {
+          ...opcionesPorDiaRef.current,
           [diaId]: opciones,
-        }));
+        };
+        setOpcionesPorDia(opcionesPorDiaRef.current);
         return opciones;
       } catch (error) {
         setErrorOpciones(error.message || "No pudimos cargar las opciones de este dia.");
@@ -51,7 +57,7 @@ export function useOpcionesMenu({
         setCargandoOpciones(false);
       }
     },
-    [empresaId, opcionesPorDia, semanaId, service],
+    [empresaId, semanaId, service],
   );
 
   const recargarOpcionesDia = useCallback(
@@ -59,32 +65,11 @@ export function useOpcionesMenu({
     [obtenerOpcionesDia],
   );
 
-  const buscarOpciones = useCallback((texto) => {
-    setTextoBusqueda(texto);
-  }, []);
-
-  const limpiarBusqueda = useCallback(() => {
-    setTextoBusqueda("");
-  }, []);
-
-  const estadoOpciones = useMemo(
-    () => ({
-      cargandoOpciones,
-      errorOpciones,
-      textoBusqueda,
-    }),
-    [cargandoOpciones, errorOpciones, textoBusqueda],
-  );
-
   return {
-    buscarOpciones,
     cargandoOpciones,
     errorOpciones,
-    estadoOpciones,
-    limpiarBusqueda,
     obtenerOpcionesDia,
     opcionesPorDia,
     recargarOpcionesDia,
-    textoBusqueda,
   };
 }

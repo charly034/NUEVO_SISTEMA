@@ -1,14 +1,6 @@
 import { SIN_PEDIDO_ID, TIPOS_OPERACION_PEDIDO } from "../constants/estadosPedido.js";
 import { contarSeleccionesValidas } from "../utils/reglasSeleccionPedido.js";
-
-function crearIdDesdeTexto(texto) {
-  return String(texto || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+import { crearIdDesdeTexto } from "../utils/texto.js";
 
 function obtenerIdPlato(seleccion) {
   return seleccion?.platoId || seleccion?.plato?.platoId || seleccion?.plato?.id || null;

@@ -1,18 +1,10 @@
 import { apiGet } from "./apiCliente.js";
+import { crearIdDesdeTexto } from "../utils/texto.js";
 
 function crearParams(limpiar) {
   return new URLSearchParams(
     Object.entries(limpiar).filter(([, valor]) => valor !== undefined && valor !== null),
   );
-}
-
-function crearIdDesdeTexto(texto) {
-  return String(texto || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 function normalizarGuarnicion(guarnicion) {

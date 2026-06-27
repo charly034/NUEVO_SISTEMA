@@ -51,10 +51,6 @@ export function usePedidoSemanal({
   const [errorGuardado, setErrorGuardado] = useState("");
   const [feedback, setFeedback] = useState("");
 
-  const semanaActiva = semanas[indiceInicial] || semanas.find((semana) => semana.tipo === "actual") || null;
-  const pedidoActual = semanas.find((semana) => semana.estado === ESTADOS_PEDIDO.CONFIRMADO) || null;
-  const modoEdicion = modoActivo.modo === "edicion";
-
   const recargarPedido = useCallback(async () => {
     setCargando(true);
     setError("");
@@ -131,21 +127,6 @@ export function usePedidoSemanal({
     [cambiarModoSemana],
   );
 
-  const actualizarSeleccionDia = useCallback((semanaId, diaActualizado) => {
-    setSemanas((semanasActuales) =>
-      semanasActuales.map((semana) =>
-        semana.id === semanaId
-          ? mapearSemanaApiAEstado({
-              ...semana,
-              dias: semana.dias.map((dia) =>
-                dia.clave === diaActualizado.clave ? diaActualizado : dia,
-              ),
-            })
-          : semana,
-      ),
-    );
-  }, []);
-
   const guardarCambios = useCallback(
     async (semanaActualizada) => {
       setGuardando(true);
@@ -218,7 +199,6 @@ export function usePedidoSemanal({
   );
 
   return {
-    actualizarSeleccionDia,
     cambiosPendientes,
     cancelarEdicion,
     cargando,
@@ -237,13 +217,10 @@ export function usePedidoSemanal({
     iniciarModificacion,
     iniciarPedido,
     modoActivo,
-    modoEdicion,
-    pedidoActual,
     cargarPedidoSemanal: recargarPedido,
     recargar: recargarPedido,
     recargarPedido,
     registrarCambiosEdicion: setCambiosPendientes,
-    semanaActiva,
     semanas,
   };
 }

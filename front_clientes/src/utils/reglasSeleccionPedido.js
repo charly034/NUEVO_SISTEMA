@@ -3,6 +3,7 @@ import {
   ORIGEN_SIN_PEDIDO_USUARIO,
   SIN_PEDIDO_ID,
 } from "../constants/estadosPedido.js";
+import { crearIdDesdeTexto } from "./texto.js";
 
 export function platoRequiereGuarnicion(plato) {
   return Boolean(plato?.requiereGuarnicion);
@@ -16,15 +17,6 @@ function obtenerNombreGuarnicion(guarnicion) {
 function obtenerIdGuarnicion(guarnicion) {
   if (!guarnicion || typeof guarnicion === "string") return null;
   return guarnicion.id || null;
-}
-
-function crearIdDesdeTexto(texto) {
-  return String(texto || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 export function crearOpcionSinPedido({ porDefecto = false } = {}) {
