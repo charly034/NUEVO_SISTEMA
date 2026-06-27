@@ -77,18 +77,19 @@ technical_debt:
     evidence:
       - "front_clientes/QA_REGRESION.md documenta npm run lint, npm run build, npm test y npm run test:e2e."
       - "La guia usa la ruta canonica /pedido-semanal."
-      - "La guia registra que Playwright puede quedar colgado aunque el smoke inicie/avance."
-    risk: "Bajo; queda pendiente estabilizar el runner e2e."
-    recommended_cut: "Investigar Playwright/Vite preview si el e2e sigue colgando en CI."
+      - "npm run test:e2e paso el smoke e2e/smoke.spec.js el 2026-06-27 en 29.2 segundos."
+    risk: "Bajo; validar nuevamente si cambia playwright.config.js o el webServer de Vite."
+    recommended_cut: "Mantener el smoke e2e como gate local; ampliar cobertura solo si el runner sigue estable."
 
   - id: "debt-client-e2e-runner-timeout"
-    status: open
+    status: resolved
     area: "front_clientes"
     evidence:
       - "npm run test:e2e mostro el smoke de login como ok/iniciado pero el proceso no finalizo antes de 180 segundos."
       - "No quedo puerto 4173 escuchando despues del timeout."
-    risk: "No bloquea lint/build/unit, pero impide usar e2e como gate automatico confiable."
-    recommended_cut: "Revisar configuracion Playwright webServer/Vite preview y salida del runner antes de usarlo en CI."
+      - "Revalidado el 2026-06-27: npm run test:e2e finalizo correctamente con 1 passed en 29.2 segundos."
+    risk: "Riesgo residual bajo; una corrida local exitosa no reemplaza CI ni smoke contra deploy real."
+    recommended_cut: "Si reaparece el timeout, revisar Playwright webServer/Vite preview antes de marcar e2e como gate obligatorio en CI."
 
   - id: "debt-api-graceful-shutdown"
     status: resolved

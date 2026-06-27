@@ -88,6 +88,12 @@ timeline:
       event: "Release candidate retira /api/v1/users con 410 Gone y endurece seeds demo/destructivos con confirmacion y passwords por env."
     - date: "2026-06-27"
       event: "Release candidate actualiza QA_REGRESION.md; validaciones lint/build/test pasan y el smoke Playwright queda marcado como runner no confiable por timeout."
+    - date: "2026-06-27"
+      event: "Auditoria integral crea commit inicial de resguardo dedf5f1 antes de nuevos cambios."
+    - date: "2026-06-27"
+      event: "Se corrige front_menu/src/components/layout/Sidebar.jsx para evitar setState sincrono en useEffect y restaurar npm run lint de front_menu."
+    - date: "2026-06-27"
+      event: "Validaciones locales pasan: API lint/test, front_menu lint/build, front_clientes lint/build/test/test:e2e; smoke navegador admin/cliente mobile sin errores de consola."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."
@@ -96,6 +102,6 @@ needs_user_confirmation:
   - "Confirmar entorno objetivo de deploy actual: Docker Compose local, Easypanel o ambos."
 
 recommended_next_steps:
-  - "Ejecutar validaciones: API lint/test, front_clientes lint/build/test, front_menu lint/build."
-  - "Probar flujo end-to-end: admin publica menu, cliente crea/modifica/confirma, admin cambia estado."
-  - "Actualizar QA_REGRESION.md y docs/pedidos-cliente.md con resultados de validacion."
+  - "Validar deploy real con Docker Compose/Easypanel usando secretos reales fuera del repo."
+  - "Probar smoke post-deploy: health, login admin, login cliente, pedido semanal y listado admin de pedidos."
+  - "Confirmar si se desea reestructurar modulos menu/menus-semanales bajo carpeta contenedora comun."

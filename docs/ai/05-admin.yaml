@@ -141,12 +141,20 @@ test_access_notes:
 current_worktree_notes:
   verified_in_repo:
     branch: "test...origin/test"
-    dirty_files_at_last_inspection:
-      - "front_clientes/src/components/layout/PrivateRoute.jsx"
-      - "front_clientes/src/components/pedido/PedidoContainer.jsx"
-      - "front_clientes/src/components/pedido/SemanaPedidoCard.jsx"
-      - "front_clientes/src/services/menuService.js"
-      - "AGENTS.md"
-      - "docs/ai/"
-      - "docs/contexto-proyecto.md"
-    git_warning: "Permission denied al leer C:\\Users\\charl/.config/git/ignore"
+    baseline_commit_2026_06_27: "dedf5f1 chore: resguardo inicial antes de auditoria integral"
+    dirty_files_after_audit_fix:
+      - "front_menu/src/components/layout/Sidebar.jsx"
+      - "docs/ai/05-admin.yaml"
+      - "docs/ai/60-debt.yaml"
+      - "docs/ai/70-project-history.yaml"
+    validation_2026_06_27:
+      - "API_LA_QUINTA npm run lint: OK"
+      - "API_LA_QUINTA npm test: OK, 33 tests"
+      - "front_menu npm run lint: OK"
+      - "front_menu npm run build: OK"
+      - "front_clientes npm run lint: OK"
+      - "front_clientes npm run build: OK"
+      - "front_clientes npm test: OK, 5 files y 13 tests"
+      - "front_clientes npm run test:e2e: OK, 1 smoke"
+      - "Browser smoke admin desktop/mobile: login admin OK, sin errores de consola"
+      - "Browser smoke cliente mobile: login florencia.ruiz@sol.test OK, pedido semanal y modo edicion visibles, sin errores de consola"
