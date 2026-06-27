@@ -30,7 +30,11 @@ export function usePedidoSemanal({
 } = {}) {
   const identidadUsuario = useMemo(
     () => ({
-      empresaId: empleado?.empresaId || empleado?.empresa_id || IDENTIDAD_PEDIDO_DEMO.empresaId,
+      empresaId:
+        empleado?.empresa?.id ||
+        empleado?.empresaId ||
+        empleado?.empresa_id ||
+        IDENTIDAD_PEDIDO_DEMO.empresaId,
       usuarioId: empleado?.id || empleado?.usuarioId || IDENTIDAD_PEDIDO_DEMO.usuarioId,
     }),
     [empleado],
@@ -65,7 +69,11 @@ export function usePedidoSemanal({
       setSemanas(semanasMapeadas);
       setIndiceInicial(obtenerIndiceSemanaInicial(semanasMapeadas));
     } catch (errorCarga) {
-      setError(errorCarga.message || "No pudimos cargar el pedido semanal.");
+      if (errorCarga.status === 401 || errorCarga.codigo === "sin_token") {
+        setError("No pudimos cargar tu pedido. Inicia sesion nuevamente.");
+      } else {
+        setError("No pudimos cargar tu pedido. Intenta nuevamente.");
+      }
     } finally {
       setCargando(false);
     }
@@ -207,10 +215,12 @@ export function usePedidoSemanal({
     cambiosPendientes,
     cancelarEdicion,
     cargando,
+    cargandoSemanas: cargando,
     cambiarModoSemana,
     confirmarPedido,
     error,
     errorCarga: error,
+    errorSemanas: error,
     errorGuardado,
     fechaReferencia,
     feedback,
@@ -222,6 +232,8 @@ export function usePedidoSemanal({
     modoActivo,
     modoEdicion,
     pedidoActual,
+    cargarPedidoSemanal: recargarPedido,
+    recargar: recargarPedido,
     recargarPedido,
     registrarCambiosEdicion: setCambiosPendientes,
     semanaActiva,

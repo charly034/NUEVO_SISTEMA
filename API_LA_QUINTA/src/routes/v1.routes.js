@@ -11,6 +11,7 @@ import adminAuthRoutes from '../modules/admin-auth/admin-auth.routes.js';
 import guarnicionesRoutes from '../modules/guarniciones/guarniciones.routes.js';
 import empresasRoutes from '../modules/empresas/empresas.routes.js';
 import empleadosRoutes from '../modules/empleados/empleados.routes.js';
+import menuRoutes from '../modules/menu/menu.routes.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/menus-semanales', menusSemanalesRoutes);
 router.use('/estadisticas', estadisticasRoutes);
 router.use('/sugerencias', sugerenciasRoutes);
 router.use('/pedidos', pedidosRoutes);
+router.use('/menu', menuRoutes);
 router.use('/guarniciones', guarnicionesRoutes);
 router.use('/empresas', empresasRoutes);
 router.use('/empleados', empleadosRoutes);

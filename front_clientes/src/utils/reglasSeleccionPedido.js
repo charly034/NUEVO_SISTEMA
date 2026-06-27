@@ -1,4 +1,8 @@
-import { SIN_PEDIDO_ID } from "../constants/estadosPedido.js";
+import {
+  ORIGEN_SIN_PEDIDO_DEFAULT,
+  ORIGEN_SIN_PEDIDO_USUARIO,
+  SIN_PEDIDO_ID,
+} from "../constants/estadosPedido.js";
 
 export function platoRequiereGuarnicion(plato) {
   return Boolean(plato?.requiereGuarnicion);
@@ -23,22 +27,27 @@ function crearIdDesdeTexto(texto) {
     .replace(/^-|-$/g, "");
 }
 
-function crearOpcionSinPedido() {
+export function crearOpcionSinPedido({ porDefecto = false } = {}) {
   return {
     id: SIN_PEDIDO_ID,
-    nombre: "Sin pedido para este día",
-    descripcion: "No recibir comida este día",
+    nombre: "Sin pedido para este dia",
+    descripcion: porDefecto
+      ? "Preseleccionado para evitar pedidos de fin de semana por error"
+      : "No recibir comida este dia",
     categoria: "sin_pedido",
     tipo: "sin_pedido",
     requiereGuarnicion: false,
-    etiquetas: [],
+    porDefecto,
+    etiquetas: porDefecto ? ["Por defecto"] : [],
     guarniciones: [],
   };
 }
 
-export function crearSeleccionPedido(plato, guarnicion = "") {
+export function crearSeleccionPedido(plato, guarnicion = "", opciones = {}) {
   if (!plato) return null;
   const sinPedido = plato.id === SIN_PEDIDO_ID;
+  const origenSinPedido = opciones.origenSinPedido ||
+    (plato.porDefecto ? ORIGEN_SIN_PEDIDO_DEFAULT : ORIGEN_SIN_PEDIDO_USUARIO);
 
   return {
     plato,
@@ -49,6 +58,7 @@ export function crearSeleccionPedido(plato, guarnicion = "") {
       ? null
       : obtenerIdGuarnicion(guarnicion) || crearIdDesdeTexto(guarnicion),
     nombreGuarnicion: sinPedido ? "" : obtenerNombreGuarnicion(guarnicion),
+    origenSinPedido: sinPedido ? origenSinPedido : null,
     sinPedido,
   };
 }
@@ -62,7 +72,11 @@ export function seleccionDiaEsValida(seleccion) {
 
 export function construirTextoPlatoSeleccionado(seleccion) {
   if (!seleccion?.plato) return "Sin seleccionar";
-  if (seleccion.plato.id === SIN_PEDIDO_ID || seleccion.sinPedido) return "Sin pedido";
+  if (seleccion.plato.id === SIN_PEDIDO_ID || seleccion.sinPedido) {
+    return seleccion.origenSinPedido === ORIGEN_SIN_PEDIDO_DEFAULT
+      ? "Sin pedido por defecto"
+      : "Sin pedido";
+  }
   if (seleccion.guarnicion) {
     return `${seleccion.plato.nombre} con ${obtenerNombreGuarnicion(seleccion.guarnicion).toLowerCase()}`;
   }
@@ -73,8 +87,17 @@ export function crearSeleccionDesdeTexto(plato, opciones = []) {
   const textoPlato = String(plato || "");
   const textoNormalizado = textoPlato.toLowerCase();
 
-  if (textoPlato === "Sin pedido") {
-    return crearSeleccionPedido(crearOpcionSinPedido());
+  if (textoPlato === "Sin pedido" || textoPlato === "Sin pedido por defecto") {
+    const porDefecto = textoPlato === "Sin pedido por defecto";
+    return crearSeleccionPedido(
+      crearOpcionSinPedido({ porDefecto }),
+      "",
+      {
+        origenSinPedido: porDefecto
+          ? ORIGEN_SIN_PEDIDO_DEFAULT
+          : ORIGEN_SIN_PEDIDO_USUARIO,
+      },
+    );
   }
 
   const opcion = opciones.find((item) => {
@@ -95,6 +118,6 @@ export function contarSeleccionesValidas(dias) {
   return dias.filter((dia) => {
     if (dia.seleccion?.sinPedido) return false;
     if (dia.seleccion?.plato) return true;
-    return dia.plato && !["Sin pedido", "Sin seleccionar"].includes(dia.plato);
+    return dia.plato && !["Sin pedido", "Sin pedido por defecto", "Sin seleccionar"].includes(dia.plato);
   }).length;
 }

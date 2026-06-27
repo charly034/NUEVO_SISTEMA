@@ -59,7 +59,7 @@ export default function SemanaCardEditable({
 
   function puedeEditarDia(dia) {
     const estadoVisual = obtenerEstadoVisualDia(dia, semana, fechaActual);
-    return !["bloqueado", "vencido"].includes(estadoVisual);
+    return !["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual);
   }
 
   function obtenerSiguienteDiaEditable(dias, claveActual) {
@@ -79,7 +79,7 @@ export default function SemanaCardEditable({
   }, [diasEditados, modoCreacion]);
 
   function abrirSeleccionDia(dia, estadoVisual) {
-    if (["bloqueado", "vencido"].includes(estadoVisual)) return;
+    if (["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual)) return;
     setMensajeError("");
     setDiaActivo(dia);
   }
@@ -172,6 +172,7 @@ export default function SemanaCardEditable({
         cerrarAlConfirmar={!modoCreacion}
         dia={diaActivo}
         dias={diasEditados}
+        semanaId={semana.id}
         onCerrar={() => setDiaActivo(null)}
         onConfirmar={actualizarDia}
       />

@@ -20,7 +20,7 @@ function isRemembered() {
 
 export function useAuth() {
   const [empleado, setEmpleado] = useState(() => readStoredEmpleado());
-  const [checking, setChecking] = useState(() => hasToken());
+  const [checking, setChecking] = useState(() => hasToken() && !readStoredEmpleado());
 
   const logout = useCallback(() => {
     clearClientSession();
@@ -34,7 +34,10 @@ export function useAuth() {
   }, [logout]);
 
   useEffect(() => {
-    if (!hasToken()) return;
+    if (!hasToken()) {
+      setChecking(false);
+      return;
+    }
     authApi.me()
       .then((data) => {
         const remember = isRemembered();

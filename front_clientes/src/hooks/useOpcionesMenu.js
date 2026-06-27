@@ -12,35 +12,51 @@ export function useOpcionesMenu({
   const [textoBusqueda, setTextoBusqueda] = useState("");
 
   const obtenerOpcionesDia = useCallback(
-    async (dia) => {
+    async (dia, opcionesCarga = {}) => {
       if (!dia) return [];
-      if (dia.opciones?.length) return dia.opciones;
+      if (dia.opciones?.length && !opcionesCarga.forzar) return dia.opciones;
 
       const diaId = dia.id || dia.clave;
-      if (opcionesPorDia[diaId]) return opcionesPorDia[diaId];
+      if (opcionesPorDia[diaId] && !opcionesCarga.forzar) {
+        return opcionesPorDia[diaId];
+      }
 
       setCargandoOpciones(true);
       setErrorOpciones("");
 
       try {
+        if (!semanaId) {
+          throw new Error("No pudimos identificar la semana para cargar opciones.");
+        }
+
         const opciones = await service.obtenerOpcionesMenuPorDia({
           diaId,
           empresaId,
           semanaId,
         });
+
+        if (opciones.length === 0) {
+          setErrorOpciones("No hay opciones disponibles para este dia.");
+        }
+
         setOpcionesPorDia((actuales) => ({
           ...actuales,
           [diaId]: opciones,
         }));
         return opciones;
       } catch (error) {
-        setErrorOpciones(error.message || "No pudimos cargar las opciones del día.");
+        setErrorOpciones(error.message || "No pudimos cargar las opciones de este dia.");
         return [];
       } finally {
         setCargandoOpciones(false);
       }
     },
     [empresaId, opcionesPorDia, semanaId, service],
+  );
+
+  const recargarOpcionesDia = useCallback(
+    (dia) => obtenerOpcionesDia(dia, { forzar: true }),
+    [obtenerOpcionesDia],
   );
 
   const buscarOpciones = useCallback((texto) => {
@@ -68,6 +84,7 @@ export function useOpcionesMenu({
     limpiarBusqueda,
     obtenerOpcionesDia,
     opcionesPorDia,
+    recargarOpcionesDia,
     textoBusqueda,
   };
 }

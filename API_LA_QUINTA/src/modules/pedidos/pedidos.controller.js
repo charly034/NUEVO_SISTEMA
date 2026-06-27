@@ -2,23 +2,33 @@ import * as service from './pedidos.service.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess, sendCreated } from '../../utils/response.js';
 
-// Público: menú del día y de la semana
 export const getMenuHoy = asyncHandler(async (req, res) => {
-  sendSuccess(res, await service.getMenuHoy(), 'Menú del día');
+  sendSuccess(res, await service.getMenuHoy(), 'Menu del dia');
 });
 
 export const getMenuSemana = asyncHandler(async (req, res) => {
-  sendSuccess(res, await service.getMenuSemana(req.query.fecha_inicio), 'Menú de la semana');
+  sendSuccess(res, await service.getMenuSemana(req.query.fecha_inicio), 'Menu de la semana');
 });
 
-// Público: menú publicado activo (sin necesidad de saber la fecha)
 export const getMenuActivo = asyncHandler(async (req, res) => {
-  // empresa_id puede venir del token (si está logueado) o como query param
   const empresaId = req.empleado?.empresa_id ?? req.query.empresa_id ?? null;
-  sendSuccess(res, await service.getMenuActivo(empresaId), 'Menú activo');
+  sendSuccess(res, await service.getMenuActivo(empresaId), 'Menu activo');
 });
 
-// Requiere auth del empleado (req.empleado inyectado por middleware)
+export const getSemanasPedido = asyncHandler(async (req, res) => {
+  const empresaId = req.empleado?.empresa_id ?? req.query.empresaId ?? req.query.empresa_id ?? null;
+  const empleadoId = req.empleado?.sub ?? req.query.usuarioId ?? req.query.usuario_id ?? null;
+  sendSuccess(res, await service.getSemanasPedido({ empleadoId, empresaId }), 'Semanas de pedido');
+});
+
+export const getOpcionesMenuSemana = asyncHandler(async (req, res) => {
+  const empresaId = req.empleado?.empresa_id ?? req.query.empresaId ?? req.query.empresa_id ?? null;
+  sendSuccess(res, await service.getOpcionesMenuSemana({
+    empresaId,
+    semanaId: req.params.semanaId,
+  }), 'Opciones de menu semanal');
+});
+
 export const getMiPedido = asyncHandler(async (req, res) => {
   const pedido = await service.getMiPedido(req.empleado.sub, req.query.semana_inicio);
   sendSuccess(res, pedido, 'Pedido obtenido');
@@ -38,12 +48,10 @@ export const guardarPedido = asyncHandler(async (req, res) => {
   sendCreated(res, pedido, 'Pedido guardado exitosamente');
 });
 
-// Admin: listar todos los pedidos
 export const getPedidos = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getPedidos(req.query), 'Pedidos obtenidos');
 });
 
-// Admin: obtener pedido por ID
 export const getPedidoById = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getPedidoById(req.params.id), 'Pedido obtenido');
 });

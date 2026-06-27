@@ -1,4 +1,5 @@
 import { usePedidoSemanal } from "../../hooks/usePedidoSemanal.js";
+import { USAR_MOCKS } from "../../services/apiCliente.js";
 import AppMobileShell from "../layout/AppMobileShell.jsx";
 import HeaderUsuario from "./HeaderUsuario.jsx";
 import SemanaContainer from "./SemanaContainer.jsx";
@@ -28,7 +29,7 @@ export default function PedidoContainer({ empleado }) {
       <HeaderUsuario nombre={nombre} />
       {cargando && (
         <div className="rounded-2xl border border-[#d8e6d4] bg-[#f0f7ee] px-3 py-2 text-sm font-black text-[#2d5a27]">
-          Cargando tu pedido semanal...
+          Cargando tu pedido...
         </div>
       )}
       {errorCarga && (
@@ -48,8 +49,15 @@ export default function PedidoContainer({ empleado }) {
           {errorGuardado}
         </div>
       )}
+      {!cargando && !errorCarga && semanas.length === 0 && (
+        <div className="rounded-2xl border border-[#e8e3da] bg-white px-3 py-3 text-sm font-bold text-[#716c64]">
+          No hay semanas disponibles para pedido.
+        </div>
+      )}
       <div className="rounded-2xl border border-[#e8e3da] bg-[#faf8f4] px-3 py-2 text-xs font-bold text-[#5f5a52]">
-        Modo desarrollo: flujo funcional con datos mock, preparado para conectar API.
+        {USAR_MOCKS
+          ? "Modo desarrollo: usando datos mock temporales."
+          : "Modo desarrollo: lectura conectada a API. El guardado sigue en mock."}
       </div>
       <SemanaContainer
         fechaActual={fechaReferencia}

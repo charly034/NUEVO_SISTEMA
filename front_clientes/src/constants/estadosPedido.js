@@ -19,6 +19,21 @@ export const TIPOS_PLAN_PEDIDO = {
 };
 
 export const SIN_PEDIDO_ID = "sin-pedido";
+export const ORIGEN_SIN_PEDIDO_DEFAULT = "default";
+export const ORIGEN_SIN_PEDIDO_USUARIO = "usuario";
+
+export const ESTADOS_DIA_PEDIDO = {
+  BLOQUEADO: "bloqueado",
+  EDITABLE: "editable",
+  FERIADO: "feriado",
+  SELECCIONADO: "seleccionado",
+  SIN_MENU: "sin_menu",
+  SIN_PEDIDO: "sin_pedido",
+  SIN_PEDIDO_POR_DEFECTO: "sin_pedido_por_defecto",
+  SIN_SELECCIONAR: "sin_seleccionar",
+  SIN_SERVICIO: "sin_servicio",
+  VENCIDO: "vencido",
+};
 
 export const IDENTIDAD_PEDIDO_DEMO = {
   empresaId: "empresa_demo",

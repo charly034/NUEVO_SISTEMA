@@ -1,5 +1,6 @@
 import * as repo from './pedidos.repository.js';
 import * as empresasRepo from '../empresas/empresas.repository.js';
+import * as guarnicionesRepo from '../guarniciones/guarniciones.repository.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { getClient } from '../../database/connection.js';
 import { validarPedidoInput } from './pedidos.validation.js';
@@ -10,17 +11,187 @@ const DIAS_LABORALES = {
   lunes_sabado: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'],
   lunes_domingo: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
 };
+const DIAS_LABEL = {
+  lunes: 'Lunes',
+  martes: 'Martes',
+  miercoles: 'Miercoles',
+  jueves: 'Jueves',
+  viernes: 'Viernes',
+  sabado: 'Sabado',
+  domingo: 'Domingo',
+};
 
 
 // Índice de día en la semana (lunes=0 ... domingo=6)
 const DIA_IDX = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4, sabado: 5, domingo: 6 };
 
+function fechaISO(fecha) {
+  if (fecha instanceof Date) return fecha.toISOString().split('T')[0];
+  return String(fecha || '').split('T')[0];
+}
+
+function aISO(fecha) {
+  return [
+    fecha.getFullYear(),
+    String(fecha.getMonth() + 1).padStart(2, '0'),
+    String(fecha.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function addDias(fecha, dias) {
+  const base = new Date(`${fechaISO(fecha)}T00:00:00`);
+  base.setDate(base.getDate() + dias);
+  return aISO(base);
+}
+
+function lunesDeSemana(fechaReferencia = new Date()) {
+  const fecha = new Date(fechaReferencia);
+  fecha.setHours(0, 0, 0, 0);
+  const dia = fecha.getDay();
+  fecha.setDate(fecha.getDate() + (dia === 0 ? -6 : 1 - dia));
+  return aISO(fecha);
+}
+
+function fechaCorta(fecha) {
+  const [anio, mes, dia] = fechaISO(fecha).split('-');
+  void anio;
+  return `${dia}/${mes}`;
+}
+
+function obtenerTipoSemana(semanaInicio, semanaActual) {
+  if (semanaInicio === semanaActual) return 'actual';
+  return semanaInicio < semanaActual ? 'anterior' : 'proxima';
+}
+
+function obtenerEtiquetaSemana(tipo) {
+  if (tipo === 'actual') return 'Semana actual';
+  if (tipo === 'proxima') return 'Semana proxima';
+  return 'Semana anterior';
+}
+
+function obtenerDiasPorDefectoSinPedido(empresa) {
+  return empresa?.dias_laborales === 'lunes_domingo' ? ['sabado', 'domingo'] : [];
+}
+
+function normalizarGuarniciones(guarniciones) {
+  return guarniciones.map((guarnicion) => ({
+    id: guarnicion.id,
+    nombre: guarnicion.nombre,
+    tipo: guarnicion.tipo || null,
+  }));
+}
+
+function crearEtiquetasPlato(plato, extra = []) {
+  const tags = Array.isArray(plato.tags)
+    ? plato.tags
+    : String(plato.tags || '')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+  return [
+    ...extra,
+    ...tags,
+    plato.tiene_guarnicion ? 'Requiere guarnicion' : 'Plato completo',
+  ].filter(Boolean);
+}
+
+function mapearPlatoEspecial(plato, guarniciones) {
+  return {
+    id: `menu-${plato.plato_id}-${plato.dia}-${plato.opcion || 'sin-opcion'}`,
+    platoId: plato.plato_id,
+    opcion: plato.opcion || null,
+    nombre: plato.plato_nombre,
+    descripcion: plato.descripcion || 'Menu publicado',
+    categoria: 'menu',
+    tipo: plato.tiene_guarnicion ? 'principal_con_guarnicion' : 'plato_completo',
+    requiereGuarnicion: Boolean(plato.tiene_guarnicion),
+    destacado: true,
+    grupo: 'especiales',
+    estado: 'disponible',
+    etiquetas: crearEtiquetasPlato(plato, [`Opcion ${plato.opcion || ''}`.trim()]),
+    guarniciones: plato.tiene_guarnicion ? guarniciones : [],
+  };
+}
+
+function mapearPlatoFijo(plato, guarniciones) {
+  return {
+    id: `fijo-${plato.plato_id}`,
+    platoId: plato.plato_id,
+    opcion: null,
+    nombre: plato.plato_nombre,
+    descripcion: plato.descripcion || 'Plato fijo',
+    categoria: 'fijo',
+    tipo: plato.tiene_guarnicion ? 'principal_con_guarnicion' : 'plato_completo',
+    requiereGuarnicion: Boolean(plato.tiene_guarnicion),
+    destacado: false,
+    grupo: 'fijos',
+    estado: 'disponible',
+    etiquetas: crearEtiquetasPlato(plato, ['Fijo']),
+    guarniciones: plato.tiene_guarnicion ? guarniciones : [],
+    diasDisponibles: plato.dias_disponibles || null,
+  };
+}
+
+function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible }) {
+  if (pedidoVisible) return 'confirmado';
+  if (!menuSemana?.menu?.id) return semanaInicio > lunesDeSemana() ? 'sin_menu' : 'sin_pedido';
+  if (menuSemana.cerrado || menuSemana.limiteEmpresa?.vencido) return 'cerrado';
+  return 'sin_pedido';
+}
+
+function construirTextoItem(item) {
+  if (!item?.plato_nombre) return null;
+  return item.guarnicion_nombre
+    ? `${item.plato_nombre} con ${String(item.guarnicion_nombre).toLowerCase()}`
+    : item.plato_nombre;
+}
+
+function construirSeleccionItem(item, opciones) {
+  if (!item) return null;
+  const plato = opciones.find(
+    (opcion) =>
+      Number(opcion.platoId) === Number(item.plato_id) &&
+      String(opcion.opcion || '') === String(item.opcion || ''),
+  );
+  if (!plato) return null;
+
+  return {
+    plato,
+    guarnicion: item.guarnicion_id
+      ? { id: item.guarnicion_id, nombre: item.guarnicion_nombre }
+      : '',
+    platoId: plato.platoId,
+    nombrePlato: plato.nombre,
+    guarnicionId: item.guarnicion_id || null,
+    nombreGuarnicion: item.guarnicion_nombre || '',
+    sinPedido: false,
+  };
+}
+
+function crearSugerenciasSemana(diasPedido) {
+  const sugerenciasBase = [
+    'Milanesa con pure de papas',
+    'Tarta de verduras con ensalada',
+    'Wok de pollo con arroz',
+    'Ravioles con salsa fileto',
+    'Hamburguesa casera con vegetales',
+    'Pastel de papa',
+    'Pollo al horno con calabaza',
+  ];
+
+  return diasPedido.slice(0, 3).map((dia, indice) => ({
+    dia: DIAS_LABEL[dia] || dia,
+    plato: sugerenciasBase[indice % sugerenciasBase.length],
+  }));
+}
+
 /**
  * Dado un lunes de semana (YYYY-MM-DD) y un nombre de día, devuelve la Date de ese día.
  */
 function fechaDeDia(semanaInicio, dia) {
-  const base = new Date(semanaInicio + 'T00:00:00');
-  base.setDate(base.getDate() + DIA_IDX[dia]);
+  const base = new Date(`${fechaISO(semanaInicio)}T00:00:00`);
+  base.setDate(base.getDate() + (DIA_IDX[dia] ?? 0));
   return base;
 }
 
@@ -118,6 +289,211 @@ export const getMenuActivo = async (empresaId = null) => {
   });
 
   return { menus_disponibles };
+};
+
+export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia = new Date() }) => {
+  if (!empresaId) throw ApiError.badRequest('empresaId es requerido');
+
+  const [empresa, menus, historial, guarnicionesActivas] = await Promise.all([
+    empresasRepo.findById(empresaId),
+    repo.menusPublicadosList(),
+    empleadoId ? repo.findHistorialByEmpleado(empleadoId, 24) : Promise.resolve([]),
+    guarnicionesRepo.findAll(true),
+  ]);
+
+  if (!empresa) throw ApiError.notFound(`Empresa ${empresaId} no encontrada`);
+
+  const diasPedido = DIAS_LABORALES[empresa.dias_laborales] ?? DIAS_LABORALES.lunes_viernes;
+  const diasPorDefectoSinPedido = obtenerDiasPorDefectoSinPedido(empresa);
+  const guarniciones = normalizarGuarniciones(guarnicionesActivas);
+  const semanaActual = lunesDeSemana(fechaReferencia);
+  const menusPorSemana = new Map(menus.map((menu) => {
+    const semanaInicio = fechaISO(menu.fecha_inicio);
+    return [
+      semanaInicio,
+      {
+        disponible: true,
+        menu,
+        limiteEmpresa: construirInfoLimite(empresa, semanaInicio),
+        dias_laborales: empresa.dias_laborales,
+      },
+    ];
+  }));
+  const pedidosPorSemana = new Map(
+    historial
+      .filter((pedido) => pedido.estado !== 'cancelado')
+      .map((pedido) => [fechaISO(pedido.semana_inicio), pedido]),
+  );
+  const fechas = new Set([...menusPorSemana.keys(), ...pedidosPorSemana.keys()]);
+
+  if (fechas.size === 0) fechas.add(semanaActual);
+  if (![...fechas].some((fecha) => fecha >= semanaActual)) fechas.add(semanaActual);
+  fechas.add(addDias([...fechas].sort().at(-1) || semanaActual, 7));
+
+  const semanas = [...fechas].sort().map((semanaInicio) => {
+    const menuSemana = menusPorSemana.get(semanaInicio) || {
+      disponible: false,
+      menu: {
+        fecha_inicio: semanaInicio,
+        fecha_fin: addDias(semanaInicio, Math.max(diasPedido.length - 1, 0)),
+        sin_servicio: [],
+      },
+      dias_laborales: empresa.dias_laborales,
+    };
+    const pedidoVisible = pedidosPorSemana.get(semanaInicio) || null;
+    const tipo = obtenerTipoSemana(semanaInicio, semanaActual);
+    const estado = obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible });
+    const fechaFin = addDias(semanaInicio, Math.max(diasPedido.length - 1, 0));
+    const tieneMenuPublicado = Boolean(menuSemana?.menu?.id);
+    const esSemanaSugerencias = !tieneMenuPublicado && semanaInicio > semanaActual;
+    const itemsPorDia = new Map((pedidoVisible?.items || []).map((item) => [item.dia, item]));
+    const sinServicioPorDia = new Map((menuSemana.menu?.sin_servicio || []).map((item) => [item.dia, item.motivo]));
+
+    return {
+      id: semanaInicio,
+      etiqueta: obtenerEtiquetaSemana(tipo),
+      tipo,
+      fechaDesde: semanaInicio,
+      fechaHasta: fechaFin,
+      rango: `${fechaCorta(semanaInicio)} al ${fechaCorta(fechaFin)}`,
+      titulo: `Semana del lunes ${fechaCorta(semanaInicio)}`,
+      estado,
+      tipoPlan: empresa.modo_pedido || 'semanal',
+      modalidad: empresa.modo_pedido || 'semanal',
+      limiteModificacion: {
+        dia: empresa.limite_dia_semana || 'lunes',
+        hora: empresa.limite_hora ? String(empresa.limite_hora).slice(0, 5) : '09:30',
+      },
+      diasSeleccionados: pedidoVisible?.items?.length || 0,
+      editable: ['sin_pedido', 'pendiente', 'confirmado'].includes(estado),
+      sugerencias: esSemanaSugerencias ? crearSugerenciasSemana(diasPedido) : [],
+      dias: diasPedido.map((dia, indice) => {
+        const item = itemsPorDia.get(dia);
+        const especiales = (menuSemana.menu?.variables || [])
+          .filter((plato) => plato.dia === dia)
+          .map((plato) => mapearPlatoEspecial(plato, guarniciones));
+        const fijos = (menuSemana.menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
+        const opciones = [...especiales, ...fijos];
+        const motivoSinServicio = sinServicioPorDia.get(dia);
+        const sinPedidoPorDefecto = !item && diasPorDefectoSinPedido.includes(dia);
+        const seleccion = construirSeleccionItem(item, opciones);
+        const sinMenuEspecial = !motivoSinServicio && especiales.length === 0 && fijos.length > 0;
+
+        return {
+          id: dia,
+          clave: dia,
+          dia: DIAS_LABEL[dia] || dia,
+          fecha: addDias(semanaInicio, indice),
+          estado: motivoSinServicio
+            ? 'sin_servicio'
+            : sinPedidoPorDefecto
+              ? 'sin_pedido_por_defecto'
+              : seleccion
+                ? 'seleccionado'
+                : sinMenuEspecial
+                  ? 'sin_menu'
+                  : 'sin_seleccionar',
+          bloqueado: Boolean(motivoSinServicio),
+          motivo: motivoSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
+          mensajeMenu: sinMenuEspecial
+            ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
+            : null,
+          plato: seleccion
+            ? construirTextoItem(item)
+            : sinPedidoPorDefecto
+              ? 'Sin pedido por defecto'
+              : motivoSinServicio
+                ? `Sin servicio: ${motivoSinServicio}`
+                : 'Sin seleccionar',
+          seleccion: seleccion || null,
+          especiales,
+          fijos,
+          opciones,
+          regla: empresa.modo_pedido === 'diario' ? 'diario' : 'semanal',
+        };
+      }),
+      metadata: {
+        pedidoId: pedidoVisible?.id || null,
+        pedido: pedidoVisible,
+        cantidadDias: diasPedido.length,
+        diasPedido,
+        diasPorDefectoSinPedido,
+        tieneMenuPublicado,
+        esSemanaSugerencias,
+        menuSemana,
+      },
+    };
+  });
+
+  return {
+    empresa: {
+      id: empresa.id,
+      nombre: empresa.nombre,
+      diasLaborales: empresa.dias_laborales,
+      diasPedido,
+      diasPorDefectoSinPedido,
+    },
+    semanas,
+  };
+};
+
+export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
+  if (!semanaId) throw ApiError.badRequest('semanaId es requerido');
+  if (!empresaId) throw ApiError.badRequest('empresaId es requerido');
+
+  const [empresa, menus, guarnicionesActivas] = await Promise.all([
+    empresasRepo.findById(empresaId),
+    repo.menusPublicadosList(),
+    guarnicionesRepo.findAll(true),
+  ]);
+
+  if (!empresa) throw ApiError.notFound(`Empresa ${empresaId} no encontrada`);
+
+  const diasPedido = DIAS_LABORALES[empresa.dias_laborales] ?? DIAS_LABORALES.lunes_viernes;
+  const menu = menus.find((item) =>
+    String(item.id) === String(semanaId) ||
+    fechaISO(item.fecha_inicio) === fechaISO(semanaId),
+  );
+  const guarniciones = normalizarGuarniciones(guarnicionesActivas);
+
+  return {
+    semanaId,
+    dias: diasPedido.map((dia, indice) => {
+      const motivoSinServicio = (menu?.sin_servicio || [])
+        .find((item) => item.dia === dia)?.motivo || null;
+      const especiales = motivoSinServicio
+        ? []
+        : (menu?.variables || [])
+          .filter((plato) => plato.dia === dia)
+          .map((plato) => mapearPlatoEspecial(plato, guarniciones));
+      const fijos = motivoSinServicio
+        ? []
+        : (menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
+      const sinMenuEspecial = !motivoSinServicio && especiales.length === 0 && fijos.length > 0;
+
+      return {
+        diaId: dia,
+        fecha: menu?.fecha_inicio ? addDias(menu.fecha_inicio, indice) : null,
+        estadoMenu: motivoSinServicio
+          ? 'sin_servicio'
+          : especiales.length > 0
+            ? 'con_menu_especial'
+            : sinMenuEspecial
+              ? 'sin_menu_especial'
+              : 'sin_menu',
+        mensaje: motivoSinServicio
+          ? `No hay servicio este dia: ${motivoSinServicio}`
+          : sinMenuEspecial
+            ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
+            : null,
+        sinServicio: Boolean(motivoSinServicio),
+        motivoSinServicio,
+        especiales,
+        fijos,
+        opciones: [...especiales, ...fijos],
+      };
+    }),
+  };
 };
 
 /**

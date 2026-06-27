@@ -1,7 +1,10 @@
 import { opcionesMenuPorDia } from "../data/opcionesMenuMock.js";
 import { pedidoMock } from "../data/pedidoMock.js";
 import { semanasMock } from "../data/semanasMock.js";
+import { clearClientSession, getClientToken } from "./api.js";
 
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "");
+export const USAR_MOCKS = import.meta.env.VITE_USAR_MOCKS_PEDIDO === "true";
 const demoraMockMs = 120;
 
 function clonarDato(dato) {
@@ -38,6 +41,7 @@ function resolverGetMock(recurso) {
   }
 
   if (recurso.startsWith("/menu/opciones-semana")) return opcionesMenuPorDia;
+  if (/^\/menu\/semanas\/[^/]+\/opciones/.test(recurso)) return opcionesMenuPorDia;
 
   if (recurso.startsWith("/menu/guarniciones")) {
     const platoId = extraerParametro(recurso, "platoId");
@@ -48,13 +52,94 @@ function resolverGetMock(recurso) {
   return null;
 }
 
-export function apiGet(recurso) {
-  // Reemplazar por fetch/axios: return api.get(recurso).then((r) => r.data)
-  return responderMock(resolverGetMock(recurso));
+function construirUrl(recurso) {
+  if (/^https?:\/\//.test(recurso)) return recurso;
+  return `${API_URL}${recurso.startsWith("/") ? recurso : `/${recurso}`}`;
+}
+
+function extraerMensajeError(data, status) {
+  return (
+    data?.message ||
+    data?.mensaje ||
+    data?.error ||
+    `La API respondio con error ${status}.`
+  );
+}
+
+function extraerData(data) {
+  if (data && typeof data === "object" && "data" in data) return data.data;
+  return data;
+}
+
+async function parsearRespuestaJson(response) {
+  const texto = await response.text();
+  if (!texto) return null;
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error("La API devolvio una respuesta invalida.");
+  }
+}
+
+function crearErrorAutenticacion(mensaje = "No pudimos cargar tu pedido. Inicia sesion nuevamente.") {
+  const error = new Error(mensaje);
+  error.status = 401;
+  error.codigo = "sin_token";
+  return error;
+}
+
+async function pedirApi(recurso, opciones = {}) {
+  const { requiereAuth = false, ...opcionesFetch } = opciones;
+  const headers = {
+    Accept: "application/json",
+    ...(opcionesFetch.body ? { "Content-Type": "application/json" } : {}),
+    ...(opcionesFetch.headers || {}),
+  };
+  const token = getClientToken();
+
+  if (requiereAuth && !token) {
+    throw crearErrorAutenticacion();
+  }
+
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let response;
+  try {
+    response = await fetch(construirUrl(recurso), {
+      ...opcionesFetch,
+      headers,
+    });
+  } catch {
+    throw new Error("No pudimos conectar con la API. Revisa que el backend este levantado.");
+  }
+
+  const data = await parsearRespuestaJson(response);
+
+  if (!response.ok) {
+    const error = new Error(extraerMensajeError(data, response.status));
+    error.status = response.status;
+    error.data = data;
+
+    if (response.status === 401) {
+      clearClientSession();
+      window.dispatchEvent(new Event("cliente:unauthorized"));
+    }
+
+    throw error;
+  }
+
+  return extraerData(data);
+}
+
+export function apiGet(recurso, opciones = {}) {
+  if (USAR_MOCKS) return responderMock(resolverGetMock(recurso));
+  return pedirApi(recurso, { ...opciones, method: "GET" });
 }
 
 export function apiPost(recurso, payload) {
-  // Reemplazar por fetch/axios: return api.post(recurso, payload).then((r) => r.data)
+  // Escritura real pendiente: luego usar pedirApi(recurso, { method: "POST", body: JSON.stringify(payload) }).
+  // Por ahora se mantiene mock para no enviar pedidos reales durante la primera integracion de lectura.
   return responderMock({
     ...payload,
     id: payload.id || `${recurso.replaceAll("/", "-").replace(/^-/, "")}-${Date.now()}`,
@@ -63,7 +148,8 @@ export function apiPost(recurso, payload) {
 }
 
 export function apiPut(recurso, payload) {
-  // Reemplazar por fetch/axios: return api.put(recurso, payload).then((r) => r.data)
+  // Escritura real pendiente: luego usar pedirApi(recurso, { method: "PUT", body: JSON.stringify(payload) }).
+  // Por ahora se mantiene mock para no modificar pedidos reales durante la primera integracion de lectura.
   return responderMock({
     ...payload,
     actualizadoEn: new Date().toISOString(),
@@ -71,7 +157,8 @@ export function apiPut(recurso, payload) {
 }
 
 export function apiPatch(recurso, payload) {
-  // Reemplazar por fetch/axios: return api.patch(recurso, payload).then((r) => r.data)
+  // Escritura real pendiente: luego usar pedirApi(recurso, { method: "PATCH", body: JSON.stringify(payload) }).
+  // Por ahora se mantiene mock para no confirmar/cancelar pedidos reales durante la primera integracion de lectura.
   return responderMock({
     ...payload,
     actualizadoEn: new Date().toISOString(),

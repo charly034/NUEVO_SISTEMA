@@ -3,7 +3,11 @@ import { unirClases } from "../../compartido/utils/clases.js";
 
 const textoEstado = {
   editable: "Editable",
+  feriado: "Sin servicio",
   sin_seleccionar: "Editable",
+  sin_menu: "Sin menu especial",
+  sin_pedido_por_defecto: "Por defecto",
+  sin_servicio: "Sin servicio",
   seleccionado: "Elegido",
   bloqueado: "Bloqueado",
   vencido: "Vencido",
@@ -14,11 +18,11 @@ export default function FilaPedidoDiaEditable({
   estadoVisual,
   onAbrir,
 }) {
-  const deshabilitado = estadoVisual === "bloqueado" || estadoVisual === "vencido";
+  const deshabilitado = ["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual);
   const sinSeleccion = !dia.plato || dia.plato === "Sin seleccionar";
   const textoPlato = sinSeleccion ? "Sin elegir" : dia.plato;
   const ayudaAccion = deshabilitado
-    ? "Ya no se puede modificar"
+    ? dia.motivo || "Ya no se puede modificar"
     : "Tocar para elegir o cambiar plato";
   const menusPublicados = (dia.opciones || [])
     .filter((opcion) => opcion.destacado)
@@ -68,7 +72,12 @@ export default function FilaPedidoDiaEditable({
           )}
           {deshabilitado && (
             <p className="mt-0.5 truncate text-[0.72rem] font-bold leading-none text-[#8a857c]">
-              Ya no se puede modificar
+              {dia.motivo || "Ya no se puede modificar"}
+            </p>
+          )}
+          {!deshabilitado && dia.mensajeMenu && (
+            <p className="mt-0.5 line-clamp-1 text-[0.72rem] font-bold leading-none text-[#8a6a1f]">
+              {dia.mensajeMenu}
             </p>
           )}
         </div>

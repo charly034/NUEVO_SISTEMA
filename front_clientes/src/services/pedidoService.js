@@ -2,24 +2,25 @@ import {
   adaptarSemanasPedido,
 } from "../components/pedido/adaptadoresPedido.js";
 import { apiGet, apiPatch, apiPost, apiPut } from "./apiCliente.js";
-import { guarnicionesApi, menuApi, pedidoApi } from "./api.js";
 
-async function obtenerSemanasPedidoMock({ empresaId, usuarioId } = {}) {
-  const params = new URLSearchParams({ empresaId, usuarioId });
-  return apiGet(`/pedidos/semanas?${params.toString()}`);
+function crearParams(limpiar) {
+  return new URLSearchParams(
+    Object.entries(limpiar).filter(([, valor]) => valor !== undefined && valor !== null),
+  );
 }
 
 export async function obtenerSemanasPedido({
   empleado,
   empresaId,
   fechaReferencia,
-  usuarioId,
 } = {}) {
-  try {
+  const params = crearParams({ empresaId });
+
+  if (import.meta.env.VITE_USAR_ENDPOINT_LEGACY_PEDIDOS === "true") {
     const [menuData, historial, guarniciones] = await Promise.all([
-      menuApi.activo(),
-      pedidoApi.miHistorial(),
-      guarnicionesApi.listar(),
+      apiGet("/pedidos/menu-activo"),
+      apiGet("/pedidos/mi-historial"),
+      apiGet("/guarniciones?activo=true"),
     ]);
 
     return adaptarSemanasPedido({
@@ -29,17 +30,17 @@ export async function obtenerSemanasPedido({
       historial,
       menuData,
     });
-  } catch (error) {
-    console.warn(
-      "No se pudo cargar pedidos desde API real. Usando mock temporal.",
-      error,
-    );
-    return obtenerSemanasPedidoMock({ empresaId, usuarioId });
   }
+
+  const query = params.toString();
+  const respuesta = await apiGet(`/pedidos/semanas${query ? `?${query}` : ""}`, {
+    requiereAuth: true,
+  });
+  return Array.isArray(respuesta) ? respuesta : respuesta?.semanas || [];
 }
 
 export function obtenerPedidoPorSemana({ empresaId, usuarioId, semanaId }) {
-  const params = new URLSearchParams({ empresaId, usuarioId, semanaId });
+  const params = crearParams({ empresaId, usuarioId, semanaId });
   return apiGet(`/pedidos/por-semana?${params.toString()}`);
 }
 
@@ -64,7 +65,7 @@ export function cancelarPedido(pedidoId) {
 }
 
 export function obtenerHistorialPedidos({ empresaId, usuarioId } = {}) {
-  const params = new URLSearchParams({ empresaId, usuarioId });
+  const params = crearParams({ empresaId, usuarioId });
   return apiGet(`/pedidos/historial?${params.toString()}`);
 }
 

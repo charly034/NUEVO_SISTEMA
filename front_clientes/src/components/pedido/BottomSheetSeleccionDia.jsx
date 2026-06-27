@@ -17,6 +17,7 @@ export default function BottomSheetSeleccionDia({
   dias = [],
   onCerrar,
   onConfirmar,
+  semanaId,
 }) {
   const guarnicionRef = useRef(null);
   const scrollRef = useRef(null);
@@ -31,10 +32,12 @@ export default function BottomSheetSeleccionDia({
     errorOpciones,
     filtrosPlatos,
     filtroActivo,
+    mensajeMenu,
     mensajeValidacion,
     opcionNoPedir,
     opcionesDia,
     opcionesFiltradas,
+    reintentarCargaOpciones,
     seleccion,
     seleccionarGuarnicion,
     seleccionarPlato,
@@ -43,6 +46,7 @@ export default function BottomSheetSeleccionDia({
     dia,
     onCerrar,
     onConfirmar,
+    semanaId,
   });
 
   useEffect(() => {
@@ -115,6 +119,11 @@ export default function BottomSheetSeleccionDia({
           onChange={cambiarBusqueda}
           placeholder="Buscar plato"
         />
+        {mensajeMenu && (
+          <p className="mt-3 rounded-2xl border border-[#edd9b8] bg-[#fff7eb] px-3 py-2 text-sm font-bold text-[#8a5a18]">
+            {mensajeMenu}
+          </p>
+        )}
         <div className="-mx-4 mt-3 overflow-x-auto px-4 pb-1">
           <div className="flex min-w-max gap-2">
             {filtrosPlatos.map((filtro) => (
@@ -141,9 +150,16 @@ export default function BottomSheetSeleccionDia({
           </p>
         )}
         {errorOpciones && (
-          <p className="mt-3 rounded-2xl bg-[#fff0ed] px-3 py-2 text-sm font-bold text-[#8a3d30]">
-            {errorOpciones}
-          </p>
+          <div className="mt-3 rounded-2xl bg-[#fff0ed] px-3 py-2 text-sm font-bold text-[#8a3d30]">
+            <p>{errorOpciones}</p>
+            <button
+              type="button"
+              className="mt-1 font-black underline underline-offset-2"
+              onClick={reintentarCargaOpciones}
+            >
+              Reintentar
+            </button>
+          </div>
         )}
         <div className="mt-3">
           <ListaOpcionesPlato

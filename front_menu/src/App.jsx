@@ -18,7 +18,7 @@ import { adminAuth } from './auth.js';
 
 export default function App() {
   const [admin, setAdmin] = useState(() => adminAuth.storedUser());
-  const [checking, setChecking] = useState(() => !!(localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token')));
+  const [checking, setChecking] = useState(() => adminAuth.hasToken() && !adminAuth.storedUser());
 
   useEffect(() => {
     const unauthorized = () => setAdmin(null);
@@ -27,7 +27,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!localStorage.getItem('admin_token') && !sessionStorage.getItem('admin_token')) return;
+    if (!adminAuth.hasToken()) {
+      setChecking(false);
+      return;
+    }
     adminAuth.me()
       .then(setAdmin)
       .catch(() => {
@@ -44,7 +47,7 @@ export default function App() {
   };
 
   if (checking) {
-    return <div className="min-h-screen grid place-items-center text-gray-500">Verificando sesión…</div>;
+    return <div className="min-h-screen grid place-items-center text-gray-500">Verificando sesion...</div>;
   }
   if (!admin) return <AdminLogin onLogin={login} />;
 

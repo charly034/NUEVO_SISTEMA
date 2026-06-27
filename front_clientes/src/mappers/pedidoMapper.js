@@ -35,6 +35,7 @@ function mapearDiasPayload(semana) {
         platoId: sinPedido ? null : platoId,
         guarnicionId: sinPedido ? null : obtenerIdGuarnicion(dia.seleccion),
         sinPedido,
+        origen: sinPedido ? dia.seleccion.origenSinPedido || "usuario" : null,
       };
     });
 }
@@ -61,12 +62,17 @@ export function construirPayloadActualizarPedido({ pedidoId, empresaId, usuarioI
 }
 
 export function mapearSemanaApiAEstado(apiSemana) {
+  const esSemanaSugerencias =
+    Boolean(apiSemana.metadata?.esSemanaSugerencias) ||
+    (apiSemana.estado === "sin_menu" && apiSemana.tipo === "proxima");
+
   return {
     ...apiSemana,
     diasSeleccionados: contarSeleccionesValidas(apiSemana.dias || []),
     metadata: {
       ...(apiSemana.metadata || {}),
       cantidadDias: apiSemana.dias?.length || 5,
+      esSemanaSugerencias,
     },
   };
 }

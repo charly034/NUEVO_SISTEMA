@@ -3,6 +3,7 @@ import { SIN_PEDIDO_ID } from "../constants/estadosPedido.js";
 import { useOpcionesMenu } from "./useOpcionesMenu.js";
 import {
   construirTextoPlatoSeleccionado,
+  crearOpcionSinPedido,
   crearSeleccionPedido,
   crearSeleccionDesdeTexto,
   platoRequiereGuarnicion,
@@ -16,27 +17,22 @@ const filtrosIniciales = [
   { id: "carne", label: "Carne" },
   { id: "vegetariano", label: "Vegetariano" },
   { id: "completos", label: "Completos" },
-  { id: "guarnicion", label: "Con guarnición" },
+  { id: "guarnicion", label: "Con guarnicion" },
 ];
 
-const opcionSinPedidoFallback = {
-  id: SIN_PEDIDO_ID,
-  nombre: "Sin pedido para este día",
-  descripcion: "No recibir comida este día",
-  categoria: "sin_pedido",
-  tipo: "sin_pedido",
-  requiereGuarnicion: false,
-  etiquetas: [],
-  guarniciones: [],
-};
-
 function obtenerSeleccionInicial(dia, opciones = []) {
-  return dia?.seleccion || crearSeleccionDesdeTexto(dia?.plato, opciones) || null;
+  if (dia?.seleccion) return dia.seleccion;
+  if (dia?.estado === "sin_pedido_por_defecto") {
+    return crearSeleccionPedido(crearOpcionSinPedido({ porDefecto: true }), "", {
+      origenSinPedido: "default",
+    });
+  }
+  return crearSeleccionDesdeTexto(dia?.plato, opciones) || null;
 }
 
 function coincideFiltro(plato, filtroActivo) {
   if (filtroActivo === "todos") return true;
-  if (filtroActivo === "especiales") return Boolean(plato.destacado);
+  if (filtroActivo === "especiales") return Boolean(plato.destacado) || plato.grupo === "especiales";
   if (filtroActivo === "completos") return plato.tipo === "plato_completo";
   if (filtroActivo === "guarnicion") return platoRequiereGuarnicion(plato);
   return plato.categoria === filtroActivo;
@@ -58,6 +54,7 @@ export function useSeleccionDia({
     cargandoOpciones,
     errorOpciones,
     obtenerOpcionesDia,
+    recargarOpcionesDia,
   } = useOpcionesMenu({ empresaId, semanaId });
 
   useEffect(() => {
@@ -93,17 +90,31 @@ export function useSeleccionDia({
       });
   }, [busqueda, filtroActivo, opcionesDia]);
 
-  const opcionNoPedir = useMemo(
-    () => opcionesDia.find((plato) => plato.id === SIN_PEDIDO_ID) || opcionSinPedidoFallback,
+  const especialesDia = useMemo(
+    () => opcionesDia.filter((plato) => plato.grupo === "especiales" || plato.destacado),
     [opcionesDia],
+  );
+  const fijosDia = useMemo(
+    () => opcionesDia.filter((plato) => plato.grupo === "fijos" && !plato.destacado),
+    [opcionesDia],
+  );
+  const mensajeMenu = dia?.mensajeMenu ||
+    (especialesDia.length === 0 && fijosDia.length > 0
+      ? "Todavia no hay menu especial para este dia. Podes elegir un plato fijo."
+      : "");
+
+  const opcionNoPedir = useMemo(
+    () => opcionesDia.find((plato) => plato.id === SIN_PEDIDO_ID) ||
+      crearOpcionSinPedido({ porDefecto: dia?.estado === "sin_pedido_por_defecto" }),
+    [dia?.estado, opcionesDia],
   );
 
   const requiereGuarnicion = platoRequiereGuarnicion(seleccion?.plato);
   const seleccionValida = seleccionDiaEsValida(seleccion);
   const mensajeValidacion = !seleccion?.plato
-    ? "Seleccioná un plato para este día."
+    ? "Selecciona un plato para este dia."
     : requiereGuarnicion && !seleccion?.guarnicion
-      ? "Elegí una guarnición para confirmar este plato."
+      ? "Elegi una guarnicion para confirmar este plato."
       : "";
 
   function confirmarSeleccionCompleta(seleccionCompleta) {
@@ -111,6 +122,10 @@ export function useSeleccionDia({
 
     onConfirmar?.({
       ...dia,
+      estado: seleccionCompleta?.sinPedido &&
+        seleccionCompleta.origenSinPedido === "default"
+        ? "sin_pedido_por_defecto"
+        : "seleccionado",
       seleccion: seleccionCompleta,
       plato: construirTextoPlatoSeleccionado(seleccionCompleta),
     });
@@ -153,14 +168,24 @@ export function useSeleccionDia({
     cargandoOpciones,
     confirmarSeleccionDia,
     errorOpciones,
+    especialesDia,
     filtrosPlatos: filtrosIniciales,
     filtroActivo,
+    fijosDia,
     guarnicionTemporal: seleccion?.guarnicion || "",
+    mensajeMenu,
     mensajeValidacion,
     opcionNoPedir,
     opcionesDia,
     opcionesFiltradas,
     platoTemporal: seleccion?.plato || null,
+    reintentarCargaOpciones: () => recargarOpcionesDia(dia).then((opciones) => {
+      if (opciones.length === 0) return;
+      setOpcionesDia(opciones);
+      setSeleccion((seleccionActual) =>
+        seleccionActual || obtenerSeleccionInicial(dia, opciones),
+      );
+    }),
     requiereGuarnicion,
     seleccion,
     seleccionValida,

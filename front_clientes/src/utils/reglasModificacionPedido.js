@@ -71,7 +71,11 @@ export function obtenerReglaDia(dia, semana) {
 }
 
 export function puedeModificarDia(dia, semana, fechaActual) {
-  if (dia.bloqueado || ["cerrado", "fuera_de_plazo"].includes(semana.estado)) {
+  if (
+    dia.bloqueado ||
+    ["sin_servicio", "feriado"].includes(dia.estado) ||
+    ["cerrado", "fuera_de_plazo"].includes(semana.estado)
+  ) {
     return false;
   }
 
@@ -93,8 +97,11 @@ export function puedeModificarSemana(semana, fechaActual) {
 }
 
 export function obtenerEstadoVisualDia(dia, semana, fechaActual) {
+  if (dia.estado === "sin_servicio" || dia.estado === "feriado") return dia.estado;
   if (dia.bloqueado) return "bloqueado";
   if (!puedeModificarDia(dia, semana, fechaActual)) return "vencido";
+  if (dia.estado === "sin_pedido_por_defecto") return "sin_pedido_por_defecto";
+  if (dia.estado === "sin_menu") return "sin_menu";
   if (!dia.plato || dia.plato === "Sin seleccionar") return "sin_seleccionar";
   return "editable";
 }
