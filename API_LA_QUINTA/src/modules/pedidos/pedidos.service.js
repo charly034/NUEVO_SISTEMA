@@ -22,7 +22,7 @@ const DIAS_LABEL = {
 };
 
 
-// Índice de día en la semana (lunes=0 ... domingo=6)
+// Indice de dia en la semana (lunes=0 ... domingo=6)
 const DIA_IDX = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4, sabado: 5, domingo: 6 };
 
 function fechaISO(fecha) {
@@ -141,6 +141,7 @@ function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible }) {
 }
 
 function construirTextoItem(item) {
+  if (item?.sin_pedido) return 'Sin pedido';
   if (!item?.plato_nombre) return null;
   return item.guarnicion_nombre
     ? `${item.plato_nombre} con ${String(item.guarnicion_nombre).toLowerCase()}`
@@ -149,6 +150,18 @@ function construirTextoItem(item) {
 
 function construirSeleccionItem(item, opciones) {
   if (!item) return null;
+  if (item.sin_pedido) {
+    return {
+      plato: null,
+      guarnicion: '',
+      platoId: null,
+      nombrePlato: '',
+      guarnicionId: null,
+      nombreGuarnicion: '',
+      origenSinPedido: item.origen || 'usuario',
+      sinPedido: true,
+    };
+  }
   const plato = opciones.find(
     (opcion) =>
       Number(opcion.platoId) === Number(item.plato_id) &&
@@ -166,6 +179,89 @@ function construirSeleccionItem(item, opciones) {
     guarnicionId: item.guarnicion_id || null,
     nombreGuarnicion: item.guarnicion_nombre || '',
     sinPedido: false,
+  };
+}
+
+function normalizarEnteroOpcional(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
+function normalizarIdOpcional(valor) {
+  return normalizarEnteroOpcional(valor);
+}
+
+function normalizarDiaPedido(dia) {
+  const sinPedido = Boolean(dia.sinPedido ?? dia.sin_pedido);
+  const diaId = dia.diaId || dia.dia || dia.clave;
+
+  return {
+    dia: diaId,
+    fecha: dia.fecha || null,
+    plato_id: sinPedido ? null : normalizarEnteroOpcional(dia.platoId ?? dia.plato_id),
+    opcion: sinPedido ? null : (dia.opcion || dia.opcionMenu || null),
+    guarnicion_id: sinPedido ? null : normalizarEnteroOpcional(dia.guarnicionId ?? dia.guarnicion_id),
+    sin_pedido: sinPedido,
+    origen: sinPedido ? dia.origen || 'usuario' : null,
+    notas: dia.notas || null,
+  };
+}
+
+function normalizarPayloadPedido(payload = {}) {
+  if (Array.isArray(payload.items)) {
+    return {
+      semana_inicio: payload.semana_inicio || payload.semanaId,
+      menu_semanal_id: normalizarIdOpcional(payload.menu_semanal_id || payload.menuSemanalId),
+      observaciones: payload.observaciones || null,
+      items: payload.items.map((item) => ({
+        ...item,
+        sin_pedido: Boolean(item.sin_pedido),
+        origen: item.origen || null,
+      })),
+    };
+  }
+
+  return {
+    semana_inicio: payload.semana_inicio || payload.semanaId,
+    menu_semanal_id: normalizarIdOpcional(payload.menu_semanal_id || payload.menuSemanalId),
+    observaciones: payload.observaciones || null,
+    items: (payload.dias || []).map(normalizarDiaPedido),
+  };
+}
+
+function normalizarPedidoGuardado(pedido, mensaje = 'Pedido guardado correctamente') {
+  const items = pedido?.items || [];
+
+  return {
+    ok: true,
+    mensaje,
+    pedido: {
+      id: pedido?.id,
+      semanaId: fechaISO(pedido?.semana_inicio),
+      estado: pedido?.estado === 'cancelado' ? 'cancelado' : 'confirmado',
+      fechaConfirmacion: pedido?.updated_at || pedido?.created_at || null,
+      fechaUltimaModificacion: pedido?.updated_at || pedido?.created_at || null,
+      dias: items.map((item) => ({
+        diaId: item.dia,
+        fecha: null,
+        estado: item.sin_pedido ? 'sin_pedido' : 'seleccionado',
+        sinPedido: Boolean(item.sin_pedido),
+        origen: item.origen || (item.sin_pedido ? 'usuario' : null),
+        plato: item.sin_pedido
+          ? null
+          : {
+              id: item.plato_id,
+              nombre: item.plato_nombre,
+            },
+        guarnicion: item.guarnicion_id
+          ? {
+              id: item.guarnicion_id,
+              nombre: item.guarnicion_nombre,
+            }
+          : null,
+      })),
+    },
   };
 }
 
@@ -187,7 +283,7 @@ function crearSugerenciasSemana(diasPedido) {
 }
 
 /**
- * Dado un lunes de semana (YYYY-MM-DD) y un nombre de día, devuelve la Date de ese día.
+ * Dado un lunes de semana (YYYY-MM-DD) y un nombre de dia, devuelve la Date de ese dia.
  */
 function fechaDeDia(semanaInicio, dia) {
   const base = new Date(`${fechaISO(semanaInicio)}T00:00:00`);
@@ -196,18 +292,18 @@ function fechaDeDia(semanaInicio, dia) {
 }
 
 /**
- * Verifica si el momento actual está dentro del límite configurado para la empresa.
- * Devuelve null si está OK, o un string con el mensaje de error.
+ * Verifica si el momento actual esta dentro del limite configurado para la empresa.
+ * Devuelve null si esta OK, o un string con el mensaje de error.
  */
 function verificarLimiteEmpresa(empresa, semanaInicio, diasPedidos) {
-  // Override activo: admin reabrió el plazo temporalmente
+  // Override activo: admin reabrio el plazo temporalmente
   if (empresa.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta)) {
     return null;
   }
 
   const { modo_pedido, limite_dia_semana, limite_anticipacion_dias } = empresa;
   let limite_hora = empresa.limite_hora ? String(empresa.limite_hora).slice(0, 5) : null;
-  // Default: semanal sin hora configurada → lunes 09:30
+  // Default: semanal sin hora configurada -> lunes 09:30
   if (!limite_hora && (modo_pedido === 'semanal' || modo_pedido === 'ambos')) {
     limite_hora = '09:30';
   }
@@ -217,22 +313,22 @@ function verificarLimiteEmpresa(empresa, semanaInicio, diasPedidos) {
   const [hh, mm] = limite_hora.split(':').map(Number);
 
   if (modo_pedido === 'semanal' || modo_pedido === 'ambos') {
-    // Límite semanal: hasta cierto día de la semana a cierta hora
+    // Limite semanal: hasta cierto dia de la semana a cierta hora
     const diaCorte = limite_dia_semana || 'lunes';
     const fechaCorte = fechaDeDia(semanaInicio, diaCorte);
     fechaCorte.setHours(hh, mm, 0, 0);
     if (ahora > fechaCorte) {
       const diaLabel = diaCorte.charAt(0).toUpperCase() + diaCorte.slice(1);
-      return `El plazo para pedir la semana completa venció el ${diaLabel} a las ${limite_hora}hs.`;
+      return `El plazo para pedir la semana completa vencio el ${diaLabel} a las ${limite_hora}hs.`;
     }
   }
 
   if (modo_pedido === 'diario' || modo_pedido === 'ambos') {
-    // Límite diario: para cada día pedido, verificar que no haya pasado el corte
+    // Limite diario: para cada dia pedido, verificar que no haya pasado el corte
     const anticipacion = limite_anticipacion_dias ?? 0;
     for (const dia of diasPedidos) {
       const fechaDia = fechaDeDia(semanaInicio, dia);
-      // El corte es anticipacion días ANTES del día pedido, a la hora indicada
+      // El corte es anticipacion dias ANTES del dia pedido, a la hora indicada
       const fechaCorte = new Date(fechaDia);
       fechaCorte.setDate(fechaCorte.getDate() - anticipacion);
       fechaCorte.setHours(hh, mm, 0, 0);
@@ -240,8 +336,8 @@ function verificarLimiteEmpresa(empresa, semanaInicio, diasPedidos) {
         const diaLabel = dia.charAt(0).toUpperCase() + dia.slice(1);
         const cuando = anticipacion === 0
           ? `el mismo ${diaLabel} a las ${limite_hora}hs`
-          : `el día anterior a las ${limite_hora}hs`;
-        return `El plazo para pedir el ${diaLabel} venció (límite: ${cuando}).`;
+          : `el dia anterior a las ${limite_hora}hs`;
+        return `El plazo para pedir el ${diaLabel} vencio (limite: ${cuando}).`;
       }
     }
   }
@@ -265,11 +361,11 @@ export const getMenuActivo = async (empresaId = null) => {
 
   const menus_disponibles = menus.map(menu => {
     if (menu.fecha_fin && new Date(menu.fecha_fin) < ahora) {
-      return { disponible: false, cerrado: true, mensaje: 'Esta semana ya finalizó.', menu };
+      return { disponible: false, cerrado: true, mensaje: 'Esta semana ya finalizo.', menu };
     }
 
     if (menu.fecha_limite_pedidos && new Date(menu.fecha_limite_pedidos) < ahora) {
-      return { disponible: false, cerrado: true, mensaje: 'El período de pedidos para esta semana ya cerró.', menu };
+      return { disponible: false, cerrado: true, mensaje: 'El periodo de pedidos para esta semana ya cerro.', menu };
     }
 
     let limiteEmpresa = null;
@@ -375,6 +471,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
         const fijos = (menuSemana.menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
         const opciones = [...especiales, ...fijos];
         const motivoSinServicio = sinServicioPorDia.get(dia);
+        const sinPedidoGuardado = Boolean(item?.sin_pedido);
         const sinPedidoPorDefecto = !item && diasPorDefectoSinPedido.includes(dia);
         const seleccion = construirSeleccionItem(item, opciones);
         const sinMenuEspecial = !motivoSinServicio && especiales.length === 0 && fijos.length > 0;
@@ -386,7 +483,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
           fecha: addDias(semanaInicio, indice),
           estado: motivoSinServicio
             ? 'sin_servicio'
-            : sinPedidoPorDefecto
+            : sinPedidoGuardado || sinPedidoPorDefecto
               ? 'sin_pedido_por_defecto'
               : seleccion
                 ? 'seleccionado'
@@ -400,7 +497,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
             : null,
           plato: seleccion
             ? construirTextoItem(item)
-            : sinPedidoPorDefecto
+            : sinPedidoGuardado || sinPedidoPorDefecto
               ? 'Sin pedido por defecto'
               : motivoSinServicio
                 ? `Sin servicio: ${motivoSinServicio}`
@@ -497,7 +594,7 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
 };
 
 /**
- * Devuelve un objeto legible con la configuración de límite de la empresa
+ * Devuelve un objeto legible con la configuracion de limite de la empresa
  * para mostrarla en el frontend del cliente.
  */
 function construirInfoLimite(empresa, semanaInicio) {
@@ -516,7 +613,7 @@ function construirInfoLimite(empresa, semanaInicio) {
 
   const { modo_pedido, limite_dia_semana, limite_anticipacion_dias } = empresa;
   let limite_hora = empresa.limite_hora ? String(empresa.limite_hora).slice(0, 5) : null;
-  // Default: semanal sin hora configurada → lunes 09:30
+  // Default: semanal sin hora configurada -> lunes 09:30
   if (!limite_hora && (modo_pedido === 'semanal' || modo_pedido === 'ambos')) {
     limite_hora = '09:30';
   }
@@ -550,7 +647,7 @@ function construirInfoLimite(empresa, semanaInicio) {
     const diaCorte = limite_dia_semana || 'lunes';
     return {
       tipo: 'semanal',
-      texto: `Pedido semanal. Límite: ${diaCorte} a las ${limite_hora}hs.`,
+      texto: `Pedido semanal. Limite: ${diaCorte} a las ${limite_hora}hs.`,
       vencido: semanalVencido,
       fechaCorte: fechaCorteSemanal?.toISOString() ?? null,
       diasCerrados: semanalVencido
@@ -562,11 +659,11 @@ function construirInfoLimite(empresa, semanaInicio) {
   if (modo_pedido === 'diario') {
     const anticipacion = limite_anticipacion_dias ?? 0;
     const cuando = anticipacion === 0
-      ? `el mismo día hasta las ${limite_hora}hs`
-      : `el día anterior hasta las ${limite_hora}hs`;
+      ? `el mismo dia hasta las ${limite_hora}hs`
+      : `el dia anterior hasta las ${limite_hora}hs`;
     return {
       tipo: 'diario',
-      texto: `Pedido diario. Límite: ${cuando}.`,
+      texto: `Pedido diario. Limite: ${cuando}.`,
       vencido: false,
       anticipacion_dias: anticipacion,
       hora: limite_hora,
@@ -601,61 +698,75 @@ export const getMiPedido = (empleadoId, semanaInicio) => {
   return repo.findPedidoByEmpleadoSemana(empleadoId, semanaInicio);
 };
 
-export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu_semanal_id, items, observaciones }, actor = {}) => {
+export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) => {
+  const pedidoNormalizado = normalizarPayloadPedido(payload);
+  const { semana_inicio, observaciones } = pedidoNormalizado;
+  let { menu_semanal_id, items } = pedidoNormalizado;
   const diasUnicos = validarPedidoInput({ semana_inicio, menu_semanal_id, items });
 
-  const menuActivo = await repo.menuActivoPorId(menu_semanal_id);
-  if (!menuActivo) throw ApiError.conflict('El menú indicado no existe o no está publicado.');
-  const inicioActivo = menuActivo.fecha_inicio instanceof Date
-    ? menuActivo.fecha_inicio.toISOString().split('T')[0]
-    : String(menuActivo.fecha_inicio).split('T')[0];
-  if (inicioActivo !== semana_inicio) {
-    throw ApiError.conflict('La semana indicada no coincide con el menú seleccionado.');
-  }
-  if (menuActivo.fecha_limite_pedidos && new Date(menuActivo.fecha_limite_pedidos) < new Date()) {
-    throw ApiError.conflict('El período de pedidos ya cerró para esta semana.');
+  const menuActivo = menu_semanal_id
+    ? await repo.menuActivoPorId(menu_semanal_id)
+    : await repo.menuPublicadoPorSemana(semana_inicio);
+
+  if (menuActivo) {
+    menu_semanal_id = menuActivo.id;
+    if (fechaISO(menuActivo.fecha_inicio) !== semana_inicio) {
+      throw ApiError.conflict('La semana indicada no coincide con el menu seleccionado.');
+    }
+    if (menuActivo.fecha_limite_pedidos && new Date(menuActivo.fecha_limite_pedidos) < new Date()) {
+      throw ApiError.conflict('El periodo de pedidos ya cerro para esta semana.');
+    }
   }
 
-  // Validar límite por empresa
   const empresa = await empresasRepo.findById(empresaId);
-  if (empresa) {
-    const diasPermitidos = DIAS_LABORALES[empresa.dias_laborales] ?? DIAS_LABORALES.lunes_viernes;
-    const diaFueraDeJornada = items.find((item) => !diasPermitidos.includes(item.dia));
-    if (diaFueraDeJornada) {
-      throw ApiError.badRequest(`El ${diaFueraDeJornada.dia} no es un día laboral para tu empresa`);
-    }
-    const diasPedidos = items.map(i => i.dia);
-    const error = verificarLimiteEmpresa(empresa, semana_inicio, diasPedidos);
-    if (error) throw ApiError.conflict(error);
+  if (!empresa) throw ApiError.notFound('Empresa no encontrada');
+
+  const diasPermitidos = DIAS_LABORALES[empresa.dias_laborales] ?? DIAS_LABORALES.lunes_viernes;
+  const diaFueraDeJornada = items.find((item) => !diasPermitidos.includes(item.dia));
+  if (diaFueraDeJornada) {
+    throw ApiError.unprocessable(`El ${diaFueraDeJornada.dia} no es un dia laboral para tu empresa`);
   }
+
+  const errorLimite = verificarLimiteEmpresa(empresa, semana_inicio, items.map(i => i.dia));
+  if (errorLimite) throw ApiError.conflict(errorLimite);
 
   const client = await getClient();
   try {
     await client.query('BEGIN');
     const pedidoPrevio = await repo.findPedidoByEmpleadoSemana(empleadoId, semana_inicio, client);
+    const diasSinServicio = new Set((menuActivo?.sin_servicio || []).map((dia) => dia.dia));
 
     for (const item of items) {
-      const plato = await repo.validateItemForMenu(menuActivo.id, item, client);
-      if (!plato || !plato.activo) {
-        throw ApiError.badRequest(`El plato del ${item.dia} no existe o está inactivo`);
+      if (diasSinServicio.has(item.dia)) {
+        throw ApiError.unprocessable(`El ${item.dia} esta marcado como dia sin servicio`);
       }
-      if (plato.sin_servicio) {
-        throw ApiError.conflict(`El ${item.dia} está marcado como día sin servicio`);
+
+      if (item.sin_pedido) continue;
+
+      const plato = await repo.validateItemForMenu(menuActivo?.id || null, item, client);
+      if (!plato || !plato.activo) {
+        throw ApiError.unprocessable(`El plato seleccionado para el ${item.dia} ya no esta disponible`);
+      }
+      if (plato.tipo !== 'fijo' && !menuActivo) {
+        throw ApiError.unprocessable(`Todavia no hay menu publicado para elegir plato especial el ${item.dia}`);
       }
       if (plato.tipo !== 'fijo' && !plato.pertenece_menu) {
-        throw ApiError.badRequest(`El plato "${plato.nombre}" no corresponde al ${item.dia} y opción indicados`);
+        throw ApiError.unprocessable(`El plato "${plato.nombre}" no corresponde al ${item.dia} y opcion indicados`);
       }
       if (plato.tipo === 'fijo' && item.opcion) {
-        throw ApiError.badRequest(`Los platos fijos no deben indicar opción (${item.dia})`);
+        throw ApiError.badRequest(`Los platos fijos no deben indicar opcion (${item.dia})`);
       }
       if (plato.tipo !== 'fijo' && !item.opcion) {
-        throw ApiError.badRequest(`La opción es requerida para el plato del ${item.dia}`);
+        throw ApiError.badRequest(`La opcion es requerida para el plato del ${item.dia}`);
+      }
+      if (plato.tiene_guarnicion && !item.guarnicion_id) {
+        throw ApiError.unprocessable(`Elegi una guarnicion para continuar con el ${item.dia}`);
       }
       if (item.guarnicion_id && !plato.tiene_guarnicion) {
-        throw ApiError.badRequest(`El plato "${plato.nombre}" no admite guarnición`);
+        throw ApiError.unprocessable(`El plato "${plato.nombre}" no admite guarnicion`);
       }
       if (!plato.guarnicion_valida) {
-        throw ApiError.badRequest(`La guarnición del ${item.dia} no existe o está inactiva`);
+        throw ApiError.unprocessable(`La guarnicion del ${item.dia} no existe o no esta activa`);
       }
     }
 
@@ -672,6 +783,7 @@ export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu
     for (const item of items) {
       itemsGuardados.push(await repo.upsertItem(pedido.id, item, client));
     }
+
     await repo.registrarEvento({
       pedido_id: pedido.id,
       tipo: pedidoPrevio ? 'pedido_actualizado' : 'pedido_creado',
@@ -681,16 +793,81 @@ export const guardarPedido = async (empleadoId, empresaId, { semana_inicio, menu
       estado_anterior: pedidoPrevio?.estado || null,
       estado_nuevo: pedido.estado,
       resumen: pedidoPrevio
-        ? `Pedido actualizado (${itemsGuardados.length} día${itemsGuardados.length !== 1 ? 's' : ''})`
-        : `Pedido creado (${itemsGuardados.length} día${itemsGuardados.length !== 1 ? 's' : ''})`,
+        ? `Pedido actualizado (${itemsGuardados.length} dias)`
+        : `Pedido creado (${itemsGuardados.length} dias)`,
       metadata: {
         dias: itemsGuardados.map(item => item.dia),
         total_items: itemsGuardados.length,
       },
     }, client);
 
+    const pedidoCompleto = await repo.findPedidoByEmpleadoSemana(empleadoId, semana_inicio, client);
     await client.query('COMMIT');
-    return { ...pedido, items: itemsGuardados };
+    return normalizarPedidoGuardado(
+      pedidoCompleto || { ...pedido, items: itemsGuardados },
+      pedidoPrevio ? 'Cambios guardados correctamente' : 'Pedido confirmado correctamente',
+    );
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const actualizarPedidoEmpleado = async (empleadoId, empresaId, pedidoId, payload, actor = {}) => {
+  const pedidoActual = await repo.findPedidoCabeceraById(pedidoId);
+  if (!pedidoActual) throw ApiError.notFound('Pedido no encontrado');
+  if (Number(pedidoActual.empleado_id) !== Number(empleadoId) || Number(pedidoActual.empresa_id) !== Number(empresaId)) {
+    throw ApiError.forbidden('No podes modificar un pedido que no te pertenece');
+  }
+
+  const semanaPayload = payload?.semanaId || payload?.semana_inicio;
+  if (semanaPayload && fechaISO(semanaPayload) !== fechaISO(pedidoActual.semana_inicio)) {
+    throw ApiError.conflict('No se puede cambiar la semana de un pedido existente');
+  }
+
+  return guardarPedido(
+    empleadoId,
+    empresaId,
+    {
+      ...payload,
+      semanaId: fechaISO(pedidoActual.semana_inicio),
+      menu_semanal_id: payload?.menu_semanal_id || payload?.menuSemanalId || pedidoActual.menu_semanal_id,
+    },
+    actor,
+  );
+};
+
+export const confirmarPedidoEmpleado = async (empleadoId, empresaId, pedidoId, actor = {}) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const pedidoActual = await repo.findPedidoCabeceraById(pedidoId, client);
+    if (!pedidoActual) throw ApiError.notFound('Pedido no encontrado');
+    if (Number(pedidoActual.empleado_id) !== Number(empleadoId) || Number(pedidoActual.empresa_id) !== Number(empresaId)) {
+      throw ApiError.forbidden('No podes confirmar un pedido que no te pertenece');
+    }
+    if (pedidoActual.estado === 'cancelado') {
+      throw ApiError.conflict('No se puede confirmar un pedido cancelado');
+    }
+
+    await repo.touchPedido(pedidoId, client);
+    await repo.registrarEvento({
+      pedido_id: pedidoId,
+      tipo: 'pedido_confirmado',
+      actor_tipo: actor.actor_tipo || 'empleado',
+      actor_id: actor.actor_id || empleadoId,
+      actor_nombre: actor.actor_nombre || null,
+      estado_anterior: pedidoActual.estado,
+      estado_nuevo: pedidoActual.estado,
+      resumen: 'Pedido confirmado por el usuario',
+      metadata: { semana_inicio: fechaISO(pedidoActual.semana_inicio) },
+    }, client);
+
+    const pedidoCompleto = await repo.findPedidoByEmpleadoSemana(empleadoId, fechaISO(pedidoActual.semana_inicio), client);
+    await client.query('COMMIT');
+    return normalizarPedidoGuardado(pedidoCompleto, 'Pedido confirmado correctamente');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

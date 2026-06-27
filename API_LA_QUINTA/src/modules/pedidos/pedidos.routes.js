@@ -4,7 +4,7 @@ import {
   getMenuHoy, getMenuSemana, getMenuActivo,
   getOpcionesMenuSemana,
   getSemanasPedido,
-  getMiPedido, guardarPedido, cancelarMiPedido, getMiHistorial,
+  getMiPedido, guardarPedido, actualizarPedido, confirmarPedido, cancelarMiPedido, getMiHistorial,
   getPedidos, getPedidoById, updateEstado,
 } from './pedidos.controller.js';
 
@@ -20,6 +20,8 @@ router.get('/menu/semanas/:semanaId/opciones', optionalAuth, getOpcionesMenuSema
 router.get('/semanas', requireAuth, getSemanasPedido);
 router.get('/mi-pedido', requireAuth, getMiPedido);
 router.post('/', requireAuth, guardarPedido);
+router.put('/:id', requireAuth, actualizarPedido);
+router.patch('/:id/confirmar', requireAuth, confirmarPedido);
 router.delete('/mi-pedido', requireAuth, cancelarMiPedido);
 router.get('/mi-historial', requireAuth, getMiHistorial);
 

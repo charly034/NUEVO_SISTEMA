@@ -1,11 +1,11 @@
-import {
-  adaptarSemanasPedido,
-} from "../components/pedido/adaptadoresPedido.js";
+import { adaptarSemanasPedido } from "../components/pedido/adaptadoresPedido.js";
 import { apiGet, apiPatch, apiPost, apiPut } from "./apiCliente.js";
 
 function crearParams(limpiar) {
   return new URLSearchParams(
-    Object.entries(limpiar).filter(([, valor]) => valor !== undefined && valor !== null),
+    Object.entries(limpiar).filter(
+      ([, valor]) => valor !== undefined && valor !== null,
+    ),
   );
 }
 
@@ -14,7 +14,7 @@ export async function obtenerSemanasPedido({
   empresaId,
   fechaReferencia,
 } = {}) {
-  const params = crearParams({ empresaId });
+  const params = crearParams({ empresaId, limit: 999 });
 
   if (import.meta.env.VITE_USAR_ENDPOINT_LEGACY_PEDIDOS === "true") {
     const [menuData, historial, guarniciones] = await Promise.all([
@@ -33,9 +33,12 @@ export async function obtenerSemanasPedido({
   }
 
   const query = params.toString();
-  const respuesta = await apiGet(`/pedidos/semanas${query ? `?${query}` : ""}`, {
-    requiereAuth: true,
-  });
+  const respuesta = await apiGet(
+    `/pedidos/semanas${query ? `?${query}` : ""}`,
+    {
+      requiereAuth: true,
+    },
+  );
   return Array.isArray(respuesta) ? respuesta : respuesta?.semanas || [];
 }
 
@@ -45,17 +48,30 @@ export function obtenerPedidoPorSemana({ empresaId, usuarioId, semanaId }) {
 }
 
 export function crearPedido(payload) {
-  return apiPost("/pedidos", payload);
+  return apiPost("/pedidos", payload, { requiereAuth: true });
 }
 
 export function actualizarPedido(pedidoId, payload) {
-  return apiPut(`/pedidos/${pedidoId || payload.pedidoId || payload.semanaId}`, payload);
+  const id = pedidoId || payload?.pedidoId;
+  if (!id) {
+    throw new Error("No pudimos identificar el pedido a modificar.");
+  }
+
+  return apiPut(`/pedidos/${id}`, payload, {
+    requiereAuth: true,
+  });
 }
 
 export function confirmarPedido(pedidoId) {
-  return apiPatch(`/pedidos/${pedidoId}/confirmar`, {
-    estado: "confirmado",
-  });
+  return apiPatch(
+    `/pedidos/${pedidoId}/confirmar`,
+    {
+      estado: "confirmado",
+    },
+    {
+      requiereAuth: true,
+    },
+  );
 }
 
 export function cancelarPedido(pedidoId) {

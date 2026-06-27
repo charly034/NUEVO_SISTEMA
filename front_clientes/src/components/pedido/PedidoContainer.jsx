@@ -1,5 +1,4 @@
 import { usePedidoSemanal } from "../../hooks/usePedidoSemanal.js";
-import { USAR_MOCKS } from "../../services/apiCliente.js";
 import AppMobileShell from "../layout/AppMobileShell.jsx";
 import HeaderUsuario from "./HeaderUsuario.jsx";
 import SemanaContainer from "./SemanaContainer.jsx";
@@ -54,11 +53,6 @@ export default function PedidoContainer({ empleado }) {
           No hay semanas disponibles para pedido.
         </div>
       )}
-      <div className="rounded-2xl border border-[#e8e3da] bg-[#faf8f4] px-3 py-2 text-xs font-bold text-[#5f5a52]">
-        {USAR_MOCKS
-          ? "Modo desarrollo: usando datos mock temporales."
-          : "Modo desarrollo: lectura conectada a API. El guardado sigue en mock."}
-      </div>
       <SemanaContainer
         fechaActual={fechaReferencia}
         indiceInicial={indiceInicial}

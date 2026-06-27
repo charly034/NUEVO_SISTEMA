@@ -36,26 +36,36 @@ function mapearDiasPayload(semana) {
         guarnicionId: sinPedido ? null : obtenerIdGuarnicion(dia.seleccion),
         sinPedido,
         origen: sinPedido ? dia.seleccion.origenSinPedido || "usuario" : null,
+        opcion: sinPedido ? null : dia.seleccion?.plato?.opcion || null,
       };
     });
 }
 
-export function construirPayloadCrearPedido({ empresaId, usuarioId, semana }) {
+function obtenerMenuSemanalId(semana) {
+  const valor = (
+    semana?.metadata?.menuSemanalId ||
+    semana?.metadata?.menuSemana?.menu?.id ||
+    semana?.metadata?.pedido?.menu_semanal_id ||
+    null
+  );
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
+export function construirPayloadCrearPedido({ semana }) {
   return {
-    empresaId,
-    usuarioId,
     semanaId: semana.id,
+    menuSemanalId: obtenerMenuSemanalId(semana),
     tipoOperacion: TIPOS_OPERACION_PEDIDO.CREAR,
     dias: mapearDiasPayload(semana),
   };
 }
 
-export function construirPayloadActualizarPedido({ pedidoId, empresaId, usuarioId, semana }) {
+export function construirPayloadActualizarPedido({ pedidoId, semana }) {
   return {
     pedidoId,
-    empresaId,
-    usuarioId,
     semanaId: semana.id,
+    menuSemanalId: obtenerMenuSemanalId(semana),
     tipoOperacion: TIPOS_OPERACION_PEDIDO.MODIFICAR,
     dias: mapearDiasPayload(semana),
   };
@@ -78,5 +88,16 @@ export function mapearSemanaApiAEstado(apiSemana) {
 }
 
 export function mapearPedidoApiAEstado(apiPedido) {
-  return apiPedido;
+  const pedido = apiPedido?.pedido || apiPedido?.data?.pedido || apiPedido;
+
+  return {
+    id: pedido?.id || apiPedido?.id || null,
+    estado: pedido?.estado || apiPedido?.estado || null,
+    mensaje: apiPedido?.mensaje || apiPedido?.message || "",
+    semanaId: pedido?.semanaId || pedido?.semana_inicio || apiPedido?.semanaId || null,
+    dias: pedido?.dias || apiPedido?.dias || [],
+    fechaConfirmacion: pedido?.fechaConfirmacion || pedido?.fecha_confirmacion || null,
+    fechaUltimaModificacion:
+      pedido?.fechaUltimaModificacion || pedido?.updated_at || apiPedido?.actualizadoEn || null,
+  };
 }

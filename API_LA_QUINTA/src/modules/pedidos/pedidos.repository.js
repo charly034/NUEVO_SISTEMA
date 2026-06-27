@@ -90,6 +90,32 @@ export const menuActivoPorId = async (id, db = query) => {
   return cargarDetallesMenu(menu, db);
 };
 
+export const menuPublicadoPorSemana = async (semanaId, db = query) => {
+  const menuRes = await execute(db,
+    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
+            COALESCE((
+              SELECT json_agg(json_build_object('dia', ss.dia, 'motivo', ss.motivo))
+              FROM menu_semanal_sin_servicio ss
+              WHERE ss.menu_semanal_id = menus_semanales.id
+            ), '[]'::json) AS sin_servicio
+     FROM menus_semanales
+     WHERE estado = 'publicado'
+       AND fecha_fin >= CURRENT_DATE
+       AND (
+        id::text = $1
+        OR fecha_inicio = CASE
+          WHEN $1 ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN $1::date
+          ELSE NULL
+        END
+       )
+     LIMIT 1`,
+    [String(semanaId)]
+  );
+  const menu = menuRes.rows[0];
+  if (!menu) return null;
+  return cargarDetallesMenu(menu, db);
+};
+
 // Mantener por compatibilidad con menuHoy y otros usos internos
 export const menuActivo = async (db = query) => {
   const menuRes = await execute(db,
@@ -151,6 +177,7 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
          'plato_nombre', pl.nombre, 'opcion', pi.opcion,
          'tiene_guarnicion', pl.tiene_guarnicion,
          'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+         'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
          'notas', pi.notas
        ) ORDER BY pi.dia
      ) FILTER (WHERE pi.id IS NOT NULL) AS items
@@ -167,7 +194,7 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
 
 export const findPedidoCabeceraById = async (id, db = query) => {
   const r = await execute(db,
-    `SELECT id, empleado_id, empresa_id, semana_inicio, estado
+    `SELECT id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado
      FROM pedidos
      WHERE id = $1`,
     [id]
@@ -238,6 +265,7 @@ export const findById = async (id) => {
                 'plato_nombre', pl.nombre, 'opcion', pi.opcion,
                 'tiene_guarnicion', pl.tiene_guarnicion,
                 'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+                'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
                 'notas', pi.notas
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
@@ -278,6 +306,7 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
                 'plato_nombre', pl.nombre, 'opcion', pi.opcion,
                 'tiene_guarnicion', pl.tiene_guarnicion,
                 'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+                'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
                 'notas', pi.notas
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
@@ -306,21 +335,36 @@ export const upsertPedido = async ({ empleado_id, empresa_id, menu_semanal_id, s
        observaciones = EXCLUDED.observaciones,
        estado = 'pendiente',
        updated_at = NOW()
-     RETURNING id, empleado_id, empresa_id, semana_inicio, estado, observaciones, created_at`,
+     RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado, observaciones, created_at, updated_at`,
     [empleado_id, empresa_id, menu_semanal_id || null, semana_inicio, observaciones || null]
   );
   return r.rows[0];
 };
 
-export const upsertItem = async (pedidoId, { dia, plato_id, opcion, guarnicion_id, notas }, db = query) => {
+export const upsertItem = async (
+  pedidoId,
+  { dia, plato_id, opcion, guarnicion_id, notas, sin_pedido = false, origen = null },
+  db = query,
+) => {
   const r = await execute(db,
-    `INSERT INTO pedido_items (pedido_id, dia, plato_id, opcion, guarnicion_id, notas)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO pedido_items (pedido_id, dia, plato_id, opcion, guarnicion_id, notas, sin_pedido, origen)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (pedido_id, dia)
      DO UPDATE SET plato_id = EXCLUDED.plato_id, opcion = EXCLUDED.opcion,
-       guarnicion_id = EXCLUDED.guarnicion_id, notas = EXCLUDED.notas
+       guarnicion_id = EXCLUDED.guarnicion_id, notas = EXCLUDED.notas,
+       sin_pedido = EXCLUDED.sin_pedido, origen = EXCLUDED.origen,
+       updated_at = NOW()
      RETURNING *`,
-    [pedidoId, dia, plato_id, opcion || null, guarnicion_id || null, notas || null]
+    [
+      pedidoId,
+      dia,
+      plato_id || null,
+      opcion || null,
+      guarnicion_id || null,
+      notas || null,
+      Boolean(sin_pedido),
+      origen || null,
+    ]
   );
   return r.rows[0];
 };
@@ -351,6 +395,7 @@ export const validateItemForMenu = async (menuId, item, db = query) => {
             ) AS pertenece_menu,
             CASE WHEN $5::integer IS NULL THEN true ELSE EXISTS (
               SELECT 1 FROM guarniciones g WHERE g.id = $5 AND g.activo = true
+                AND p.tiene_guarnicion = true
             ) END AS guarnicion_valida,
             EXISTS (
               SELECT 1 FROM menu_semanal_sin_servicio ss
@@ -371,7 +416,8 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
               json_build_object(
                 'dia', pi.dia, 'plato_id', pi.plato_id,
                 'plato_nombre', pl.nombre, 'opcion', pi.opcion,
-                'guarnicion_nombre', g.nombre
+                'guarnicion_nombre', g.nombre,
+                'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
@@ -414,6 +460,15 @@ export const updateEstado = async (id, estado, db = query) => {
     `UPDATE pedidos SET estado = $1, updated_at = NOW() WHERE id = $2
      RETURNING id, estado, semana_inicio, empleado_id, empresa_id`,
     [estado, id]
+  );
+  return r.rows[0] || null;
+};
+
+export const touchPedido = async (id, db = query) => {
+  const r = await execute(db,
+    `UPDATE pedidos SET updated_at = NOW() WHERE id = $1
+     RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado, observaciones, created_at, updated_at`,
+    [id]
   );
   return r.rows[0] || null;
 };

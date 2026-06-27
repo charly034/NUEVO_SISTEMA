@@ -29,6 +29,10 @@ export class ApiError extends Error {
     return new ApiError(HTTP_STATUS.CONFLICT, message);
   }
 
+  static unprocessable(message, errors = []) {
+    return new ApiError(HTTP_STATUS.UNPROCESSABLE_ENTITY, message, errors);
+  }
+
   static internal(message = 'Error interno del servidor') {
     return new ApiError(HTTP_STATUS.INTERNAL_SERVER_ERROR, message);
   }

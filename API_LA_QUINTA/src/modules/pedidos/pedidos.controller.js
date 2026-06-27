@@ -48,6 +48,35 @@ export const guardarPedido = asyncHandler(async (req, res) => {
   sendCreated(res, pedido, 'Pedido guardado exitosamente');
 });
 
+export const actualizarPedido = asyncHandler(async (req, res) => {
+  const pedido = await service.actualizarPedidoEmpleado(
+    req.empleado.sub,
+    req.empleado.empresa_id,
+    req.params.id,
+    req.body,
+    {
+      actor_tipo: 'empleado',
+      actor_id: req.empleado.sub,
+      actor_nombre: `${req.empleado.nombre ?? ''} ${req.empleado.apellido ?? ''}`.trim(),
+    }
+  );
+  sendSuccess(res, pedido, 'Pedido actualizado exitosamente');
+});
+
+export const confirmarPedido = asyncHandler(async (req, res) => {
+  const pedido = await service.confirmarPedidoEmpleado(
+    req.empleado.sub,
+    req.empleado.empresa_id,
+    req.params.id,
+    {
+      actor_tipo: 'empleado',
+      actor_id: req.empleado.sub,
+      actor_nombre: `${req.empleado.nombre ?? ''} ${req.empleado.apellido ?? ''}`.trim(),
+    }
+  );
+  sendSuccess(res, pedido, 'Pedido confirmado exitosamente');
+});
+
 export const getPedidos = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getPedidos(req.query), 'Pedidos obtenidos');
 });

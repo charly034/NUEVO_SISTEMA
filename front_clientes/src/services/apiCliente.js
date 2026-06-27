@@ -137,9 +137,15 @@ export function apiGet(recurso, opciones = {}) {
   return pedirApi(recurso, { ...opciones, method: "GET" });
 }
 
-export function apiPost(recurso, payload) {
-  // Escritura real pendiente: luego usar pedirApi(recurso, { method: "POST", body: JSON.stringify(payload) }).
-  // Por ahora se mantiene mock para no enviar pedidos reales durante la primera integracion de lectura.
+export function apiPost(recurso, payload, opciones = {}) {
+  if (!USAR_MOCKS) {
+    return pedirApi(recurso, {
+      ...opciones,
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
   return responderMock({
     ...payload,
     id: payload.id || `${recurso.replaceAll("/", "-").replace(/^-/, "")}-${Date.now()}`,
@@ -147,18 +153,30 @@ export function apiPost(recurso, payload) {
   });
 }
 
-export function apiPut(recurso, payload) {
-  // Escritura real pendiente: luego usar pedirApi(recurso, { method: "PUT", body: JSON.stringify(payload) }).
-  // Por ahora se mantiene mock para no modificar pedidos reales durante la primera integracion de lectura.
+export function apiPut(recurso, payload, opciones = {}) {
+  if (!USAR_MOCKS) {
+    return pedirApi(recurso, {
+      ...opciones,
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
   return responderMock({
     ...payload,
     actualizadoEn: new Date().toISOString(),
   });
 }
 
-export function apiPatch(recurso, payload) {
-  // Escritura real pendiente: luego usar pedirApi(recurso, { method: "PATCH", body: JSON.stringify(payload) }).
-  // Por ahora se mantiene mock para no confirmar/cancelar pedidos reales durante la primera integracion de lectura.
+export function apiPatch(recurso, payload, opciones = {}) {
+  if (!USAR_MOCKS) {
+    return pedirApi(recurso, {
+      ...opciones,
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  }
+
   return responderMock({
     ...payload,
     actualizadoEn: new Date().toISOString(),

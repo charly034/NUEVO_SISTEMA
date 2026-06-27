@@ -8,6 +8,7 @@ import { confirmar } from "../lib/swal.js";
 import {
   construirPayloadActualizarPedido,
   construirPayloadCrearPedido,
+  mapearPedidoApiAEstado,
   mapearSemanaApiAEstado,
 } from "../mappers/pedidoMapper.js";
 import { pedidoService } from "../services/pedidoService.js";
@@ -18,9 +19,9 @@ function obtenerIndiceSemanaInicial(semanas) {
 }
 
 function obtenerTipoOperacion(semana) {
-  return [ESTADOS_PEDIDO.SIN_PEDIDO, ESTADOS_PEDIDO.PENDIENTE].includes(semana.estado)
-    ? TIPOS_OPERACION_PEDIDO.CREAR
-    : TIPOS_OPERACION_PEDIDO.MODIFICAR;
+  return semana?.metadata?.pedidoId
+    ? TIPOS_OPERACION_PEDIDO.MODIFICAR
+    : TIPOS_OPERACION_PEDIDO.CREAR;
 }
 
 export function usePedidoSemanal({
@@ -171,13 +172,17 @@ export function usePedidoSemanal({
         throw errorValidacion;
       }
 
-      console.log("Payload enviado a API mock:", payload);
-
       try {
-        const respuesta =
+        const respuestaGuardado =
           tipoOperacion === TIPOS_OPERACION_PEDIDO.CREAR
             ? await service.crearPedido(payload)
             : await service.actualizarPedido(payload.pedidoId, payload);
+        const pedidoGuardado = mapearPedidoApiAEstado(respuestaGuardado);
+        const respuestaFinal =
+          tipoOperacion === TIPOS_OPERACION_PEDIDO.CREAR && pedidoGuardado.id
+            ? await service.confirmarPedido(pedidoGuardado.id)
+            : respuestaGuardado;
+        const pedidoFinal = mapearPedidoApiAEstado(respuestaFinal);
 
         setSemanas((semanasActuales) =>
           semanasActuales.map((semana) =>
@@ -187,14 +192,16 @@ export function usePedidoSemanal({
                   estado: ESTADOS_PEDIDO.CONFIRMADO,
                   metadata: {
                     ...(semanaActualizada.metadata || {}),
-                    pedidoId: respuesta.id || payload.pedidoId,
+                    pedidoId: pedidoFinal.id || pedidoGuardado.id || payload.pedidoId,
+                    pedido: pedidoFinal.id ? pedidoFinal : semanaActualizada.metadata?.pedido,
+                    fechaUltimaModificacion: pedidoFinal.fechaUltimaModificacion,
                   },
                 })
               : semana,
           ),
         );
         setCambiosPendientes(false);
-        setFeedback(semanaActualizada.feedback || "Pedido guardado");
+        setFeedback(pedidoFinal.mensaje || semanaActualizada.feedback || "Pedido guardado");
       } catch (errorGuardar) {
         setErrorGuardado(errorGuardar.message || "No pudimos guardar el pedido.");
         throw errorGuardar;
