@@ -1,4 +1,4 @@
-import { opcionSinPedido } from "../data/opcionesMenuMock.js";
+import { SIN_PEDIDO_ID } from "../constants/estadosPedido.js";
 
 export function platoRequiereGuarnicion(plato) {
   return Boolean(plato?.requiereGuarnicion);
@@ -23,9 +23,22 @@ function crearIdDesdeTexto(texto) {
     .replace(/^-|-$/g, "");
 }
 
+function crearOpcionSinPedido() {
+  return {
+    id: SIN_PEDIDO_ID,
+    nombre: "Sin pedido para este día",
+    descripcion: "No recibir comida este día",
+    categoria: "sin_pedido",
+    tipo: "sin_pedido",
+    requiereGuarnicion: false,
+    etiquetas: [],
+    guarniciones: [],
+  };
+}
+
 export function crearSeleccionPedido(plato, guarnicion = "") {
   if (!plato) return null;
-  const sinPedido = plato.id === opcionSinPedido.id;
+  const sinPedido = plato.id === SIN_PEDIDO_ID;
 
   return {
     plato,
@@ -42,14 +55,14 @@ export function crearSeleccionPedido(plato, guarnicion = "") {
 
 export function seleccionDiaEsValida(seleccion) {
   if (!seleccion?.plato) return false;
-  if (seleccion.plato.id === opcionSinPedido.id || seleccion.sinPedido) return true;
+  if (seleccion.plato.id === SIN_PEDIDO_ID || seleccion.sinPedido) return true;
   if (!platoRequiereGuarnicion(seleccion.plato)) return true;
   return Boolean(seleccion.guarnicion);
 }
 
 export function construirTextoPlatoSeleccionado(seleccion) {
   if (!seleccion?.plato) return "Sin seleccionar";
-  if (seleccion.plato.id === opcionSinPedido.id || seleccion.sinPedido) return "Sin pedido";
+  if (seleccion.plato.id === SIN_PEDIDO_ID || seleccion.sinPedido) return "Sin pedido";
   if (seleccion.guarnicion) {
     return `${seleccion.plato.nombre} con ${obtenerNombreGuarnicion(seleccion.guarnicion).toLowerCase()}`;
   }
@@ -61,7 +74,7 @@ export function crearSeleccionDesdeTexto(plato, opciones = []) {
   const textoNormalizado = textoPlato.toLowerCase();
 
   if (textoPlato === "Sin pedido") {
-    return crearSeleccionPedido(opcionSinPedido);
+    return crearSeleccionPedido(crearOpcionSinPedido());
   }
 
   const opcion = opciones.find((item) => {

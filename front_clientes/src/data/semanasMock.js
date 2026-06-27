@@ -2,21 +2,29 @@ import { obtenerOpcionesMenuDia } from "./opcionesMenuMock.js";
 import { crearSeleccionDesdeTexto } from "../utils/reglasSeleccionPedido.js";
 
 const diasSemanaCompleta = [
-  { clave: "lunes", dia: "Lunes", fecha: "2026-06-22" },
-  { clave: "martes", dia: "Martes", fecha: "2026-06-23" },
-  { clave: "miercoles", dia: "Miercoles", fecha: "2026-06-24" },
-  { clave: "jueves", dia: "Jueves", fecha: "2026-06-25" },
-  { clave: "viernes", dia: "Viernes", fecha: "2026-06-26" },
-  { clave: "sabado", dia: "Sabado", fecha: "2026-06-27" },
-  { clave: "domingo", dia: "Domingo", fecha: "2026-06-28" },
+  { clave: "lunes", dia: "Lunes", desplazamiento: 0 },
+  { clave: "martes", dia: "Martes", desplazamiento: 1 },
+  { clave: "miercoles", dia: "Miercoles", desplazamiento: 2 },
+  { clave: "jueves", dia: "Jueves", desplazamiento: 3 },
+  { clave: "viernes", dia: "Viernes", desplazamiento: 4 },
+  { clave: "sabado", dia: "Sabado", desplazamiento: 5 },
+  { clave: "domingo", dia: "Domingo", desplazamiento: 6 },
 ];
 
 const diasLaborales = diasSemanaCompleta.slice(0, 5);
 
+function fechaDesdeISO(fechaISO) {
+  const [anio, mes, dia] = String(fechaISO).split("-").map(Number);
+  return new Date(anio, mes - 1, dia);
+}
+
 function crearDias(platos, ajustes = {}) {
   const diasBase = ajustes.incluirFinDeSemana ? diasSemanaCompleta : diasLaborales;
+  const inicio = fechaDesdeISO(ajustes.fechaDesde || "2026-06-22");
 
   return diasBase.map((dia) => {
+    const fechaDia = new Date(inicio);
+    fechaDia.setDate(inicio.getDate() + dia.desplazamiento);
     const opciones = obtenerOpcionesMenuDia(dia.clave);
     const plato = platos[dia.clave] || "Sin seleccionar";
     const bloqueado = ajustes.bloqueados?.includes(dia.clave) || false;
@@ -27,7 +35,7 @@ function crearDias(platos, ajustes = {}) {
       clave: dia.clave,
       nombre: dia.dia,
       dia: dia.dia,
-      fecha: dia.fecha,
+      fecha: fechaDia.toISOString().slice(0, 10),
       estado: bloqueado ? "bloqueado" : seleccion ? "seleccionado" : "sin_seleccionar",
       plato,
       seleccion,
@@ -95,7 +103,7 @@ export const semanasMock = [
       miercoles: "Suprema caprese con pure de papas",
       jueves: "Pastel de papa",
       viernes: "Bife a la criolla con arroz",
-    }),
+    }, { fechaDesde: "2026-06-15" }),
   }),
   crearSemana({
     id: "semana-2026-06-22-semanal",
@@ -112,24 +120,7 @@ export const semanasMock = [
       miercoles: "Rollitos de pollo con pure de zapallo",
       jueves: "Zapallito relleno",
       viernes: "Tacos de pollo",
-    }),
-  }),
-  crearSemana({
-    id: "semana-2026-06-22-diario",
-    tipo: "actual",
-    etiqueta: "Semana actual",
-    fechaDesde: "2026-06-22",
-    fechaHasta: "2026-06-26",
-    estado: "confirmado",
-    tipoPlan: "diario",
-    fechaActualMock: "2026-06-24T10:15:00",
-    dias: crearDias({
-      lunes: "Ravioles con bolognesa",
-      martes: "Guiso de lentejas",
-      miercoles: "Tortilla de papa rellena",
-      jueves: "Pastel de papa",
-      viernes: "Bife a la criolla con arroz",
-    }),
+    }, { fechaDesde: "2026-06-22" }),
   }),
   crearSemana({
     id: "semana-2026-06-29",
@@ -150,7 +141,7 @@ export const semanasMock = [
         sabado: "Sin seleccionar",
         domingo: "Sin seleccionar",
       },
-      { incluirFinDeSemana: true },
+      { fechaDesde: "2026-06-29", incluirFinDeSemana: true },
     ),
   }),
   crearSemana({
@@ -177,7 +168,7 @@ export const semanasMock = [
       miercoles: "Sin seleccionar",
       jueves: "Sin seleccionar",
       viernes: "Sin seleccionar",
-    }),
+    }, { fechaDesde: "2026-07-06" }),
   }),
 ];
 

@@ -23,7 +23,7 @@ function aplicarHora(fecha, hora = "09:30") {
 }
 
 function obtenerFechaActual(semana, fechaActual) {
-  return new Date(semana.fechaActualMock || fechaActual || Date.now());
+  return new Date(fechaActual || semana.fechaActualMock || Date.now());
 }
 
 function obtenerInicioSemana(semana) {

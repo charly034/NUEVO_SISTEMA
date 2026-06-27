@@ -1,71 +1,79 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fechaActualMockPedido, indiceInicialSemanaMock } from "../data/semanasMock.js";
-import { usuarioPedidoMock } from "../data/pedidoMock.js";
+import {
+  ESTADOS_PEDIDO,
+  IDENTIDAD_PEDIDO_DEMO,
+  TIPOS_OPERACION_PEDIDO,
+} from "../constants/estadosPedido.js";
 import { confirmar } from "../lib/swal.js";
+import {
+  construirPayloadActualizarPedido,
+  construirPayloadCrearPedido,
+  mapearSemanaApiAEstado,
+} from "../mappers/pedidoMapper.js";
 import { pedidoService } from "../services/pedidoService.js";
-import { construirPayloadPedido } from "../utils/payloadPedido.js";
-import { contarSeleccionesValidas } from "../utils/reglasSeleccionPedido.js";
 
-function normalizarSemana(semana) {
-  return {
-    ...semana,
-    diasSeleccionados: contarSeleccionesValidas(semana.dias || []),
-    metadata: {
-      ...(semana.metadata || {}),
-      cantidadDias: semana.dias?.length || 5,
-    },
-  };
+function obtenerIndiceSemanaInicial(semanas) {
+  const indiceActual = semanas.findIndex((semana) => semana.tipo === "actual");
+  return indiceActual >= 0 ? indiceActual : 0;
 }
 
 function obtenerTipoOperacion(semana) {
-  return ["sin_pedido", "pendiente"].includes(semana.estado) ? "crear" : "modificar";
+  return [ESTADOS_PEDIDO.SIN_PEDIDO, ESTADOS_PEDIDO.PENDIENTE].includes(semana.estado)
+    ? TIPOS_OPERACION_PEDIDO.CREAR
+    : TIPOS_OPERACION_PEDIDO.MODIFICAR;
 }
 
 export function usePedidoSemanal({
   empleado,
-  fechaActual = fechaActualMockPedido,
+  fechaActual,
   service = pedidoService,
 } = {}) {
   const identidadUsuario = useMemo(
     () => ({
-      empresaId: empleado?.empresaId || empleado?.empresa_id || usuarioPedidoMock.empresaId,
-      usuarioId: empleado?.id || empleado?.usuarioId || usuarioPedidoMock.usuarioId,
+      empresaId: empleado?.empresaId || empleado?.empresa_id || IDENTIDAD_PEDIDO_DEMO.empresaId,
+      usuarioId: empleado?.id || empleado?.usuarioId || IDENTIDAD_PEDIDO_DEMO.usuarioId,
     }),
     [empleado],
   );
-  const fechaReferencia = useMemo(() => fechaActual, [fechaActual]);
+  const [fechaReferencia] = useState(() => fechaActual || new Date());
   const [semanas, setSemanas] = useState([]);
-  const [indiceInicial, setIndiceInicial] = useState(indiceInicialSemanaMock);
+  const [indiceInicial, setIndiceInicial] = useState(0);
   const [modoActivo, setModoActivo] = useState({ semanaId: null, modo: "lectura" });
-  const [edicionConCambios, setEdicionConCambios] = useState(false);
+  const [cambiosPendientes, setCambiosPendientes] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [errorCarga, setErrorCarga] = useState("");
+  const [error, setError] = useState("");
   const [errorGuardado, setErrorGuardado] = useState("");
   const [feedback, setFeedback] = useState("");
 
   const semanaActiva = semanas[indiceInicial] || semanas.find((semana) => semana.tipo === "actual") || null;
-  const pedidoActual = semanas.find((semana) => semana.estado === "confirmado") || null;
+  const pedidoActual = semanas.find((semana) => semana.estado === ESTADOS_PEDIDO.CONFIRMADO) || null;
+  const modoEdicion = modoActivo.modo === "edicion";
 
-  const cargarPedidoSemanal = useCallback(async () => {
+  const recargarPedido = useCallback(async () => {
     setCargando(true);
-    setErrorCarga("");
+    setError("");
     setErrorGuardado("");
 
     try {
-      const semanasMock = await service.obtenerSemanasPedido();
-      setSemanas(semanasMock.map((semana) => normalizarSemana(semana)));
-      setIndiceInicial(indiceInicialSemanaMock);
-    } catch (error) {
-      setErrorCarga(error.message || "No pudimos cargar el pedido semanal.");
+      const semanasApi = await service.obtenerSemanasPedido({
+        ...identidadUsuario,
+        empleado,
+        fechaReferencia,
+      });
+      const semanasMapeadas = semanasApi.map((semana) => mapearSemanaApiAEstado(semana));
+      setSemanas(semanasMapeadas);
+      setIndiceInicial(obtenerIndiceSemanaInicial(semanasMapeadas));
+    } catch (errorCarga) {
+      setError(errorCarga.message || "No pudimos cargar el pedido semanal.");
     } finally {
       setCargando(false);
     }
-  }, [service]);
+  }, [empleado, fechaReferencia, identidadUsuario, service]);
 
   useEffect(() => {
-    cargarPedidoSemanal();
-  }, [cargarPedidoSemanal]);
+    recargarPedido();
+  }, [recargarPedido]);
 
   const cambiarModoSemana = useCallback(
     async (semanaId, modo, opciones = {}) => {
@@ -73,7 +81,7 @@ export function usePedidoSemanal({
         modoActivo.modo === "edicion" &&
         (modoActivo.semanaId !== semanaId || modo !== "edicion");
 
-      if (!opciones.forzar && saleDeEdicion && edicionConCambios) {
+      if (!opciones.forzar && saleDeEdicion && cambiosPendientes) {
         const descartar = await confirmar({
           titulo: "¿Descartar cambios?",
           texto: "Tenés cambios sin guardar en esta semana.",
@@ -91,12 +99,12 @@ export function usePedidoSemanal({
       );
 
       if (modo !== "edicion" || modoActivo.semanaId !== semanaId) {
-        setEdicionConCambios(false);
+        setCambiosPendientes(false);
       }
 
       return true;
     },
-    [edicionConCambios, modoActivo],
+    [cambiosPendientes, modoActivo],
   );
 
   const iniciarPedido = useCallback(
@@ -118,7 +126,7 @@ export function usePedidoSemanal({
     setSemanas((semanasActuales) =>
       semanasActuales.map((semana) =>
         semana.id === semanaId
-          ? normalizarSemana({
+          ? mapearSemanaApiAEstado({
               ...semana,
               dias: semana.dias.map((dia) =>
                 dia.clave === diaActualizado.clave ? diaActualizado : dia,
@@ -136,43 +144,52 @@ export function usePedidoSemanal({
       setFeedback("");
 
       const tipoOperacion = obtenerTipoOperacion(semanaActualizada);
-      const payload = construirPayloadPedido({
-        ...identidadUsuario,
-        semana: semanaActualizada,
-        tipoOperacion,
-      });
+      const payload =
+        tipoOperacion === TIPOS_OPERACION_PEDIDO.CREAR
+          ? construirPayloadCrearPedido({
+              ...identidadUsuario,
+              semana: semanaActualizada,
+            })
+          : construirPayloadActualizarPedido({
+              ...identidadUsuario,
+              pedidoId: semanaActualizada.metadata?.pedidoId,
+              semana: semanaActualizada,
+            });
 
       if (payload.dias.length === 0) {
-        const error = new Error("Elegí al menos un día para guardar el pedido.");
-        setErrorGuardado(error.message);
+        const errorValidacion = new Error("Elegí al menos un día para guardar el pedido.");
+        setErrorGuardado(errorValidacion.message);
         setGuardando(false);
-        throw error;
+        throw errorValidacion;
       }
 
-      console.log("Payload pedido semanal", payload);
+      console.log("Payload enviado a API mock:", payload);
 
       try {
-        if (tipoOperacion === "crear") {
-          await service.crearPedido(payload);
-        } else {
-          await service.actualizarPedido(semanaActualizada.metadata?.pedidoId, payload);
-        }
+        const respuesta =
+          tipoOperacion === TIPOS_OPERACION_PEDIDO.CREAR
+            ? await service.crearPedido(payload)
+            : await service.actualizarPedido(payload.pedidoId, payload);
 
         setSemanas((semanasActuales) =>
           semanasActuales.map((semana) =>
             semana.id === semanaActualizada.id
-              ? normalizarSemana({
+              ? mapearSemanaApiAEstado({
                   ...semanaActualizada,
-                  estado: "confirmado",
+                  estado: ESTADOS_PEDIDO.CONFIRMADO,
+                  metadata: {
+                    ...(semanaActualizada.metadata || {}),
+                    pedidoId: respuesta.id || payload.pedidoId,
+                  },
                 })
               : semana,
           ),
         );
-        setEdicionConCambios(false);
+        setCambiosPendientes(false);
         setFeedback(semanaActualizada.feedback || "Pedido guardado");
-      } catch (error) {
-        setErrorGuardado(error.message || "No pudimos guardar el pedido.");
-        throw error;
+      } catch (errorGuardar) {
+        setErrorGuardado(errorGuardar.message || "No pudimos guardar el pedido.");
+        throw errorGuardar;
       } finally {
         setGuardando(false);
       }
@@ -186,13 +203,14 @@ export function usePedidoSemanal({
   );
 
   return {
+    actualizarSeleccionDia,
+    cambiosPendientes,
     cancelarEdicion,
-    cargarPedidoSemanal,
     cargando,
     cambiarModoSemana,
     confirmarPedido,
-    edicionConCambios,
-    errorCarga,
+    error,
+    errorCarga: error,
     errorGuardado,
     fechaReferencia,
     feedback,
@@ -202,10 +220,11 @@ export function usePedidoSemanal({
     iniciarModificacion,
     iniciarPedido,
     modoActivo,
+    modoEdicion,
     pedidoActual,
-    registrarCambiosEdicion: setEdicionConCambios,
+    recargarPedido,
+    registrarCambiosEdicion: setCambiosPendientes,
     semanaActiva,
     semanas,
-    actualizarSeleccionDia,
   };
 }

@@ -1,4 +1,4 @@
-import { opcionSinPedido } from "../data/opcionesMenuMock.js";
+import { SIN_PEDIDO_ID } from "../constants/estadosPedido.js";
 
 function obtenerIdPlato(plato) {
   return plato?.platoId || plato?.id || null;
@@ -33,7 +33,7 @@ export function construirPayloadPedido({
       .filter((dia) => dia.seleccion?.plato)
       .map((dia) => {
         const platoId = obtenerIdPlato(dia.seleccion.plato);
-        const sinPedido = platoId === opcionSinPedido.id;
+        const sinPedido = platoId === SIN_PEDIDO_ID || dia.seleccion.sinPedido;
 
         return {
           diaId: dia.id || dia.clave,

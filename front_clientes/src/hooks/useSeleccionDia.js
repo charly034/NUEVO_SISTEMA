@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { opcionSinPedido } from "../data/opcionesMenuMock.js";
-import { pedidoService } from "../services/pedidoService.js";
+import { SIN_PEDIDO_ID } from "../constants/estadosPedido.js";
+import { useOpcionesMenu } from "./useOpcionesMenu.js";
 import {
   construirTextoPlatoSeleccionado,
   crearSeleccionPedido,
@@ -19,9 +19,16 @@ const filtrosIniciales = [
   { id: "guarnicion", label: "Con guarnición" },
 ];
 
-function obtenerOpcionesDia(dia, opcionesCargadas) {
-  return opcionesCargadas.length > 0 ? opcionesCargadas : dia?.opciones || [];
-}
+const opcionSinPedidoFallback = {
+  id: SIN_PEDIDO_ID,
+  nombre: "Sin pedido para este día",
+  descripcion: "No recibir comida este día",
+  categoria: "sin_pedido",
+  tipo: "sin_pedido",
+  requiereGuarnicion: false,
+  etiquetas: [],
+  guarniciones: [],
+};
 
 function obtenerSeleccionInicial(dia, opciones = []) {
   return dia?.seleccion || crearSeleccionDesdeTexto(dia?.plato, opciones) || null;
@@ -38,60 +45,45 @@ function coincideFiltro(plato, filtroActivo) {
 export function useSeleccionDia({
   cerrarAlConfirmar = true,
   dia,
+  empresaId,
   onCerrar,
   onConfirmar,
-  service = pedidoService,
+  semanaId,
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [filtroActivo, setFiltroActivo] = useState("todos");
-  const [opcionesCargadas, setOpcionesCargadas] = useState([]);
-  const [cargandoOpciones, setCargandoOpciones] = useState(false);
-  const [errorOpciones, setErrorOpciones] = useState("");
-  const opcionesDia = useMemo(
-    () => obtenerOpcionesDia(dia, opcionesCargadas),
-    [dia, opcionesCargadas],
-  );
+  const [opcionesDia, setOpcionesDia] = useState(dia?.opciones || []);
   const [seleccion, setSeleccion] = useState(() => obtenerSeleccionInicial(dia, opcionesDia));
+  const {
+    cargandoOpciones,
+    errorOpciones,
+    obtenerOpcionesDia,
+  } = useOpcionesMenu({ empresaId, semanaId });
 
   useEffect(() => {
+    let activo = true;
     setBusqueda("");
     setFiltroActivo("todos");
-    setOpcionesCargadas([]);
+    setOpcionesDia(dia?.opciones || []);
     setSeleccion(obtenerSeleccionInicial(dia, dia?.opciones || []));
-  }, [dia]);
 
-  useEffect(() => {
-    if (!dia || dia.opciones?.length) return undefined;
-
-    let activo = true;
-    setCargandoOpciones(true);
-    setErrorOpciones("");
-
-    service.obtenerOpcionesMenuPorDia(dia.id || dia.clave)
-      .then((opciones) => {
-        if (!activo) return;
-        setOpcionesCargadas(opciones);
-        setSeleccion((seleccionActual) =>
-          seleccionActual || obtenerSeleccionInicial(dia, opciones),
-        );
-      })
-      .catch((error) => {
-        if (!activo) return;
-        setErrorOpciones(error.message || "No pudimos cargar las opciones del día.");
-      })
-      .finally(() => {
-        if (activo) setCargandoOpciones(false);
-      });
+    obtenerOpcionesDia(dia).then((opciones) => {
+      if (!activo || opciones.length === 0) return;
+      setOpcionesDia(opciones);
+      setSeleccion((seleccionActual) =>
+        seleccionActual || obtenerSeleccionInicial(dia, opciones),
+      );
+    });
 
     return () => {
       activo = false;
     };
-  }, [dia, service]);
+  }, [dia, obtenerOpcionesDia]);
 
   const opcionesFiltradas = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
     return opcionesDia
-      .filter((plato) => plato.id !== opcionSinPedido.id)
+      .filter((plato) => plato.id !== SIN_PEDIDO_ID)
       .filter((plato) => coincideFiltro(plato, filtroActivo))
       .filter((plato) => {
         if (!termino) return true;
@@ -102,7 +94,7 @@ export function useSeleccionDia({
   }, [busqueda, filtroActivo, opcionesDia]);
 
   const opcionNoPedir = useMemo(
-    () => opcionesDia.find((plato) => plato.id === opcionSinPedido.id) || opcionSinPedido,
+    () => opcionesDia.find((plato) => plato.id === SIN_PEDIDO_ID) || opcionSinPedidoFallback,
     [opcionesDia],
   );
 
@@ -148,19 +140,27 @@ export function useSeleccionDia({
     return confirmarSeleccionCompleta(seleccion);
   }
 
+  function cancelarSeleccion() {
+    setSeleccion(obtenerSeleccionInicial(dia, opcionesDia));
+    onCerrar?.();
+  }
+
   return {
     busqueda,
     cambiarBusqueda: setBusqueda,
     cambiarFiltro: setFiltroActivo,
+    cancelarSeleccion,
     cargandoOpciones,
     confirmarSeleccionDia,
     errorOpciones,
     filtrosPlatos: filtrosIniciales,
     filtroActivo,
+    guarnicionTemporal: seleccion?.guarnicion || "",
     mensajeValidacion,
     opcionNoPedir,
     opcionesDia,
     opcionesFiltradas,
+    platoTemporal: seleccion?.plato || null,
     requiereGuarnicion,
     seleccion,
     seleccionValida,
