@@ -17,8 +17,12 @@ flows:
   docker_start:
     status: verified_in_repo
     sequence:
+      - "En Windows, instalar/abrir Docker Desktop si docker no esta en PATH: winget install --id Docker.DockerDesktop -e --accept-source-agreements --accept-package-agreements"
+      - "Si el instalador queda esperando UAC, aprobar como administrador y abrir Docker Desktop antes de continuar."
       - "Copiar .env.docker.example o .env.example a .env segun flujo usado"
       - "Completar POSTGRES_PASSWORD, JWT_SECRET, CORS_ORIGINS sin commitear secretos"
+      - "Validar configuracion: docker compose config"
+      - "Construir imagenes: docker compose build"
       - "docker compose up --build -d"
       - "API depende de db healthy"
       - "admin/clientes dependen de api healthy"

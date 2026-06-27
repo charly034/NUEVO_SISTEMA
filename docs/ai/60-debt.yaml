@@ -123,6 +123,17 @@ technical_debt:
     risk: "Riesgo residual medio: seed-full-reset sigue siendo destructivo si se confirma explicitamente en dev/test."
     recommended_cut: "No ejecutar seed-full-reset en produccion; usar solo seed-admin con credenciales provistas por env si hace falta."
 
+  - id: "debt-local-docker-desktop-unavailable"
+    status: external_action_required
+    area: "entorno local"
+    evidence:
+      - "docker --version y docker compose version no estan disponibles en PATH."
+      - "winget install --id Docker.DockerDesktop -e --accept-source-agreements --accept-package-agreements encontro Docker Desktop 4.78.0 y descargo el instalador."
+      - "El instalador quedo esperando elevacion UAC/administrador; PowerShell no pudo detener un proceso elevado del instalador por Acceso denegado."
+      - "Validacion estatica de compose.yaml, Dockerfiles, nginx templates, .dockerignore y env templates no encontro bloqueantes de repo."
+    risk: "No bloquea el estado GO para subir y dockerizar; bloquea solamente docker compose config/build/up en esta maquina hasta completar Docker Desktop."
+    recommended_cut: "Aprobar el instalador de Docker Desktop como administrador, reiniciar sesion si lo solicita y ejecutar docker compose config && docker compose build && docker compose up -d."
+
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."
   - "Precisar payloads de todos los endpoints admin solo si se van a tocar."

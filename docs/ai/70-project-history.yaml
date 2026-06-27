@@ -94,6 +94,14 @@ timeline:
       event: "Se corrige front_menu/src/components/layout/Sidebar.jsx para evitar setState sincrono en useEffect y restaurar npm run lint de front_menu."
     - date: "2026-06-27"
       event: "Validaciones locales pasan: API lint/test, front_menu lint/build, front_clientes lint/build/test/test:e2e; smoke navegador admin/cliente mobile sin errores de consola."
+    - date: "2026-06-27"
+      event: "Se crea checkpoint 42569bd con mensaje chore: checkpoint antes de auditoria integral."
+    - date: "2026-06-27"
+      event: "Revalidacion final pasa: API lint/test, admin lint/build, cliente lint/build/test/e2e."
+    - date: "2026-06-27"
+      event: "Smoke navegador multi-viewport pasa: admin 1366x768, 1440x900, 1920x1080, 1024x768; cliente 390x844, 360x740, 768x1024, 1366x768; sin errores de consola ni overflow horizontal."
+    - date: "2026-06-27"
+      event: "Docker Desktop se intento instalar con winget; queda pendiente elevacion UAC/administrador. El repo queda GO para subir y dockerizar."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."
@@ -102,6 +110,7 @@ needs_user_confirmation:
   - "Confirmar entorno objetivo de deploy actual: Docker Compose local, Easypanel o ambos."
 
 recommended_next_steps:
-  - "Validar deploy real con Docker Compose/Easypanel usando secretos reales fuera del repo."
+  - "Completar instalacion de Docker Desktop con permisos de administrador si se va a dockerizar en esta maquina."
+  - "Ejecutar docker compose config && docker compose build && docker compose up -d con .env real no commiteado."
   - "Probar smoke post-deploy: health, login admin, login cliente, pedido semanal y listado admin de pedidos."
   - "Confirmar si se desea reestructurar modulos menu/menus-semanales bajo carpeta contenedora comun."

@@ -142,11 +142,8 @@ current_worktree_notes:
   verified_in_repo:
     branch: "test...origin/test"
     baseline_commit_2026_06_27: "dedf5f1 chore: resguardo inicial antes de auditoria integral"
-    dirty_files_after_audit_fix:
-      - "front_menu/src/components/layout/Sidebar.jsx"
-      - "docs/ai/05-admin.yaml"
-      - "docs/ai/60-debt.yaml"
-      - "docs/ai/70-project-history.yaml"
+    checkpoint_commit_2026_06_27: "42569bd chore: checkpoint antes de auditoria integral"
+    release_decision_2026_06_27: "GO para subir y dockerizar"
     validation_2026_06_27:
       - "API_LA_QUINTA npm run lint: OK"
       - "API_LA_QUINTA npm test: OK, 33 tests"
@@ -156,5 +153,9 @@ current_worktree_notes:
       - "front_clientes npm run build: OK"
       - "front_clientes npm test: OK, 5 files y 13 tests"
       - "front_clientes npm run test:e2e: OK, 1 smoke"
-      - "Browser smoke admin desktop/mobile: login admin OK, sin errores de consola"
-      - "Browser smoke cliente mobile: login florencia.ruiz@sol.test OK, pedido semanal y modo edicion visibles, sin errores de consola"
+      - "Browser smoke admin: dashboard 1366x768, 1440x900, 1920x1080 y 1024x768 OK sin overflow horizontal ni errores de consola"
+      - "Browser smoke admin rutas: /semanas, /pedidos, /pedidos-hoy, /empresas, /platos, /guarniciones y /administradores OK"
+      - "Browser smoke cliente: pedido semanal 390x844, 360x740, 768x1024 y 1366x768 OK sin overflow horizontal ni errores de consola"
+      - "Browser smoke cliente: Mis pedidos y Mi cuenta OK con florencia.ruiz@sol.test"
+      - "Docker Desktop: instalacion intentada con winget; queda pendiente elevacion UAC/administrador"
+      - "Docker CLI: no disponible en PATH despues del intento; docker compose no ejecutable en esta sesion"

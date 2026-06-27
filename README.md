@@ -52,6 +52,8 @@ npm run dev
 Copiar `.env.docker.example` como `.env`, cambiar todas las claves y ejecutar:
 
 ```bash
+docker compose config
+docker compose build
 docker compose up --build -d
 ```
 
@@ -62,6 +64,18 @@ Servicios locales:
 - Clientes: `http://localhost:5175`
 
 La API ejecuta automáticamente las migraciones pendientes antes de iniciar.
+
+En Windows, si `docker` no existe en PATH, instalar Docker Desktop y abrirlo antes
+de correr Compose:
+
+```powershell
+winget install --id Docker.DockerDesktop -e --accept-source-agreements --accept-package-agreements
+docker --version
+docker compose version
+```
+
+Si el instalador solicita permisos de administrador o reinicio, completar esa
+accion manualmente y volver a ejecutar `docker compose config`.
 
 ## Despliegue en Easypanel
 
@@ -126,7 +140,7 @@ el dominio HTTPS público de la API.
 ```bash
 cd API_LA_QUINTA && npm run lint && npm test
 cd front_menu && npm run lint && npm run build
-cd front_clientes && npm run lint && npm run build && npm test
+cd front_clientes && npm run lint && npm run build && npm test && npm run test:e2e
 ```
 
 Los archivos `.env`, dependencias, builds y configuración local de herramientas

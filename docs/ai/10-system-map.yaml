@@ -199,6 +199,22 @@ production_readiness:
         - "API_LA_QUINTA/src/database/connection.js crea new Pool(dbConfig)."
         - "API_LA_QUINTA/src/config/database.js configura max, idleTimeoutMillis y connectionTimeoutMillis."
         - "Variables env: DB_POOL_MAX, DB_IDLE_TIMEOUT_MS, DB_CONNECTION_TIMEOUT_MS."
+    docker_static_validation:
+      status: "verified_in_repo"
+      evidence:
+        - "compose.yaml define db, api, admin y clientes."
+        - "compose.yaml exige POSTGRES_PASSWORD, JWT_SECRET y CORS_ORIGINS mediante expansion con error."
+        - "api depende de db healthy; admin/clientes dependen de api healthy."
+        - "front_menu y front_clientes usan API_UPSTREAM=http://api:3000 en Docker."
+        - "nginx templates proxyean /api/ a API_UPSTREAM y cachean /assets/ como immutable."
+        - "Dockerfiles tienen HEALTHCHECK; API ejecuta migraciones antes de node src/server.js."
+        - ".dockerignore por servicio excluye node_modules, dist, .env y logs."
+    local_docker_runtime:
+      status: "external_action_required"
+      evidence:
+        - "docker --version y docker compose version no estan disponibles en PATH en esta sesion."
+        - "winget install --id Docker.DockerDesktop descargo el instalador 4.78.0 y quedo esperando elevacion UAC/administrador."
+        - "No se pudo ejecutar docker compose config/build/up sin completar la instalacion elevada de Docker Desktop."
 
 service_ports:
   verified_in_repo:
