@@ -1,5 +1,5 @@
 schema: la_quinta_project_history_v2
-updated_at: "2026-06-27"
+updated_at: "2026-06-28"
 
 product_summary:
   from_chat_summary:
@@ -43,6 +43,7 @@ current_project_state:
       - "Panel admin con dashboard, platos, semanas, historial, estadisticas, sugeridor, pedidos, empresas, guarniciones, administradores."
       - "App cliente con login, registro, recuperar, pedido semanal, historial y perfil."
       - "Docker Compose para db/api/admin/clientes."
+      - "Docker Compose validado localmente con db/api/admin/clientes healthy y smoke HTTP/navegador OK."
       - "Tests backend de pedidos y tests frontend cliente."
     partially_implemented:
       - "Memoria docs/ai creada y ampliada; debe mantenerse en cambios futuros."
@@ -52,7 +53,7 @@ current_project_state:
     pending:
       - "Validar lint/build/test despues de cambios sin commit en front_clientes."
       - "Confirmar estrategia de carpeta contenedora de menu."
-      - "Validar deploy real en Docker/Easypanel."
+      - "Validar deploy real en staging/Easypanel con dominios y datos reales."
       - "Actualizar docs/pedidos-cliente.md si cambia contrato final."
 
 conversation_decisions_or_context:
@@ -102,6 +103,12 @@ timeline:
       event: "Smoke navegador multi-viewport pasa: admin 1366x768, 1440x900, 1920x1080, 1024x768; cliente 390x844, 360x740, 768x1024, 1366x768; sin errores de consola ni overflow horizontal."
     - date: "2026-06-27"
       event: "Docker Desktop se intento instalar con winget; queda pendiente elevacion UAC/administrador. El repo queda GO para subir y dockerizar."
+    - date: "2026-06-28"
+      event: "Docker Desktop quedo operativo; docker compose config/build/up -d paso con db/api/admin/clientes healthy."
+    - date: "2026-06-28"
+      event: "Se sincronizan package-lock de front_menu y front_clientes para dependencias opcionales Linux y se endurecen Dockerfiles para usar npm ci --include=optional sin fallback."
+    - date: "2026-06-28"
+      event: "Smoke Docker HTTP y navegador integrado pasa: health API 200, admin/clientes 200, pantallas de login sin errores de consola ni overflow horizontal."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."
@@ -110,7 +117,7 @@ needs_user_confirmation:
   - "Confirmar entorno objetivo de deploy actual: Docker Compose local, Easypanel o ambos."
 
 recommended_next_steps:
-  - "Completar instalacion de Docker Desktop con permisos de administrador si se va a dockerizar en esta maquina."
-  - "Ejecutar docker compose config && docker compose build && docker compose up -d con .env real no commiteado."
-  - "Probar smoke post-deploy: health, login admin, login cliente, pedido semanal y listado admin de pedidos."
+  - "Subir branch/commits al remoto cuando el usuario confirme."
+  - "Probar smoke post-deploy en staging/Easypanel: health, login admin, login cliente, pedido semanal y listado admin de pedidos."
+  - "Crear datos iniciales reales o seed de staging no destructivo antes de probar logins en una base Docker nueva."
   - "Confirmar si se desea reestructurar modulos menu/menus-semanales bajo carpeta contenedora comun."

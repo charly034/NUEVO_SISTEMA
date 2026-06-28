@@ -1,5 +1,5 @@
 schema: la_quinta_system_map_v2
-updated_at: "2026-06-27"
+updated_at: "2026-06-28"
 
 runtime_surfaces:
   verified_in_repo:
@@ -210,11 +210,19 @@ production_readiness:
         - "Dockerfiles tienen HEALTHCHECK; API ejecuta migraciones antes de node src/server.js."
         - ".dockerignore por servicio excluye node_modules, dist, .env y logs."
     local_docker_runtime:
-      status: "external_action_required"
+      status: "verified_in_local_runtime"
       evidence:
-        - "docker --version y docker compose version no estan disponibles en PATH en esta sesion."
-        - "winget install --id Docker.DockerDesktop descargo el instalador 4.78.0 y quedo esperando elevacion UAC/administrador."
-        - "No se pudo ejecutar docker compose config/build/up sin completar la instalacion elevada de Docker Desktop."
+        - "Docker Desktop 4.78.0 esta instalado y el motor desktop-linux responde en WSL2."
+        - "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe --version: Docker version 29.5.3."
+        - "docker compose version: Docker Compose version v5.1.4."
+        - "Se creo .env local ignorado por git a partir de .env.docker.example, con secretos generados localmente y sin documentar valores reales."
+        - "docker compose config OK."
+        - "docker compose build OK para api, admin y clientes."
+        - "docker compose build --no-cache admin clientes OK con npm ci --include=optional estricto."
+        - "docker compose up -d OK; db, api, admin y clientes quedan healthy."
+        - "GET http://localhost:3000/api/v1/health devuelve 200 con database.connected=true."
+        - "GET http://localhost:5174 y http://localhost:5175 devuelven 200 desde Nginx."
+        - "Smoke navegador integrado: admin y clientes cargan pantallas de login sin errores de consola ni overflow horizontal."
 
 service_ports:
   verified_in_repo:

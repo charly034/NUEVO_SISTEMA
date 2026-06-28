@@ -77,6 +77,15 @@ docker compose version
 Si el instalador solicita permisos de administrador o reinicio, completar esa
 accion manualmente y volver a ejecutar `docker compose config`.
 
+Si Docker Desktop esta instalado pero una terminal nueva no encuentra `docker`,
+anteponer temporalmente el binario de Docker Desktop:
+
+```powershell
+$env:PATH = 'C:\Program Files\Docker\Docker\resources\bin;' + $env:PATH
+docker --version
+docker compose version
+```
+
 ## Despliegue en Easypanel
 
 Crear un proyecto con cuatro servicios.

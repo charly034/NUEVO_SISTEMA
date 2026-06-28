@@ -1,5 +1,5 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-06-27"
+updated_at: "2026-06-28"
 
 technical_debt:
   - id: "debt-users-module-legacy"
@@ -124,15 +124,25 @@ technical_debt:
     recommended_cut: "No ejecutar seed-full-reset en produccion; usar solo seed-admin con credenciales provistas por env si hace falta."
 
   - id: "debt-local-docker-desktop-unavailable"
-    status: external_action_required
+    status: resolved
     area: "entorno local"
     evidence:
-      - "docker --version y docker compose version no estan disponibles en PATH."
-      - "winget install --id Docker.DockerDesktop -e --accept-source-agreements --accept-package-agreements encontro Docker Desktop 4.78.0 y descargo el instalador."
-      - "El instalador quedo esperando elevacion UAC/administrador; PowerShell no pudo detener un proceso elevado del instalador por Acceso denegado."
-      - "Validacion estatica de compose.yaml, Dockerfiles, nginx templates, .dockerignore y env templates no encontro bloqueantes de repo."
-    risk: "No bloquea el estado GO para subir y dockerizar; bloquea solamente docker compose config/build/up en esta maquina hasta completar Docker Desktop."
-    recommended_cut: "Aprobar el instalador de Docker Desktop como administrador, reiniciar sesion si lo solicita y ejecutar docker compose config && docker compose build && docker compose up -d."
+      - "Docker Desktop 4.78.0 quedo operativo con motor desktop-linux en WSL2."
+      - "Docker CLI verificado desde C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe: version 29.5.3."
+      - "Docker Compose verificado: v5.1.4."
+      - "docker compose config, build, up -d, ps, logs y health HTTP pasaron en esta maquina."
+      - "db, api, admin y clientes quedaron healthy; /api/v1/health respondio 200 con database.connected=true."
+    risk: "Bajo; algunas terminales pueden seguir sin docker en PATH hasta abrir una sesion nueva o anteponer C:\\Program Files\\Docker\\Docker\\resources\\bin."
+    recommended_cut: "Usar Docker Desktop abierto y, si docker no aparece en PATH, anteponer temporalmente C:\\Program Files\\Docker\\Docker\\resources\\bin en PowerShell."
+
+  - id: "debt-admin-xlsx-vulnerability"
+    status: open
+    area: "front_menu"
+    evidence:
+      - "npm ci --include=optional durante docker compose build de front_menu informa 1 vulnerabilidad high."
+      - "Auditoria previa identifica xlsx 0.18.5 con advisories de Prototype Pollution/ReDoS y sin fix directo disponible mediante npm audit."
+    risk: "Medio si el panel procesa archivos XLSX no confiables o expone conversiones de hojas a usuarios no confiables."
+    recommended_cut: "Revisar usos reales de xlsx en front_menu y evaluar reemplazo, aislamiento del parseo o controles de entrada en una tarea separada."
 
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."

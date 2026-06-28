@@ -2,7 +2,7 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --include=optional || npm install --include=optional
+RUN npm ci --include=optional
 COPY . .
 RUN npm run build
 

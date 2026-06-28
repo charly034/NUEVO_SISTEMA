@@ -1,5 +1,5 @@
 schema: la_quinta_flows_v2
-updated_at: "2026-06-27"
+updated_at: "2026-06-28"
 
 flows:
   local_start:
@@ -15,22 +15,24 @@ flows:
       - "Abrir http://localhost:5175 y verificar pantalla login cliente"
 
   docker_start:
-    status: verified_in_repo
+    status: verified_in_local_runtime
     sequence:
-      - "En Windows, instalar/abrir Docker Desktop si docker no esta en PATH: winget install --id Docker.DockerDesktop -e --accept-source-agreements --accept-package-agreements"
-      - "Si el instalador queda esperando UAC, aprobar como administrador y abrir Docker Desktop antes de continuar."
-      - "Copiar .env.docker.example o .env.example a .env segun flujo usado"
+      - "Abrir Docker Desktop y verificar que el motor desktop-linux este corriendo."
+      - "Si docker no esta en PATH, anteponer C:\\Program Files\\Docker\\Docker\\resources\\bin en la terminal actual."
+      - "Copiar .env.docker.example a .env"
       - "Completar POSTGRES_PASSWORD, JWT_SECRET, CORS_ORIGINS sin commitear secretos"
       - "Validar configuracion: docker compose config"
       - "Construir imagenes: docker compose build"
       - "docker compose up --build -d"
       - "API depende de db healthy"
       - "admin/clientes dependen de api healthy"
+      - "Cerrar smoke local con docker compose down si no se necesita dejar la pila levantada"
     manual_smoke_checks:
       - "docker compose ps"
       - "GET http://localhost:3000/api/v1/health"
       - "http://localhost:5174"
       - "http://localhost:5175"
+      - "Logs de api/admin/clientes/db sin errores de arranque"
 
   cliente_auth:
     status: verified_in_repo

@@ -1,5 +1,5 @@
 schema: la_quinta_ai_admin_guide_v2
-updated_at: "2026-06-27"
+updated_at: "2026-06-28"
 
 maintenance_guide:
   status: verified_in_repo
@@ -157,5 +157,8 @@ current_worktree_notes:
       - "Browser smoke admin rutas: /semanas, /pedidos, /pedidos-hoy, /empresas, /platos, /guarniciones y /administradores OK"
       - "Browser smoke cliente: pedido semanal 390x844, 360x740, 768x1024 y 1366x768 OK sin overflow horizontal ni errores de consola"
       - "Browser smoke cliente: Mis pedidos y Mi cuenta OK con florencia.ruiz@sol.test"
-      - "Docker Desktop: instalacion intentada con winget; queda pendiente elevacion UAC/administrador"
-      - "Docker CLI: no disponible en PATH despues del intento; docker compose no ejecutable en esta sesion"
+      - "Docker Desktop: operativo en esta maquina con Docker 29.5.3 y Compose v5.1.4 usando el binario C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe."
+      - "Docker Compose: config, build, up -d, ps, logs y health HTTP OK con db/api/admin/clientes healthy."
+      - "Docker frontends: package-lock sincronizados para dependencias opcionales Linux y Dockerfiles usan npm ci --include=optional sin fallback a npm install."
+      - "Smoke Docker navegador: admin y cliente cargan pantallas de login por Nginx sin errores de consola ni overflow horizontal."
+      - "Riesgo residual: npm ci de front_menu informa 1 vulnerabilidad high en xlsx sin fix directo disponible en npm audit."
