@@ -1,16 +1,33 @@
-# React + Vite
+# Front clientes - La Quinta
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicacion React/Vite para empleados que cargan y consultan pedidos semanales.
 
-Currently, two official plugins are available:
+## Comandos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm run dev
+npm run lint
+npm run build
+npm test
+npm run test:e2e
+```
 
-## React Compiler
+## Desarrollo local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+El dev server usa el puerto `5175`. En Windows, el arranque recomendado desde la raiz del repo es:
 
-## Expanding the ESLint configuration
+```bat
+iniciar.bat
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Ese script levanta API, admin, clientes y Cloudflare Tunnel en ventanas visibles. Para evitar modulos React cacheados entre reinicios, el Vite config de desarrollo:
+
+- fuerza prebundle con `npm run dev -- --force` desde `iniciar.bat`;
+- sirve headers `Cache-Control: no-store`;
+- agrega un query de sesion a imports relativos de `src`.
+
+## API
+
+El cliente usa `VITE_API_URL` si existe. Si no existe, usa `/api/v1`, que funciona tanto localmente con proxy Vite como desde Cloudflare Tunnel/Nginx.
+
+No usar un fallback hardcodeado a `localhost` para llamadas del navegador: desde celulares o navegadores externos, `localhost` apunta al dispositivo del usuario y no a la API local.

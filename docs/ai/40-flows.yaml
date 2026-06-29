@@ -1,5 +1,5 @@
 schema: la_quinta_flows_v2
-updated_at: "2026-06-28"
+updated_at: "2026-06-29"
 
 flows:
   local_start:
@@ -8,11 +8,14 @@ flows:
       - "API: cd API_LA_QUINTA && npm run dev"
       - "Admin: cd front_menu && npm run dev"
       - "Clientes: cd front_clientes && npm run dev"
-      - "Alternativa Windows: .\\iniciar.bat"
+      - "Alternativa Windows: .\\iniciar.bat abre ventanas visibles de consola para API, Admin, Clientes y cloudflared; frontends usan Vite con --force."
+      - "front_menu y front_clientes sirven dev con Cache-Control no-store/no-cache para evitar modulos React viejos al pasar por Cloudflare Tunnel o navegador integrado."
+      - "front_menu y front_clientes agregan en dev un query de sesion a imports relativos de src para romper cache de modulos entre reinicios de Vite."
     manual_smoke_checks:
-      - "GET http://localhost:3000/api/v1/health"
-      - "Abrir http://localhost:5174 y verificar pantalla/login admin"
-      - "Abrir http://localhost:5175 y verificar pantalla login cliente"
+      - "GET http://127.0.0.1:3000/api/v1/health"
+      - "Abrir http://127.0.0.1:5174 y verificar pantalla/login admin"
+      - "Abrir http://127.0.0.1:5175 y verificar pantalla login cliente"
+      - "Abrir https://devadmin.laquintacomidas.com y https://dev.laquintacomidas.com si cloudflared esta activo"
 
   docker_start:
     status: verified_in_local_runtime
@@ -126,9 +129,10 @@ flows:
       - "Las semanas con menu publicado abren primero en lectura para mostrar fecha, dias y todas las opciones especiales de la semana antes de entrar a cargar pedido."
       - "Las semanas futuras montan SemanaPedidoCard recien cuando el usuario toca la accion correspondiente; en ese modo se oculta el resto y la card ocupa el alto disponible."
       - "La semana activa se persiste por semana.id en localStorage y la tab Pedido vuelve a la pantalla principal."
-      - "El estado de pedido muestra X de Y dias o Faltan N durante edicion."
+      - "El estado de pedido muestra X de Y dias o Faltan N dias durante edicion."
       - "Semanas de sugerencias se etiquetan como Sin menu / Sugerencias abiertas y, al abrirse, explican que el usuario esta dejando ideas para esa semana y no cargando un pedido."
-      - "El bottom sheet de seleccion aclara que el pedido se guarda al final, destaca dia/fecha y permite navegar al dia anterior o siguiente."
+      - "El bottom sheet de seleccion aclara que elegir un plato no guarda el pedido; el guardado ocurre al tocar Confirmar pedido o Guardar cambios."
+      - "El bottom sheet de seleccion destaca dia/fecha y permite navegar al dia anterior o siguiente."
     error_behavior:
       - "401 carga pedido -> mensaje de iniciar sesion nuevamente"
       - "otros errores carga -> mensaje generico de intentar nuevamente"

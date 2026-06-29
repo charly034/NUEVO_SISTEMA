@@ -118,7 +118,7 @@ export default function BottomSheetSeleccionDia({
       abierto={abierto}
       encabezadoCompacto
       titulo={`Elegi tu plato del ${dia?.dia?.toLowerCase() || "dia"}`}
-      subtitulo={`${opcionesDia.length || 0} opciones disponibles. Guardas el pedido al final.`}
+      subtitulo={`${opcionesDia.length || 0} opciones disponibles. Elegir aca no guarda el pedido.`}
       onCerrar={onCerrar}
     >
       <div
@@ -255,7 +255,7 @@ export default function BottomSheetSeleccionDia({
           />
         </div>
         {hayMasOpcionesAbajo && (
-          <div className="sticky bottom-0 z-10 -mx-4 mt-2 bg-gradient-to-t from-[#faf8f4] via-[#faf8f4] to-transparent px-4 pb-2 pt-7">
+          <div className="mt-3 pb-1">
             <div className="mx-auto flex w-fit items-center gap-1.5 rounded-full border border-[#d8e6d4] bg-white px-3 py-1.5 text-xs font-black text-[#2d5a27] shadow-[0_8px_20px_rgba(45,90,39,0.12)]">
               <span>Desliza para ver mas opciones</span>
               <ChevronDown className="h-4 w-4" aria-hidden="true" />
@@ -267,7 +267,7 @@ export default function BottomSheetSeleccionDia({
       <footer className="shrink-0 border-t border-[#eee8df] bg-[#faf8f4] px-4 py-3">
         <ResumenSeleccionDia seleccion={seleccion} />
         <p className="mt-1 text-xs font-bold leading-snug text-[#716c64]">
-          Esta eleccion queda en la semana. Confirmala con el boton de guardar.
+          Esta eleccion queda pendiente. El pedido se guarda cuando tocas Confirmar pedido o Guardar cambios.
         </p>
         <div className="mt-3">
           <Boton variante="secundario" onClick={onCerrar}>

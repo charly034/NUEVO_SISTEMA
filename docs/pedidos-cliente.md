@@ -131,9 +131,10 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Las semanas futuras montan la vista completa recién cuando el usuario toca la acción correspondiente y ocultan el resto para ocupar el alto disponible.
 - La semana activa se conserva por `semana.id` en `localStorage` para mantener contexto al recargar.
 - La tab principal `Pedido` vuelve a la pantalla principal de pedido si el usuario quedó mirando otra acción.
-- El estado de pedido muestra progreso como `X de Y días` o `Faltan N` durante edición.
+- El estado de pedido muestra progreso como `X de Y días` o `Faltan N días` durante edición.
 - Las semanas sin menu aparecen como CTA de sugerencia cuando todavia no hay sugerencia enviada; al abrirlas, la pantalla explica que no se esta cargando un pedido sino dejando ideas para esa semana.
-- El selector de día aclara que la elección queda en la semana, hace foco visual en el día/fecha y permite ir al día anterior o siguiente.
+- El selector de día aclara que elegir un plato todavía no guarda el pedido; el guardado ocurre al tocar `Confirmar pedido` o `Guardar cambios`.
+- El selector hace foco visual en el día/fecha y permite ir al día anterior o siguiente.
 
 ## Prueba local
 

@@ -1,5 +1,5 @@
 schema: la_quinta_project_history_v2
-updated_at: "2026-06-28"
+updated_at: "2026-06-29"
 
 product_summary:
   from_chat_summary:
@@ -113,6 +113,36 @@ timeline:
       event: "UX cliente Pedido semanal: se reemplaza carrusel/listado primario por panel de cards grandes; las semanas proximas con menu abren primero lectura de menu semanal completo y luego permiten hacer pedido, sugerir menu queda como accion separada; el selector de dia destaca dia/fecha y permite anterior/siguiente; lint/build OK y navegador integrado sin overflow."
     - date: "2026-06-28"
       event: "UX cliente Pedido semanal: la pantalla principal vuelve a mostrar siempre la semana actual con accion contextual Ver pedido/Ver menu/Ver semana; la pantalla de sugerir menu agrega encabezado explicito de semana sin menu para aclarar que se dejan ideas y no se carga pedido."
+    - date: "2026-06-28"
+      event: "Se corrige iniciar-servicios.ps1 para no usar la variable reservada $PID al cerrar procesos por puerto; iniciar.bat vuelve a ejecutar sin ese error."
+    - date: "2026-06-29"
+      event: "Se endurecen vite.config.js de front_menu y front_clientes con resolve.dedupe y optimizeDeps.include para React, React DOM y TanStack Query, evitando instancias duplicadas que causaban Invalid hook call en dev por Cloudflare/Vite."
+    - date: "2026-06-29"
+      event: "Se ajustan iniciar-servicios.ps1 y detener.bat para cerrar arboles de procesos previos del proyecto y cloudflared tunnel run antes de reiniciar, evitando tuneles y watchers duplicados."
+    - date: "2026-06-29"
+      event: "Se fija Vite dev server de front_menu/front_clientes en host 127.0.0.1 y el config local de cloudflared apunta a 127.0.0.1:5174/5175 para evitar que localhost resuelva a ::1 y cause errores de origen denegado."
+    - date: "2026-06-29"
+      event: "Se cambia iniciar-servicios.ps1 para iniciar API, front_menu, front_clientes y cloudflared con Start-Process en segundo plano en vez de Windows Terminal, evitando arranques parciales con wt."
+    - date: "2026-06-29"
+      event: "Se agrega --force al arranque Vite de front_menu/front_clientes desde iniciar-servicios.ps1 para regenerar dependencias optimizadas y evitar hashes mezclados de React/React Query en pestañas dev."
+    - date: "2026-06-29"
+      event: "Se agregan aliases absolutos de React, React DOM y runtimes JSX en vite.config.js de front_menu/front_clientes para forzar una unica copia fisica de React en dev."
+    - date: "2026-06-29"
+      event: "Se cambia iniciar-servicios.ps1 para abrir API, front_menu, front_clientes y cloudflared en ventanas visibles de consola con cmd /k, evitando que queden ocultos en segundo plano."
+    - date: "2026-06-29"
+      event: "Se excluyen react/react-dom/react-dom-client del optimizeDeps de Vite en front_menu/front_clientes, manteniendo aliases absolutos, para evitar prebundles separados de React en dev."
+    - date: "2026-06-29"
+      event: "Se retira @vitejs/plugin-react de Vite dev en front_menu/front_clientes para evitar React Fast Refresh/runtime en el navegador integrado; Vite/esbuild conserva la compilacion JSX."
+    - date: "2026-06-29"
+      event: "Se agregan cabeceras Cache-Control no-store/no-cache en los dev servers Vite de front_menu/front_clientes para evitar que Cloudflare Tunnel o el navegador integrado reutilicen modulos /src y /node_modules/.vite/deps de arranques anteriores."
+    - date: "2026-06-29"
+      event: "Se agrega plugin Vite dev-only la-quinta-dev-source-cache-bust en front_menu/front_clientes para anexar codex_v a imports relativos de src y evitar que useAuth/App.jsx queden apuntando a hashes viejos de React tras reiniciar Vite."
+    - date: "2026-06-29"
+      event: "Auditoria corrige front_clientes/src/services/apiCliente.js para usar /api/v1 como fallback de VITE_API_URL, evitando que pedidos/menu intenten llamar http://localhost:3000 desde navegadores externos al pasar por Cloudflare Tunnel."
+    - date: "2026-06-29"
+      event: "Auditoria elimina la dependencia vulnerable xlsx de front_menu y reemplaza la exportacion de PedidosAdmin por CSV compatible con Excel; npm audit --omit=dev de front_menu queda sin vulnerabilidades."
+    - date: "2026-06-29"
+      event: "Por requerimiento operativo del usuario se restablece la exportacion XLSX en front_menu/src/pages/PedidosAdmin.jsx y se reinstala xlsx; la vulnerabilidad queda como deuda aceptada al no existir fix directo."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."

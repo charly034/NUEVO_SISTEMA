@@ -46,7 +46,7 @@ export default function SemanaCardEditable({
     [diasEditados, diasIniciales],
   );
   const mensajeAyudaEdicion = modoCreacion
-    ? "Completa los dias que quieras pedir. Avanzamos dia por dia y guardas todo al final."
+    ? "Elegir un plato no guarda el pedido. Avanzamos dia por dia y confirmas todo al final."
     : mensajeLimite;
 
   useEffect(() => {

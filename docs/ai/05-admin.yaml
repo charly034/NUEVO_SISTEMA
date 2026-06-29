@@ -161,4 +161,5 @@ current_worktree_notes:
       - "Docker Compose: config, build, up -d, ps, logs y health HTTP OK con db/api/admin/clientes healthy."
       - "Docker frontends: package-lock sincronizados para dependencias opcionales Linux y Dockerfiles usan npm ci --include=optional sin fallback a npm install."
       - "Smoke Docker navegador: admin y cliente cargan pantallas de login por Nginx sin errores de consola ni overflow horizontal."
-      - "Riesgo residual: npm ci de front_menu informa 1 vulnerabilidad high en xlsx sin fix directo disponible en npm audit."
+      - "Riesgo residual: front_menu usa xlsx para exportar pedidos admin a Excel; npm audit informa 1 vulnerabilidad high sin fix directo disponible."
+      - "Decision 2026-06-29: se restablece exportacion XLSX en PedidosAdmin por importancia operativa; no procesa archivos XLSX subidos por usuarios."

@@ -158,6 +158,7 @@ global_variables_and_env:
     frontend_env_names:
       - "VITE_API_URL"
       - "VITE_USAR_ENDPOINT_LEGACY_PEDIDOS"
+      - "VITE_USAR_MOCKS_PEDIDO"
       - "VITE_DEBUG_PERFORMANCE"
       - "API_UPSTREAM"
 

@@ -1,16 +1,61 @@
-import { ChevronRight, LockKeyhole } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  ChevronRight,
+  CircleDashed,
+  Clock3,
+  LockKeyhole,
+} from "lucide-react";
 import { unirClases } from "../../compartido/utils/clases.js";
 
-const textoEstado = {
-  editable: "Editable",
-  feriado: "Sin servicio",
-  sin_seleccionar: "Editable",
-  sin_menu: "Sin menu especial",
-  sin_pedido_por_defecto: "Por defecto",
-  sin_servicio: "Sin servicio",
-  seleccionado: "Elegido",
-  bloqueado: "Bloqueado",
-  vencido: "Vencido",
+const estadoBase = {
+  Icono: CircleDashed,
+  texto: "Sin elegir",
+  clases: "text-[#8a6a1f]",
+};
+
+const configuracionEstado = {
+  editable: {
+    Icono: CheckCircle2,
+    texto: "Elegido",
+    clases: "text-[#2d5a27]",
+  },
+  feriado: {
+    Icono: Ban,
+    texto: "Sin servicio",
+    clases: "text-[#7b756d]",
+  },
+  sin_seleccionar: estadoBase,
+  sin_menu: {
+    Icono: Clock3,
+    texto: "Sin menu especial",
+    clases: "text-[#8a6a1f]",
+  },
+  sin_pedido_por_defecto: {
+    Icono: CircleDashed,
+    texto: "Por defecto",
+    clases: "text-[#8a6a1f]",
+  },
+  sin_servicio: {
+    Icono: Ban,
+    texto: "Sin servicio",
+    clases: "text-[#7b756d]",
+  },
+  seleccionado: {
+    Icono: CheckCircle2,
+    texto: "Elegido",
+    clases: "text-[#2d5a27]",
+  },
+  bloqueado: {
+    Icono: LockKeyhole,
+    texto: "Bloqueado",
+    clases: "text-[#7b756d]",
+  },
+  vencido: {
+    Icono: LockKeyhole,
+    texto: "Vencido",
+    clases: "text-[#7b756d]",
+  },
 };
 
 export default function FilaPedidoDiaEditable({
@@ -21,6 +66,8 @@ export default function FilaPedidoDiaEditable({
   const deshabilitado = ["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual);
   const sinSeleccion = !dia.plato || dia.plato === "Sin seleccionar";
   const textoPlato = sinSeleccion ? "Sin elegir" : dia.plato;
+  const estado = configuracionEstado[estadoVisual] || estadoBase;
+  const { Icono } = estado;
   const ayudaAccion = deshabilitado
     ? dia.motivo || "Ya no se puede modificar"
     : "Tocar para elegir o cambiar plato";
@@ -32,7 +79,7 @@ export default function FilaPedidoDiaEditable({
     <li className="flex min-h-0 flex-1 border-b border-[#f0ebe2] py-0.5 last:border-b-0">
       <button
         type="button"
-        aria-label={`${dia.dia}. ${textoEstado[estadoVisual] || "Editable"}. ${textoPlato}. ${ayudaAccion}.`}
+        aria-label={`${dia.dia}. ${estado.texto}. ${textoPlato}. ${ayudaAccion}.`}
         disabled={deshabilitado}
         onClick={onAbrir}
         className={unirClases(
@@ -46,11 +93,12 @@ export default function FilaPedidoDiaEditable({
           <p className="text-[0.95rem] font-black leading-none text-[#2d5a27]">{dia.dia}</p>
           <p
             className={unirClases(
-              "mt-1 text-[0.68rem] font-black uppercase tracking-wide",
-              deshabilitado ? "text-[#7b756d]" : "text-[#6c8f5d]",
+              "mt-1 inline-flex items-center gap-1 text-[0.68rem] font-black uppercase tracking-wide",
+              estado.clases,
             )}
           >
-            {textoEstado[estadoVisual] || "Editable"}
+            <Icono className="h-3 w-3 shrink-0" aria-hidden="true" />
+            {estado.texto}
           </p>
         </div>
 

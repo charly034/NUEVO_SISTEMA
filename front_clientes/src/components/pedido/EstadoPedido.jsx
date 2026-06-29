@@ -12,6 +12,10 @@ function textoProgreso({ diasSeleccionados = 0, totalDias = 0 }) {
   return `${diasSeleccionados} de ${totalDias} dias`;
 }
 
+function textoDiasPendientes(cantidad) {
+  return `Faltan ${cantidad} ${cantidad === 1 ? "día" : "días"}`;
+}
+
 const configuracionEstado = {
   confirmado: {
     Icono: CheckCircle2,
@@ -24,7 +28,7 @@ const configuracionEstado = {
     titulo: "Editando",
     descripcion: ({ diasPendientes, diasSeleccionados, totalDias }) => {
       if (!diasSeleccionados) return "Elegi tus platos";
-      if (diasPendientes > 0) return `Faltan ${diasPendientes}`;
+      if (diasPendientes > 0) return textoDiasPendientes(diasPendientes);
       return totalDias ? textoProgreso({ diasSeleccionados, totalDias }) : "Completo";
     },
     clases: "border-[#cde5c8] bg-[#f0f7ee] text-[#2d5a27]",
@@ -33,7 +37,7 @@ const configuracionEstado = {
     Icono: Clock3,
     titulo: "Pendiente",
     descripcion: ({ diasPendientes }) =>
-      diasPendientes > 0 ? `Faltan ${diasPendientes}` : "Elegi tus platos",
+      diasPendientes > 0 ? textoDiasPendientes(diasPendientes) : "Elegi tus platos",
     clases: "border-[#eadfbd] bg-[#fbf5e3] text-[#7b5f12]",
   },
   sin_pedido: {

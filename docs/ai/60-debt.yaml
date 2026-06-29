@@ -1,5 +1,5 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-06-28"
+updated_at: "2026-06-29"
 
 technical_debt:
   - id: "debt-users-module-legacy"
@@ -136,13 +136,14 @@ technical_debt:
     recommended_cut: "Usar Docker Desktop abierto y, si docker no aparece en PATH, anteponer temporalmente C:\\Program Files\\Docker\\Docker\\resources\\bin en PowerShell."
 
   - id: "debt-admin-xlsx-vulnerability"
-    status: open
+    status: accepted
     area: "front_menu"
     evidence:
-      - "npm ci --include=optional durante docker compose build de front_menu informa 1 vulnerabilidad high."
-      - "Auditoria previa identifica xlsx 0.18.5 con advisories de Prototype Pollution/ReDoS y sin fix directo disponible mediante npm audit."
-    risk: "Medio si el panel procesa archivos XLSX no confiables o expone conversiones de hojas a usuarios no confiables."
-    recommended_cut: "Revisar usos reales de xlsx en front_menu y evaluar reemplazo, aislamiento del parseo o controles de entrada en una tarea separada."
+      - "Auditoria previa identificaba xlsx 0.18.5 con advisories de Prototype Pollution/ReDoS y sin fix directo disponible mediante npm audit."
+      - "El 2026-06-29 se intento reemplazar XLSX por CSV, pero se restablece XLSX por requerimiento operativo del usuario."
+      - "front_menu/src/pages/PedidosAdmin.jsx usa xlsx solo para generar y descargar archivos desde datos internos de pedidos."
+    risk: "Medio: xlsx queda en bundle admin con advisories conocidos, aunque no se usa para parsear archivos no confiables."
+    recommended_cut: "Mantener XLSX mientras sea requisito operativo; si se necesita cerrar el riesgo, evaluar una libreria XLSX mantenida o generar el archivo en backend/controlado."
 
   - id: "debt-client-week-carousel-context"
     status: resolved

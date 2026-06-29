@@ -4,7 +4,7 @@ import { semanasMock } from "../data/semanasMock.js";
 import { iniciarMedicionPerformance } from "../utils/performance.js";
 import { clearClientSession, getClientToken } from "./api.js";
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "");
+const API_URL = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/$/, "");
 export const USAR_MOCKS = import.meta.env.VITE_USAR_MOCKS_PEDIDO === "true";
 const demoraMockMs = 120;
 
