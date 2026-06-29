@@ -1,6 +1,7 @@
-import { CheckCircle2, Plus, Send, X } from "lucide-react";
+import { CheckCircle2, Lightbulb, Plus, Send, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { unirClases } from "../../compartido/utils/clases.js";
+import { formatearRangoPedido } from "../../utils/fechasPedido.js";
 import Boton from "../ui/Boton.jsx";
 import SemanaHeader from "./SemanaHeader.jsx";
 
@@ -86,6 +87,29 @@ export default function SemanaCardRecomendacion({
       <SemanaHeader semana={semana} />
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[#d8e6d4] bg-[#f0f7ee] p-3 text-[#1a1a1a]">
+        <div className="mb-3 rounded-2xl bg-white px-3 py-3 shadow-[0_8px_18px_rgba(45,90,39,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#fff4d8] text-[#8a6115]">
+              <Lightbulb className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[0.7rem] font-black uppercase tracking-wide text-[#8a6115]">
+                Sugerencia de menu
+              </p>
+              <h3 className="mt-0.5 text-lg font-black leading-tight text-[#1a1a1a]">
+                Semana del {formatearRangoPedido(semana.rango)}
+              </h3>
+              <p className="mt-1 text-sm font-bold leading-snug text-[#655f56]">
+                Todavia no hay menu publicado. Deja ideas de platos o un comentario para que el equipo las tenga en cuenta.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <p className="mb-2 text-[0.78rem] font-black uppercase tracking-wide text-[#4f7448]">
+          Elegi una o mas ideas
+        </p>
+
         <div className="flex flex-wrap gap-2">
           {opciones.slice(0, 8).map((opcion) => {
             const seleccionada = seleccionadas.includes(opcion);
@@ -151,7 +175,7 @@ export default function SemanaCardRecomendacion({
         <textarea
           value={comentario}
           onChange={(event) => setComentario(event.target.value)}
-          placeholder="Comentario opcional"
+          placeholder="Comentario opcional: contanos que te gustaria comer esa semana"
           className="mt-2 min-h-0 flex-1 resize-none rounded-2xl border border-[#cfe2c8] bg-white px-3 py-2 text-sm font-bold text-[#1a1a1a] outline-none focus:border-[#2d5a27] focus:ring-2 focus:ring-[#d8e9d2]"
         />
       </section>

@@ -109,6 +109,10 @@ timeline:
       event: "Se sincronizan package-lock de front_menu y front_clientes para dependencias opcionales Linux y se endurecen Dockerfiles para usar npm ci --include=optional sin fallback."
     - date: "2026-06-28"
       event: "Smoke Docker HTTP y navegador integrado pasa: health API 200, admin/clientes 200, pantallas de login sin errores de consola ni overflow horizontal."
+    - date: "2026-06-28"
+      event: "UX cliente Pedido semanal: se reemplaza carrusel/listado primario por panel de cards grandes; las semanas proximas con menu abren primero lectura de menu semanal completo y luego permiten hacer pedido, sugerir menu queda como accion separada; el selector de dia destaca dia/fecha y permite anterior/siguiente; lint/build OK y navegador integrado sin overflow."
+    - date: "2026-06-28"
+      event: "UX cliente Pedido semanal: la pantalla principal vuelve a mostrar siempre la semana actual con accion contextual Ver pedido/Ver menu/Ver semana; la pantalla de sugerir menu agrega encabezado explicito de semana sin menu para aclarar que se dejan ideas y no se carga pedido."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."

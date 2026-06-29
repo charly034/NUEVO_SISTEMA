@@ -27,6 +27,7 @@ export default function SemanaCardDetalle({
       <EstadoPedido
         estado={semana.estado}
         diasSeleccionados={semana.diasSeleccionados}
+        totalDias={semana.metadata?.cantidadDias || semana.dias?.length || 0}
         compacta={compacta}
       />
 

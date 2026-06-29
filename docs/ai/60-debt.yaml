@@ -144,6 +144,29 @@ technical_debt:
     risk: "Medio si el panel procesa archivos XLSX no confiables o expone conversiones de hojas a usuarios no confiables."
     recommended_cut: "Revisar usos reales de xlsx en front_menu y evaluar reemplazo, aislamiento del parseo o controles de entrada en una tarea separada."
 
+  - id: "debt-client-week-carousel-context"
+    status: resolved
+    area: "front_clientes"
+    evidence:
+      - "Antes del 2026-06-28 Pedido semanal usaba Embla como navegacion primaria de semanas."
+      - "El carrusel ocultaba parte de semanas vecinas y en desktop desperdiciaba espacio con navegacion lateral/indicadores."
+      - "El 2026-06-28 front_clientes/src/components/pedido/SemanaContainer.jsx reemplaza ese flujo por un panel de accion que oculta semanas actuales cerradas/fuera de plazo."
+      - "Las semanas futuras se muestran como cards grandes y montan SemanaPedidoCard recien al tocar Ver menu o Sugerir menu, ocupando el alto disponible."
+      - "Las semanas con menu abren primero en lectura de menu semanal, con fecha, dias y opciones especiales, antes de permitir Hacer mi pedido."
+      - "Validado en navegador 390x844, 360x740, 768x1024 y 1366x768 sin overflow horizontal de pagina."
+    risk: "Bajo; embla-carousel-react queda instalado aunque ya no lo consume SemanaContainer."
+    recommended_cut: "Eliminar dependencia embla-carousel-react solo en una limpieza separada si no quedan otros consumidores."
+
+  - id: "debt-client-vitest-worker-timeout"
+    status: open
+    area: "front_clientes"
+    evidence:
+      - "npm test del 2026-06-28 fallo antes de ejecutar aserciones de algunos archivos por Timeout waiting for worker to respond."
+      - "npx vitest run --pool=threads ejecuto 3 archivos y 8 tests OK, pero 2 workers tambien fallaron al iniciar."
+      - "npm run lint, npm run build y npm run test:e2e pasaron."
+    risk: "Medio para confianza local de regression suite; no apunta a una asercion funcional fallida del cambio UX."
+    recommended_cut: "Investigar configuracion Vitest/Node 22/OneDrive o forzar pool/aislamiento estable en una tarea separada."
+
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."
   - "Precisar payloads de todos los endpoints admin solo si se van a tocar."

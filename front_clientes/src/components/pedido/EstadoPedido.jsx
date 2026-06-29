@@ -7,42 +7,51 @@ import {
 } from "lucide-react";
 import { unirClases } from "../../compartido/utils/clases.js";
 
+function textoProgreso({ diasSeleccionados = 0, totalDias = 0 }) {
+  if (!totalDias) return `${diasSeleccionados} dias`;
+  return `${diasSeleccionados} de ${totalDias} dias`;
+}
+
 const configuracionEstado = {
   confirmado: {
     Icono: CheckCircle2,
     titulo: "Confirmado",
-    descripcion: ({ diasSeleccionados }) => `${diasSeleccionados} días`,
+    descripcion: textoProgreso,
     clases: "border-[#cde5c8] bg-[#f0f7ee] text-[#2d5a27]",
   },
   editable: {
     Icono: Clock3,
     titulo: "Editando",
-    descripcion: ({ diasSeleccionados }) =>
-      diasSeleccionados > 0 ? `${diasSeleccionados} días elegidos` : "Elegí tus platos",
+    descripcion: ({ diasPendientes, diasSeleccionados, totalDias }) => {
+      if (!diasSeleccionados) return "Elegi tus platos";
+      if (diasPendientes > 0) return `Faltan ${diasPendientes}`;
+      return totalDias ? textoProgreso({ diasSeleccionados, totalDias }) : "Completo";
+    },
     clases: "border-[#cde5c8] bg-[#f0f7ee] text-[#2d5a27]",
   },
   pendiente: {
     Icono: Clock3,
     titulo: "Pendiente",
-    descripcion: () => "Elegí tus platos",
+    descripcion: ({ diasPendientes }) =>
+      diasPendientes > 0 ? `Faltan ${diasPendientes}` : "Elegi tus platos",
     clases: "border-[#eadfbd] bg-[#fbf5e3] text-[#7b5f12]",
   },
   sin_pedido: {
     Icono: ClipboardList,
-    titulo: "Todavía no pediste",
-    descripcion: () => "Menú disponible",
+    titulo: "Todavia no pediste",
+    descripcion: ({ totalDias }) => totalDias ? `0 de ${totalDias} dias` : "Menu disponible",
     clases: "border-[#eadfbd] bg-[#fbf5e3] text-[#7b5f12]",
   },
   sin_menu: {
     Icono: CalendarClock,
-    titulo: "En preparación",
+    titulo: "En preparacion",
     descripcion: () => "Sugerencias abiertas",
     clases: "border-[#eadfbd] bg-[#fbf5e3] text-[#7b5f12]",
   },
   cerrado: {
     Icono: LockKeyhole,
     titulo: "Cerrada",
-    descripcion: ({ diasSeleccionados }) => `${diasSeleccionados} días`,
+    descripcion: textoProgreso,
     clases: "border-[#e8e3da] bg-[#faf8f4] text-[#5f5a52]",
   },
   fuera_de_plazo: {
@@ -55,11 +64,17 @@ const configuracionEstado = {
 
 export default function EstadoPedido({
   estado,
-  diasSeleccionados,
+  diasSeleccionados = 0,
+  totalDias = 0,
 }) {
   const config = configuracionEstado[estado] || configuracionEstado.sin_pedido;
   const { Icono } = config;
-  const descripcion = config.descripcion({ diasSeleccionados });
+  const diasPendientes = Math.max(totalDias - diasSeleccionados, 0);
+  const descripcion = config.descripcion({
+    diasPendientes,
+    diasSeleccionados,
+    totalDias,
+  });
 
   return (
     <section

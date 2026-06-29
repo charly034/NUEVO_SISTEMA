@@ -122,7 +122,7 @@ DB_IDLE_TIMEOUT_MS=30000
 DB_CONNECTION_TIMEOUT_MS=5000
 APP_TIMEZONE=America/Argentina/Buenos_Aires
 TRUST_PROXY_HOPS=1
-CORS_ORIGINS=https://admin.example.com,https://pedidos.example.com
+CORS_ORIGINS=http://localhost:5174,http://localhost:5175,https://laquintacomidas.com,https://dev.laquintacomidas.com,https://devadmin.laquintacomidas.com
 ```
 
 ### Panel administrativo

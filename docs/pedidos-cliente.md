@@ -121,6 +121,20 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Recarga de página: el pedido confirmado o modificado se reconstruye desde DB.
 - Semana sin menú asignado: mostrar pantalla de sugerencia de menú.
 
+## Decisiones UX cliente 2026-06-28
+
+- La navegación principal de semanas ya no depende de un carrusel de cards como mecanismo primario.
+- `Pedido semanal` muestra siempre la semana en curso como opcion principal; la accion dice `Ver pedido` si ya hay pedido cargado, `Ver menu` si hay menu publicado o `Ver semana` si aun no hay menu.
+- Debajo solo aparecen acciones futuras relevantes: hacer pedido para la próxima semana con menú publicado y sin pedido cargado, o sugerir menú para una próxima semana sin menú.
+- Las opciones de pantalla principal son cards grandes por semana/accion: semana actual, semanas proximas con menu publicado y sugerir menu cuando todavia no hay menu.
+- Las semanas con menú se abren primero en lectura para mostrar fecha, días y todas las opciones especiales publicadas antes de entrar a cargar pedido.
+- Las semanas futuras montan la vista completa recién cuando el usuario toca la acción correspondiente y ocultan el resto para ocupar el alto disponible.
+- La semana activa se conserva por `semana.id` en `localStorage` para mantener contexto al recargar.
+- La tab principal `Pedido` vuelve a la pantalla principal de pedido si el usuario quedó mirando otra acción.
+- El estado de pedido muestra progreso como `X de Y días` o `Faltan N` durante edición.
+- Las semanas sin menu aparecen como CTA de sugerencia cuando todavia no hay sugerencia enviada; al abrirlas, la pantalla explica que no se esta cargando un pedido sino dejando ideas para esa semana.
+- El selector de día aclara que la elección queda en la semana, hace foco visual en el día/fecha y permite ir al día anterior o siguiente.
+
 ## Prueba local
 
 1. Levantar backend y frontend.

@@ -15,9 +15,10 @@ import {
 import { pedidoService } from "../services/pedidoService.js";
 import { medirPromesaPerformance } from "../utils/performance.js";
 
-const indicesPedidoSemanal = new Map();
+const semanasActivasPedido = new Map();
 const STALE_PEDIDO_SEMANAL_MS = 10 * 60 * 1000;
 const GC_PEDIDO_SEMANAL_MS = 30 * 60 * 1000;
+const STORAGE_SEMANA_ACTIVA_PREFIX = "la_quinta:pedido:semana_activa:v3:";
 
 function obtenerIndiceSemanaInicial(semanas) {
   const indiceActual = semanas.findIndex((semana) => semana.tipo === "actual");
@@ -52,8 +53,45 @@ function crearClaveCachePedido({ empleado, fechaReferencia, identidadUsuario }) 
   ].join(":");
 }
 
-function guardarIndicePedido(clave, semanas, indiceActivo) {
-  indicesPedidoSemanal.set(clave, normalizarIndiceSemana(indiceActivo, semanas));
+function guardarSemanaActivaPedido(clave, semanas, indiceActivo) {
+  const indiceNormalizado = normalizarIndiceSemana(indiceActivo, semanas);
+  const semanaId = semanas[indiceNormalizado]?.id || "";
+  if (!semanaId) return;
+
+  semanasActivasPedido.set(clave, semanaId);
+
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      `${STORAGE_SEMANA_ACTIVA_PREFIX}${clave}`,
+      String(semanaId),
+    );
+  } catch {
+    // Si el storage no esta disponible, la cache en memoria conserva el contexto.
+  }
+}
+
+function leerSemanaActivaGuardada(clave) {
+  if (semanasActivasPedido.has(clave)) {
+    return semanasActivasPedido.get(clave);
+  }
+
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage.getItem(
+      `${STORAGE_SEMANA_ACTIVA_PREFIX}${clave}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+function obtenerIndiceSemanaGuardada(semanaId, semanas) {
+  if (!semanaId) return null;
+  const indice = semanas.findIndex((semana) => semana.id === semanaId);
+  return indice >= 0 ? indice : null;
 }
 
 export function usePedidoSemanal({
@@ -88,7 +126,9 @@ export function usePedidoSemanal({
     ],
     [fechaReferenciaKey, identidadUsuario],
   );
-  const [indiceActivo, setIndiceActivo] = useState(() => indicesPedidoSemanal.get(claveIndice) ?? null);
+  const [semanaActivaGuardada, setSemanaActivaGuardada] = useState(() =>
+    leerSemanaActivaGuardada(claveIndice),
+  );
   const [modoActivo, setModoActivo] = useState({ semanaId: null, modo: "lectura" });
   const [cambiosPendientes, setCambiosPendientes] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -124,8 +164,9 @@ export function usePedidoSemanal({
     return "No pudimos cargar tu pedido. Intenta nuevamente.";
   }, [errorCargaQuery]);
 
+  const indiceSemanaGuardada = obtenerIndiceSemanaGuardada(semanaActivaGuardada, semanas);
   const indiceInicial = normalizarIndiceSemana(
-    indiceActivo ?? obtenerIndiceSemanaInicial(semanas),
+    indiceSemanaGuardada ?? obtenerIndiceSemanaInicial(semanas),
     semanas,
   );
   const cargando = isLoading && semanas.length === 0;
@@ -138,10 +179,11 @@ export function usePedidoSemanal({
   const registrarIndiceActivo = useCallback(
     (indice) => {
       const indiceNormalizado = normalizarIndiceSemana(indice, semanas);
-      setIndiceActivo(indiceNormalizado);
-      guardarIndicePedido(claveIndice, semanas, indiceNormalizado);
+      const semanaId = semanas[indiceNormalizado]?.id || null;
+      setSemanaActivaGuardada(semanaId);
+      guardarSemanaActivaPedido(claveIndice, semanas, indiceNormalizado);
     },
-    [claveIndice, semanas, setIndiceActivo],
+    [claveIndice, semanas, setSemanaActivaGuardada],
   );
 
   const invalidarPedidoSemanal = useCallback(() => {
@@ -253,7 +295,7 @@ export function usePedidoSemanal({
                 })
               : semana,
           );
-          guardarIndicePedido(claveIndice, semanasActualizadas, indiceActivo);
+          guardarSemanaActivaPedido(claveIndice, semanasActualizadas, indiceInicial);
           return semanasActualizadas;
         });
         invalidarPedidoSemanal();
@@ -266,7 +308,7 @@ export function usePedidoSemanal({
         setGuardando(false);
       }
     },
-    [claveIndice, identidadUsuario, indiceActivo, invalidarPedidoSemanal, queryClient, queryKeyPedidoSemanal, semanas, service],
+    [claveIndice, identidadUsuario, indiceInicial, invalidarPedidoSemanal, queryClient, queryKeyPedidoSemanal, semanas, service],
   );
 
   const confirmarPedido = useCallback(
@@ -313,7 +355,7 @@ export function usePedidoSemanal({
                 })
               : semana,
           );
-          guardarIndicePedido(claveIndice, semanasActualizadas, indiceActivo);
+          guardarSemanaActivaPedido(claveIndice, semanasActualizadas, indiceInicial);
           return semanasActualizadas;
         });
         invalidarPedidoSemanal();
@@ -326,7 +368,7 @@ export function usePedidoSemanal({
         setGuardando(false);
       }
     },
-    [claveIndice, indiceActivo, invalidarPedidoSemanal, queryClient, queryKeyPedidoSemanal, semanas, service],
+    [claveIndice, indiceInicial, invalidarPedidoSemanal, queryClient, queryKeyPedidoSemanal, semanas, service],
   );
 
   return {

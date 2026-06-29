@@ -46,7 +46,7 @@ export default function SemanaCardEditable({
     [diasEditados, diasIniciales],
   );
   const mensajeAyudaEdicion = modoCreacion
-    ? "Completá los días que quieras. Te abrimos el primer día editable para empezar."
+    ? "Completa los dias que quieras pedir. Avanzamos dia por dia y guardas todo al final."
     : mensajeLimite;
 
   useEffect(() => {
@@ -61,11 +61,24 @@ export default function SemanaCardEditable({
     const estadoVisual = obtenerEstadoVisualDia(dia, semana, fechaActual);
     return !["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual);
   }, [fechaActual, semana]);
+  const diasEditables = useMemo(
+    () => diasEditados.filter((dia) => puedeEditarDia(dia)).length,
+    [diasEditados, puedeEditarDia],
+  );
 
   function obtenerSiguienteDiaEditable(dias, claveActual) {
     const indiceActual = dias.findIndex((dia) => dia.clave === claveActual);
     if (indiceActual === -1) return null;
     return dias.slice(indiceActual + 1).find((dia) => puedeEditarDia(dia)) || null;
+  }
+
+  function obtenerDiaEditableAnterior(dias, claveActual) {
+    const indiceActual = dias.findIndex((dia) => dia.clave === claveActual);
+    if (indiceActual === -1) return null;
+    return dias
+      .slice(0, indiceActual)
+      .reverse()
+      .find((dia) => puedeEditarDia(dia)) || null;
   }
 
   useEffect(() => {
@@ -136,6 +149,7 @@ export default function SemanaCardEditable({
       <EstadoPedido
         estado="editable"
         diasSeleccionados={diasSeleccionados}
+        totalDias={diasEditables || diasEditados.length}
         compacta={compacta}
       />
       <AvisoModificacion mensaje={mensajeAyudaEdicion} tono="ayuda" />
@@ -177,6 +191,14 @@ export default function SemanaCardEditable({
         semanaId={semana.id}
         onCerrar={() => setDiaActivo(null)}
         onConfirmar={actualizarDia}
+        onDiaAnterior={(diaActual) => {
+          const diaAnterior = obtenerDiaEditableAnterior(diasEditados, diaActual?.clave);
+          if (diaAnterior) setDiaActivo(diaAnterior);
+        }}
+        onDiaSiguiente={(diaActual) => {
+          const diaSiguiente = obtenerSiguienteDiaEditable(diasEditados, diaActual?.clave);
+          if (diaSiguiente) setDiaActivo(diaSiguiente);
+        }}
       />
     </>
   );

@@ -54,11 +54,12 @@ export default function SemanaCardLectura({
     <>
       <SemanaHeader semana={semana} compacta={compacta} />
       {!esSemanaSugerencias && (
-        <EstadoPedido
-          estado={semana.estado}
-          diasSeleccionados={semana.diasSeleccionados}
-          compacta={compacta}
-        />
+      <EstadoPedido
+        estado={semana.estado}
+        diasSeleccionados={semana.diasSeleccionados}
+        totalDias={semana.metadata?.cantidadDias || semana.dias?.length || 0}
+        compacta={compacta}
+      />
       )}
       {mostrarAviso && (
         <AvisoModificacion mensaje={mensajeLimite} tono={tonoAviso} />

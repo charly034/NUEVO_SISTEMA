@@ -203,7 +203,7 @@ production_readiness:
       status: "verified_in_repo"
       evidence:
         - "compose.yaml define db, api, admin y clientes."
-        - "compose.yaml exige POSTGRES_PASSWORD, JWT_SECRET y CORS_ORIGINS mediante expansion con error."
+        - "compose.yaml exige POSTGRES_PASSWORD y JWT_SECRET mediante expansion con error; CORS_ORIGINS tiene valor por defecto con localhost y dominios de laquinta."
         - "api depende de db healthy; admin/clientes dependen de api healthy."
         - "front_menu y front_clientes usan API_UPSTREAM=http://api:3000 en Docker."
         - "nginx templates proxyean /api/ a API_UPSTREAM y cachean /assets/ como immutable."
