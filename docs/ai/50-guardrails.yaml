@@ -23,6 +23,8 @@ high_risk_areas:
       risk: "Reglas de negocio criticas, transacciones, validacion de plazo, guarniciones y eventos."
     - area: "API_LA_QUINTA/src/database/migrations"
       risk: "Schema historico; editar migraciones aplicadas puede romper DB existente."
+    - area: "API_LA_QUINTA/uploads/platos"
+      risk: "Archivos subidos por admin; no versionar imagenes reales ni asumir que existen fuera del volumen local/Docker."
     - area: "API_LA_QUINTA/src/middlewares/auth.middleware.js"
       risk: "Afecta auth cliente/admin y permisos."
     - area: "front_clientes/src/hooks/usePedidoSemanal.js"
@@ -47,6 +49,8 @@ recommended_blast_radius:
     scope: "componentes de front_clientes; no cambiar contratos API"
   migration_change:
     scope: "nueva migracion + repository/service afectado + rollback pensado"
+  plato_upload_change:
+    scope: "platos routes/schema/service + middleware upload + front_menu PlatoForm + proxy /uploads + docs/ai/30-contracts.yaml"
 
 required_validation_by_area:
   verified_in_repo:

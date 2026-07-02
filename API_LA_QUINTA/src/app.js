@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -33,6 +34,8 @@ if (env.isDevelopment) {
 
 // Logger de requests personalizado
 app.use(requestLoggerMiddleware);
+
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Rate limiting global: máximo 1000 requests por IP cada 15 minutos
 const limiter = rateLimit({

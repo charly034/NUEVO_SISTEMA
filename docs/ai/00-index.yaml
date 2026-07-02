@@ -1,5 +1,5 @@
 schema: la_quinta_ai_memory_index_v2
-updated_at: "2026-06-28"
+updated_at: "2026-07-02"
 language: es
 
 repo_summary:
@@ -21,7 +21,7 @@ repo_summary:
       purpose: "app de empleados/clientes"
   product_context:
     status: from_chat_summary
-    summary: "App mobile-first para pedidos semanales de La Quinta con navegacion inferior Pedido / Mis pedidos / Mi cuenta."
+    summary: "App mobile-first para pedidos semanales de La Quinta con navegacion inferior Inicio / Historial / Perfil."
 
 entrypoints:
   verified_in_repo:
@@ -52,6 +52,8 @@ main_commands:
       lint: "cd API_LA_QUINTA && npm run lint"
       seed_admin: "cd API_LA_QUINTA && npm run seed:admin"
       seed_demo: "cd API_LA_QUINTA && npm run seed:demo"
+      seed_setup: "cd API_LA_QUINTA && npm run seed:setup"
+      seed_platos_metadata: "cd API_LA_QUINTA && npm run seed:platos-metadata"
     admin:
       install: "cd front_menu && npm ci"
       dev: "cd front_menu && npm run dev"

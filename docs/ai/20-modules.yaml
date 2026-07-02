@@ -39,7 +39,7 @@ modules:
     owns: ["semanas de pedido", "menu activo/hoy/semana legacy", "crear pedido", "modificar pedido", "confirmar", "sugerencias cliente para semanas sin menu", "listar sugerencias cliente para admin", "cancelar mi pedido", "historial", "estado admin"]
     boundaries:
       - "Reglas de plazo, empresa, empleado, dia laboral, plato y guarnicion deben vivir en backend."
-      - "Un dia marcado sin servicio en el menu no bloquea pedido cliente: queda como sin_pedido por defecto, pero puede elegirse plato si la empresa recibe entrega anticipada."
+      - "Un dia marcado sin servicio en el menu bloquea la edicion cliente y el guardado backend: queda como sin_pedido por defecto y no debe enviarse como item editable."
       - "Crear/modificar usa transacciones y upsert por empleado + semana."
 
   - owner_module: "API_LA_QUINTA.menu"
@@ -68,9 +68,15 @@ modules:
   - owner_module: "API_LA_QUINTA.platos"
     status: verified_in_repo
     kind: api_module
-    paths: ["API_LA_QUINTA/src/modules/platos"]
+    paths:
+      - "API_LA_QUINTA/src/modules/platos"
+      - "API_LA_QUINTA/src/middlewares/upload-plato-image.middleware.js"
+      - "API_LA_QUINTA/uploads/platos"
     routes_file: "API_LA_QUINTA/src/modules/platos/platos.routes.js"
-    owns: ["CRUD platos", "tags", "tipo fijo/especial/ambos", "tiene_guarnicion"]
+    owns: ["CRUD platos", "tags", "tipo fijo/especial/ambos", "tiene_guarnicion", "metadata nutricional aproximada", "foto_url", "upload y compresion WebP de imagenes de platos"]
+    boundaries:
+      - "Las imagenes se reciben como multipart field foto, se validan JPG/PNG/WebP <=5MB y se guardan como WebP en uploads/platos."
+      - "Los archivos subidos se sirven por /uploads/platos y no se versionan en git."
 
   - owner_module: "API_LA_QUINTA.guarniciones"
     status: verified_in_repo
@@ -113,8 +119,19 @@ modules:
     paths:
       - "API_LA_QUINTA/src/modules/notificaciones"
       - "API_LA_QUINTA/src/database/migrations/1719000035000_notificaciones.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000037000_notificaciones-dedupe-key.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000038000_notificaciones-reglas-whatsapp.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000040000_notificaciones-evento-pedido-pendiente.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000041000_notificaciones-scheduler.js"
     routes_file: "API_LA_QUINTA/src/modules/notificaciones/notificaciones.routes.js"
-    owns: ["notificaciones cliente", "contador no leidas", "marcar notificacion leida", "marcar todas leidas"]
+    owns: ["notificaciones cliente", "contador no leidas", "marcar notificacion leida", "marcar todas leidas", "listado/envio admin de notificaciones", "reglas configurables por canal/evento", "reglas programadas semanales", "destinatarios externos de WhatsApp", "configuracion webhook n8n", "auditoria de envios WhatsApp", "dedupe de notificaciones automaticas y programadas"]
+    notes:
+      - "POST /api/v1/notificaciones/admin permite enviar notificaciones internas manuales por todos, empresa o empleado desde front_menu."
+      - "GET/POST/PATCH/DELETE /api/v1/notificaciones/admin/reglas administra reglas para canal interna o whatsapp y eventos nuevo_registro, menu_publicado y pedido_estado_cambiado."
+      - "GET/PATCH /api/v1/notificaciones/admin/whatsapp/config guarda activo/webhook_url de n8n en notificacion_configuracion."
+      - "GET/POST/PATCH/DELETE /api/v1/notificaciones/admin/whatsapp/destinatarios administra contactos externos de WhatsApp."
+      - "API_LA_QUINTA/src/modules/notificaciones/notificaciones.scheduler.js corre cada minuto y ejecuta reglas activas evento=pedido_semanal_pendiente segun programacion semanal."
+      - "menus-semanales, pedidos y auth.registro disparan eventos que se resuelven contra reglas activas; si la tabla nueva falta, se conserva fallback interno legacy."
 
   - owner_module: "API_LA_QUINTA.sugerencias-empleados"
     status: verified_in_repo
@@ -142,7 +159,7 @@ modules:
       - "front_menu/src"
       - "front_menu/public"
       - "front_menu/nginx/default.conf.template"
-    owns: ["dashboard", "platos", "semanas", "historial", "estadisticas", "sugeridor", "recomendaciones-menu", "pedidos", "empresas", "guarniciones", "administradores", "sidebar admin con grupo desplegable Menu semanal"]
+    owns: ["dashboard", "platos con metadata/foto", "semanas", "historial", "estadisticas", "sugeridor", "recomendaciones-menu", "pedidos", "notificaciones", "empresas", "guarniciones", "administradores", "sidebar admin con grupo desplegable Menu semanal"]
     boundaries:
       - "Sesion admin debe pasar por front_menu/src/auth.js y front_menu/src/lib/apiClient.js."
 
@@ -151,13 +168,15 @@ modules:
     kind: frontend_module
     paths:
       - "front_clientes/src/hooks/useAuth.js"
+      - "front_clientes/src/hooks/useLoginPage.js"
       - "front_clientes/src/services/api.js"
+      - "front_clientes/src/pages/LoginPage.jsx"
       - "front_clientes/src/components/LoginScreen.jsx"
       - "front_clientes/src/components/RegistroScreen.jsx"
       - "front_clientes/src/components/RecuperarPassword.jsx"
       - "front_clientes/src/components/PerfilCliente.jsx"
       - "front_clientes/src/pages/PerfilPage.jsx"
-    owns: ["login", "registro", "recuperar acceso", "perfil", "preferencias alimentarias", "storage token/empleado"]
+    owns: ["login", "registro", "recuperar acceso", "perfil", "preferencias alimentarias", "preferencia de recordatorios por WhatsApp", "storage token/empleado"]
 
   - owner_module: "front_clientes.pedido"
     status: verified_in_repo
@@ -172,8 +191,12 @@ modules:
       - "front_clientes/src/mappers/pedidoMapper.js"
       - "front_clientes/src/utils/reglasSeleccionPedido.js"
       - "front_clientes/src/utils/reglasModificacionPedido.js"
+      - "front_clientes/src/utils/permisosPedido.js"
+      - "front_clientes/src/components/pedido/MenuViewScreen.jsx"
+      - "front_clientes/src/components/pedido/SuggestionSheet.jsx"
+      - "front_clientes/src/pages/NavMapScreen.jsx"
       - "front_clientes/src/pages/SugerenciasPage.jsx"
-    owns: ["pedido semanal mobile", "seleccion por dia", "guarniciones", "crear/modificar/confirmar", "sugerencias de semana sin menu", "estado local de semana"]
+    owns: ["home Inicio de pedido", "lectura de menu semanal", "pedido semanal mobile", "seleccion por dia", "guarniciones", "crear/modificar/confirmar", "sugerencias de semana sin menu en bottom sheet", "estado local de semana", "mapa de navegacion cliente"]
 
 safe_refactor_zones:
   verified_in_repo:

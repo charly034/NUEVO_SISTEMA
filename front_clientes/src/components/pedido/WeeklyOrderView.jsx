@@ -5,6 +5,10 @@ import {
 } from 'lucide-react';
 import BtnPrimary from '../ui/BtnPrimary.jsx';
 import { SIN_PEDIDO_ID } from '../../constants/estadosPedido.js';
+import {
+  diaEsEditablePedido,
+  obtenerDiasEditablesPedido,
+} from '../../utils/permisosPedido.js';
 
 function cn(...a) { return a.filter(Boolean).join(' '); }
 
@@ -21,7 +25,7 @@ function claveDia(dia) {
 }
 
 function esFeriado(dia) {
-  return Boolean(dia.motivo);
+  return dia.estado === 'feriado';
 }
 
 function ordenInicial(dia) {
@@ -40,6 +44,24 @@ function ordenInicial(dia) {
     return { platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, noVianda: true };
   }
   return { platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, noVianda: false };
+}
+
+function normalizarOrdenParaComparar(orden = {}) {
+  return {
+    platoId: orden.platoId == null ? null : String(orden.platoId),
+    guarnicionId: orden.guarnicionId == null ? null : String(orden.guarnicionId),
+    noVianda: Boolean(orden.noVianda),
+  };
+}
+
+function ordenTieneCambios(ordenActual, ordenOriginal) {
+  const actual = normalizarOrdenParaComparar(ordenActual);
+  const original = normalizarOrdenParaComparar(ordenOriginal);
+  return (
+    actual.platoId !== original.platoId ||
+    actual.guarnicionId !== original.guarnicionId ||
+    actual.noVianda !== original.noVianda
+  );
 }
 
 // ─── Day progress bubbles ───────────────────────────────────────────────────────
@@ -329,11 +351,12 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
 }
 
 // ─── Weekly order screen ────────────────────────────────────────────────────────
-export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
-  const dias = semana.dias || [];
-  const [orders, setOrders] = useState(() =>
+export default function WeeklyOrderView({ readOnly = false, semana, onBack, onGuardar }) {
+  const dias = useMemo(() => semana.dias || [], [semana.dias]);
+  const ordenesIniciales = useMemo(() =>
     Object.fromEntries(dias.map(d => [claveDia(d), ordenInicial(d)]))
-  );
+  , [dias]);
+  const [orders, setOrders] = useState(ordenesIniciales);
   const [selDay, setSelDay] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -341,8 +364,11 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
   const [showLeave, setShowLeave] = useState(false);
   const [errorGuardar, setErrorGuardar] = useState('');
 
-  const habiles = dias.filter(d => !esFeriado(d));
-  const hasChanges = habiles.some(d => { const o = orders[claveDia(d)]; return o.platoId !== null || o.noVianda; });
+  const habiles = obtenerDiasEditablesPedido(semana);
+  const hasChanges = !readOnly && habiles.some(d => {
+    const k = claveDia(d);
+    return ordenTieneCambios(orders[k], ordenesIniciales[k]);
+  });
   const incomplete = habiles.filter(d => { const o = orders[claveDia(d)]; return !o.platoId && !o.noVianda; });
 
   const rango = semana.rango || '';
@@ -352,12 +378,15 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
     : null;
 
   const confirmDay = (k, orden) => {
+    if (readOnly) return;
     setOrders(p => ({ ...p, [k]: orden }));
     setShowV(false);
     setSelDay(null);
   };
 
   const doSave = async () => {
+    if (readOnly) return;
+    if (!hasChanges) return;
     if (incomplete.length > 0) { setShowV(true); return; }
     setSaving(true);
     setErrorGuardar('');
@@ -436,7 +465,9 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
       )}
 
       <div className="px-5 pt-3 pb-1 shrink-0">
-        <p className="text-[12px] text-[#9A9885]">Elegí un plato por día y confirmá todo junto.</p>
+        <p className="text-[12px] text-[#9A9885]">
+          {readOnly ? "Semana cerrada: este pedido se muestra en solo lectura." : "Elegí un plato por día y confirmá todo junto."}
+        </p>
       </div>
 
       {/* Lista de días */}
@@ -445,9 +476,10 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
           {dias.map((day) => {
             const k = claveDia(day);
             const feriado = esFeriado(day);
+            const editableDia = diaEsEditablePedido(day, semana);
             const o = orders[k];
             const done = o.platoId !== null || o.noVianda;
-            const err = showV && !done && !feriado;
+            const err = showV && !done && editableDia;
             const { num } = parseFecha(day.fecha);
 
             if (feriado) {
@@ -472,12 +504,12 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
             return (
               <button
                 key={k}
-                onClick={() => !saved && setSelDay(k)}
+                onClick={() => !saved && !readOnly && editableDia && setSelDay(k)}
                 className={cn('w-full text-left rounded-2xl transition-all active:scale-[0.99]',
                   done ? 'bg-white border-l-[3px] border-l-[#5B6B2A] border border-[#5B6B2A]/12 shadow-sm py-3.5 px-4'
                     : err ? 'bg-red-50/60 border border-red-200 border-l-[3px] border-l-red-400 py-3 px-4'
                     : 'bg-transparent py-3 px-4 hover:bg-white/60',
-                  saved && 'cursor-default')}
+                  (saved || readOnly || !editableDia) && 'cursor-default')}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center w-10 shrink-0">
@@ -495,14 +527,22 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
                         {o.guarnicion && <span className="text-[#9A9885] font-normal"> · {o.guarnicion}</span>}
                       </p>
                     ) : done && o.noVianda ? (
-                      <p className="text-[13px] text-[#9A9885] italic">Sin vianda este día</p>
+                      <p className="text-[13px] text-[#9A9885] italic">
+                        {day.motivo ? "Sin servicio" : "Sin vianda este día"}
+                      </p>
+                    ) : !editableDia ? (
+                      <p className="text-[13px] text-[#B8B6A8]">Fuera de plazo</p>
                     ) : (
                       <p className={cn('text-[13px]', err ? 'text-red-400' : 'text-[#C4C2B4]')}>
                         {err ? 'Requerido — tocá para completar' : 'Tocá para elegir'}
                       </p>
                     )}
                   </div>
-                  <ChevronRight size={15} className={cn('shrink-0', done ? 'text-[#9A9885]' : 'text-[#D8D5C8]')} />
+                  {editableDia && !saved && !readOnly ? (
+                    <ChevronRight size={15} className={cn('shrink-0', done ? 'text-[#9A9885]' : 'text-[#D8D5C8]')} />
+                  ) : (
+                    <span className="w-[15px] shrink-0" aria-hidden="true" />
+                  )}
                 </div>
               </button>
             );
@@ -512,13 +552,17 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
 
       {/* Footer fijo */}
       <div className="fixed inset-x-0 bottom-[calc(4.65rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[480px] bg-white/95 backdrop-blur border-t border-[#E8E5DC] px-5 py-3 space-y-2">
-        {saved ? (
+        {readOnly ? (
+          <BtnPrimary variant="secondary" onClick={onBack} className="w-full">
+            Volver al inicio
+          </BtnPrimary>
+        ) : saved ? (
           <div className="flex items-center justify-center gap-2 py-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
             <CheckCircle2 size={17} className="text-emerald-600" />
             <span className="text-[15px] font-bold text-emerald-800">¡Pedido confirmado!</span>
           </div>
         ) : (
-          <BtnPrimary onClick={doSave} loading={saving} disabled={!hasChanges} className="w-full">
+          <BtnPrimary onClick={doSave} loading={saving} disabled={!hasChanges || saving} className="w-full">
             Confirmar pedido semanal
           </BtnPrimary>
         )}

@@ -28,14 +28,18 @@ flows:
       - "Validar configuracion: docker compose config"
       - "Construir imagenes: docker compose build"
       - "docker compose up --build -d"
+      - "Opcional Cloudflare Tunnel en Docker: completar CLOUDFLARED_TUNNEL_TOKEN en .env y ejecutar docker compose --profile tunnel up --build -d."
+      - "Para el tunnel Docker, configurar en Cloudflare Zero Trust los public hostnames: dev.laquintacomidas.com -> http://clientes:8080 y devadmin.laquintacomidas.com -> http://admin:8080."
       - "API depende de db healthy"
       - "admin/clientes dependen de api healthy"
+      - "cloudflared depende de admin/clientes healthy cuando se activa profile tunnel."
       - "Cerrar smoke local con docker compose down si no se necesita dejar la pila levantada"
     manual_smoke_checks:
       - "docker compose ps"
       - "GET http://localhost:3000/api/v1/health"
       - "http://localhost:5174"
       - "http://localhost:5175"
+      - "Si profile tunnel esta activo: https://dev.laquintacomidas.com y https://devadmin.laquintacomidas.com"
       - "Logs de api/admin/clientes/db sin errores de arranque"
 
   cliente_auth:
@@ -46,8 +50,10 @@ flows:
       - "API_LA_QUINTA/src/modules/auth"
     sequence:
       - "POST /api/v1/auth/login con email, password, remember"
+      - "POST /api/v1/auth/registro exige codigo, nombre, apellido, email, telefono, fecha_nacimiento y password."
       - "API valida empleado activo y empresa activa"
       - "API firma JWT con sub, empresa_id, nombre, apellido, rol"
+      - "API devuelve empleado de sesion con telefono, fecha_nacimiento y preferencias_alimentarias para Mi cuenta."
       - "front_clientes guarda token/empleado en localStorage si remember=true, si no en sessionStorage"
       - "requests agregan Authorization Bearer"
       - "ante 401 se limpia sesion y se emite cliente:unauthorized"
@@ -114,7 +120,11 @@ flows:
       - "crear pedido: POST /api/v1/pedidos"
       - "si se creo y vuelve id, usePedidoSemanal confirma con PATCH /api/v1/pedidos/:id/confirmar"
       - "modificar pedido: PUT /api/v1/pedidos/:id"
-      - "si la semana no tiene menu publicado, SemanaCardRecomendacion guarda con POST /api/v1/pedidos/sugerencias"
+      - "Inicio usa tabs fijas Inicio / Historial / Perfil; Inicio siempre vuelve al home de pedido y muestra badge ambar si la semana actual tiene menu publicado y pedido pendiente."
+      - "Semana actual con menu publicado muestra dos acciones: Hacer pedido abre WeeklyOrderView y Ver menu abre MenuViewScreen."
+      - "Otras semanas con menu publicado abren primero MenuViewScreen; desde ahi Hacer mi pedido abre WeeklyOrderView solo si quedan dias editables."
+      - "Semanas sin menu abren SuggestionSheet desde Inicio y guardan con POST /api/v1/pedidos/sugerencias sin navegar al stack."
+      - "Semanas cerradas abren WeeklyOrderView en modo solo lectura."
       - "front_clientes/src/pages/SugerenciasPage.jsx tambien usa POST /api/v1/pedidos/sugerencias para no desalinear admin ni pedido_sugerencias"
       - "si la semana sin menu ya tiene recomendacionesUsuario o comentarioRecomendacion, SemanaCardLectura muestra agradecimiento y no muestra CTA de sugerir"
       - "backend registra eventos y devuelve pedido normalizado"
@@ -122,8 +132,11 @@ flows:
       - "Frontend no debe enviar usuarioId ni empresaId como autoridad para guardar."
       - "Backend usa req.empleado.sub y req.empleado.empresa_id."
       - "Backend valida dias laborales, plazo, plato, opcion y guarnicion."
-      - "Si el menu marca un dia sin servicio/feriado, el cliente lo ve como sin vianda por defecto pero puede cambiarlo para empresas que reciben entrega anticipada."
+      - "Si el menu marca un dia sin servicio/feriado, el cliente lo ve como sin vianda por defecto y no puede editarlo desde la pantalla semanal."
+      - "POST/PUT de pedidos rechaza items enviados para dias sin servicio/feriado."
       - "El plazo de POST/PUT lo define la empresa; menus_semanales.fecha_limite_pedidos no bloquea el pedido cliente."
+      - "Para empresas diarias o mixtas, cada dia bloqueado por limiteEmpresa.diasCerrados queda fuera de edicion; si todos los dias laborales estan bloqueados, la semana queda cerrada."
+      - "Frontend centraliza permisos de pedido en front_clientes/src/utils/permisosPedido.js y no debe mostrar CTA de pedido cuando no hay dias editables ni pedido existente."
       - "Si sin_pedido=true no se permite plato_id ni guarnicion_id."
       - "Transaccion debe hacer rollback ante error."
       - "La pantalla de sugerencias no debe reutilizar guardar pedido ni exigir dias seleccionados."
@@ -142,6 +155,15 @@ flows:
       - "El bottom sheet de seleccion usa encabezado compacto con solo el dia, permite navegar al dia anterior o siguiente cuando aplica e indica visualmente si hay mas opciones hacia abajo."
       - "El bottom sheet de seleccion debe quedar por encima de BottomNavigation; en viewport 480x608 el boton Listo para el dia debe ser visible y clickeable."
       - "El footer de accion/confirmacion de WeeklyOrderView debe quedar fijo por encima de BottomNavigation; los estados Confirmar pedido y Pedido confirmado + Volver al inicio deben verse completos."
+    ui_decisions_2026_07_02_figma_make:
+      - "BottomNavigation renombra tabs a Inicio, Historial y Perfil con iconos Home, History y User."
+      - "Inicio emite evento pedido:estado-inicio para que BottomNavigation muestre badge ambar cuando hay pedido pendiente y el tab no esta activo."
+      - "Inicio visualmente sigue el mockup Figma: header verde con saludo, aviso compacto Primera semana, seccion Semana actual con card blanca y seccion Proximas semanas con cards separadas."
+      - "En Proximas semanas, las semanas con menu publicado usan card amplia similar a Semana actual; si falta pedido muestran un mensaje de invitacion a hacerlo y CTA Hacer pedido."
+      - "Sugerencias deja de ser navegacion primaria para semanas sin menu; el flujo activo usa SuggestionSheet."
+      - "MenuViewScreen agrega selector superior de dias y lista platos por dia con foto, categoria, calorias, alergenos y aviso de guarnicion cuando los datos existen."
+      - "MenuViewScreen oculta Hacer mi pedido cuando no hay dias editables y no existe pedido cargado; solo permite consultar el menu y muestra el motivo."
+      - "NavMapScreen vive en /mapa-navegacion como referencia interna de navegacion cliente; el repo no tiene sidebar desktop cliente donde enlazarlo visualmente."
     error_behavior:
       - "401 carga pedido -> mensaje de iniciar sesion nuevamente"
       - "otros errores carga -> mensaje generico de intentar nuevamente"
@@ -172,6 +194,7 @@ flows:
       - "Admin puede marcar dia sin servicio"
       - "Admin cambia estado del menu"
       - "Al reabrir un menu desde front_menu, se publica con fecha_limite_pedidos=null para no arrastrar un limite vencido."
+      - "Al pasar un menu a publicado, API crea notificaciones tipo menu para empleados activos y usa dedupe_key para no duplicar por menu/empleado."
       - "Cliente consume menu publicado desde pedidos/menu"
     manual_smoke_checks:
       - "Crear semana con fecha_inicio/fecha_fin validas"
@@ -179,6 +202,28 @@ flows:
       - "Marcar un dia sin servicio"
       - "Publicar/cambiar estado si UI lo permite"
       - "Verificar que cliente vea opciones o sin servicio"
+
+  admin_platos_metadata:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/Platos.jsx"
+      - "front_menu/src/components/platos/PlatoForm.jsx"
+      - "front_menu/src/services/platos.service.js"
+      - "API_LA_QUINTA/src/modules/platos"
+      - "API_LA_QUINTA/src/middlewares/upload-plato-image.middleware.js"
+      - "API_LA_QUINTA/scripts/backfill-platos-metadata-aproximada.js"
+    sequence:
+      - "Admin abre Platos y crea/edita un plato."
+      - "PlatoForm permite nombre, descripcion, descripcion_larga/receta, kcal aproximadas, alergenos, vegetariano, tags, tipo, guarnicion e imagen."
+      - "Si se selecciona foto JPG/PNG/WebP <=5MB, front_menu envia multipart/form-data con field foto."
+      - "API valida formato/tamano, convierte a WebP comprimido max 1200x900 y guarda en uploads/platos."
+      - "API persiste foto_url y metadata en platos; /uploads/platos sirve el archivo."
+      - "front_menu y front_clientes proxyean /uploads a API para mostrar imagenes en dev y Docker/Nginx."
+      - "GET /api/v1/pedidos/semanas y GET /api/v1/menu/semanas/:semanaId/opciones exponen metadata del plato para MenuViewScreen cliente."
+    manual_smoke_checks:
+      - "Crear plato con imagen PNG/JPG y verificar que queda foto_url /uploads/platos/*.webp."
+      - "Editar plato con nueva imagen y verificar reemplazo visual en listado admin."
+      - "Abrir cliente MenuViewScreen y verificar foto/kcal/alergenos si el plato esta en menu."
 
   admin_pedidos:
     status: verified_in_repo
@@ -192,11 +237,43 @@ flows:
       - "Admin puede ver detalle GET /api/v1/pedidos/:id"
       - "Admin cambia estado PATCH /api/v1/pedidos/:id/estado"
       - "Backend registra pedido_eventos tipo estado_cambiado"
+      - "Backend crea una notificacion para el empleado del pedido con dedupe_key pedido-estado:<pedido_id>:<estado>."
     manual_smoke_checks:
       - "Crear pedido desde cliente"
       - "Verlo en panel admin"
       - "Cambiar estado a en_proceso/listo"
       - "Verificar que el cambio persiste"
+      - "Verificar que el cliente ve una notificacion nueva y aumenta el contador no leidas."
+
+  admin_notificaciones:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/NotificacionesAdmin.jsx"
+      - "front_menu/src/hooks/useNotificaciones.js"
+      - "API_LA_QUINTA/src/modules/notificaciones"
+    sequence:
+      - "Admin abre /notificaciones desde sidebar o menu Mas mobile."
+      - "Panel Internas permite envio manual a todos, empresa o empleado con POST /api/v1/notificaciones/admin."
+      - "Panel Internas administra reglas de eventos con GET/POST/PATCH/DELETE /api/v1/notificaciones/admin/reglas?canal=interna."
+      - "Panel WhatsApp administra activo/webhook_url de n8n con GET/PATCH /api/v1/notificaciones/admin/whatsapp/config."
+      - "Panel WhatsApp administra destinatarios externos con /api/v1/notificaciones/admin/whatsapp/destinatarios."
+      - "Panel WhatsApp administra reglas canal=whatsapp con filtros por alcance, empresa, empleado, rol, plan, modo_pedido, dias_laborales, preferencia WhatsApp y contactos externos."
+      - "Para evento pedido_semanal_pendiente, el formulario muestra programacion semanal con dia_semana y hora; el scheduler de API corre cada minuto y ejecuta la regla si coincide."
+      - "pedido_semanal_pendiente usa la semana publicada objetivo mas cercana con fecha_fin >= CURRENT_DATE y envia solo a empleados activos sin pedido no-cancelado para esa semana."
+      - "Panel WhatsApp muestra auditoria de llamadas al webhook con GET /api/v1/notificaciones/admin/whatsapp/envios y permite prueba manual con POST /api/v1/notificaciones/admin/whatsapp/probar; si n8n rechaza la llamada, la API responde 502 con status_code/respuesta/error y el panel lo muestra como error."
+      - "GET /api/v1/notificaciones/admin lista ultimas notificaciones internas con empleado y empresa."
+      - "El cliente las consume con GET /api/v1/notificaciones y el badge de Inicio usa GET /api/v1/notificaciones/no-leidas/count."
+      - "Eventos automaticos disponibles: nuevo_registro, menu_publicado y pedido_estado_cambiado; cada evento consulta reglas activas por canal."
+      - "Evento programado disponible: pedido_semanal_pendiente; ejemplo operativo: lunes 09:00 a todos los empleados con telefono que aun no hicieron el pedido semanal."
+    manual_smoke_checks:
+      - "Enviar notificacion a un empleado y verificar que aparece en la lista admin."
+      - "Crear/editar/pausar una regla interna para menu_publicado y verificar que queda listada en el panel Internas."
+      - "Guardar webhook n8n inactivo/activo y verificar validacion de URL http/https."
+      - "Crear destinatario externo de WhatsApp y usarlo en una regla canal=whatsapp."
+      - "Crear una regla WhatsApp evento pedido_semanal_pendiente, dia Lunes y hora 09:00; verificar que queda listada con su programacion."
+      - "Ejecutar prueba de webhook y verificar que aparece en Ultimos envios WhatsApp con estado enviado o fallido."
+      - "Iniciar sesion como ese empleado, abrir Inicio y verificar contador."
+      - "Abrir /notificaciones cliente, marcar leida y verificar que baja el contador."
 
   cliente_historial_perfil:
     status: verified_in_repo
@@ -206,12 +283,16 @@ flows:
       - "front_clientes/src/services/api.js"
     sequence:
       - "Historial usa endpoints cliente autenticados"
+      - "Cancelar pedido en Historial llama DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD, actualiza cache mi-historial como cancelado e invalida la query."
       - "Perfil usa authApi.actualizarPerfil y authApi.cambiarPassword"
+      - "PerfilPage muestra Empresa, Plan, Telefono y Cumpleanos desde el empleado autenticado."
       - "PerfilPage usa PATCH /api/v1/auth/preferencias para preferencias alimentarias"
+      - "PerfilPage usa el mismo PATCH /api/v1/auth/preferencias para recibir_recordatorios_whatsapp; controla futuros avisos por WhatsApp/telefono y no desactiva la campana interna."
       - "NotificacionesPage usa GET/PATCH /api/v1/notificaciones"
+      - "Inicio consulta GET /api/v1/notificaciones/no-leidas/count para mostrar el badge real de no leidas; no debe hardcodear contadores."
     manual_smoke_checks:
       - "Abrir /mis-pedidos con sesion cliente"
-      - "Abrir /mi-cuenta y editar perfil"
+      - "Abrir /mi-cuenta y verificar Empresa, Plan, Telefono y Cumpleanos."
       - "Cambiar password con validacion visible"
       - "Abrir /notificaciones y verificar loading/empty/listado sin sesion cruzada"
 
@@ -232,6 +313,10 @@ flows:
       - "import-menus-csv.js carga estado por fecha: semanas pasadas cerrado, semana actual publicado y futuras borrador."
       - "import-menus-csv.js mantiene menus_semanales, menu_semanal_dias, menu_semanal_sin_servicio e historial_uso_platos alineados con el CSV."
       - "seed-platos-completo.js incluye los platos canonicos detectados en el CSV para evitar creaciones sueltas sin metadata."
+      - "backfill-platos-metadata-aproximada.js carga descripciones, receta/preparacion breve, kcal aproximadas, alergenos y vegetariano para platos existentes; no inventa foto_url."
+      - "seed-full-reset.js tambien se expone como npm run seed:setup; es destructivo, bloquea NODE_ENV=production y exige SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
+      - "seed:setup crea dos usuarios del panel admin: superadmin con SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD y admin operativo con DEMO_ADMIN_EMAIL/DEMO_ADMIN_PASSWORD, que deben ser emails distintos."
+      - "seed:admin crea un usuario en usuarios_admin; si no existe otro superadmin activo lo crea como superadmin, si ya existe lo crea como admin y preserva rol superadmin para emails que ya lo tengan."
     validation_2026_06_29:
       - "Auditoria local: 215 entradas del CSV -> 123 platos canonicos; faltantes en seed-platos-completo: 0."
       - "node --check OK en scripts/menu-normalizacion.js, import-menus-csv.js, seed-menus-completo.js, seed-platos-completo.js y seed-full-reset.js."
@@ -239,6 +324,9 @@ flows:
       - "API_LA_QUINTA npm test OK, 33 tests."
       - "Seed ejecutado contra DB local: 146 platos, 14 fijos, 126 especiales, 6 ambos, 23 menus, 214 opciones, 214 historial, 8 dias sin servicio, sin duplicados normalizados."
       - "Estados post-seed: 21 menus cerrados, 1 publicado y 1 borrador."
+    validation_2026_07_02:
+      - "Auditoria de seeds: seed-admin.js corregido para escribir en usuarios_admin en vez de empleados."
+      - "seed-full-reset.js corregido para crear superadmin + admin operativo, limpiar tablas nuevas de notificaciones/sugerencias y generar pedidos demo con pseudoaleatorio deterministico."
 
 validation_2026_07_02:
   verified_in_repo:
@@ -246,6 +334,14 @@ validation_2026_07_02:
     - "front_clientes e2e/smoke.spec.js valida el flujo actual Splash/Onboarding -> Login."
     - "Navegador integrado en /pedido-semanal viewport 480x608: el selector de plato muestra el boton Listo para el Martes visible/clickeable sobre BottomNavigation."
     - "Navegador integrado en /pedido-semanal viewport mobile: el footer confirmado muestra completo Pedido confirmado y Volver al inicio sobre BottomNavigation."
+    - "API_LA_QUINTA npm run migrate OK para 1719000039000_platos-metadata-constraints."
+    - "API_LA_QUINTA npm run seed:platos-metadata OK; 146 platos actualizados con metadata aproximada, 0 fotos reales cargadas."
+    - "API_LA_QUINTA npm run lint OK."
+    - "API_LA_QUINTA npm test OK en rerun: 39 tests."
+    - "front_menu npm run lint OK."
+    - "front_menu npm run build OK."
+    - "front_clientes npm run lint OK."
+    - "front_clientes npm run build OK."
 
 from_chat_summary_flows:
   - id: "post_hacer_o_modificar_pedido"

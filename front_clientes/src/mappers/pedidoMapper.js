@@ -1,5 +1,6 @@
 import { SIN_PEDIDO_ID, TIPOS_OPERACION_PEDIDO } from "../constants/estadosPedido.js";
 import { contarSeleccionesValidas } from "../utils/reglasSeleccionPedido.js";
+import { diaEsEditablePedido } from "../utils/permisosPedido.js";
 
 function normalizarTexto(valor) {
   return String(valor || "")
@@ -56,7 +57,7 @@ function obtenerIdGuarnicion(seleccion, dia) {
 
 function mapearDiasPayload(semana) {
   return (semana.dias || [])
-    .filter((dia) => dia.seleccion?.plato)
+    .filter((dia) => dia.seleccion?.plato && diaEsEditablePedido(dia, semana))
     .map((dia) => {
       const platoId = obtenerIdPlato(dia.seleccion);
       const sinPedido = dia.seleccion.sinPedido || platoId === SIN_PEDIDO_ID;

@@ -19,6 +19,7 @@ const HistorialPage     = lazy(() => import("./pages/HistorialPage.jsx"));
 const PerfilPage        = lazy(() => import("./pages/PerfilPage.jsx"));
 const NotificacionesPage = lazy(() => import("./pages/NotificacionesPage.jsx"));
 const SugerenciasPage   = lazy(() => import("./pages/SugerenciasPage.jsx"));
+const NavMapScreen      = lazy(() => import("./pages/NavMapScreen.jsx"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,7 +83,7 @@ function RouteGuardSinNav({ empleado, checking, children }) {
 }
 
 function AppRoutes() {
-  const { empleado, login, logout, setSession, checking } = useAuth();
+  const { empleado, login, logout, setSession, setAuthenticatedSession, checking } = useAuth();
 
   return (
     <Routes>
@@ -112,7 +113,10 @@ function AppRoutes() {
             <Navigate to={rutasCliente.inicio} replace />
           ) : (
             <Suspense fallback={<FallbackRutaMobile />}>
-              <LoginPage onLogin={login} />
+              <LoginPage
+                onLogin={login}
+                onSesionAutenticada={setAuthenticatedSession}
+              />
             </Suspense>
           )
         }
@@ -145,6 +149,15 @@ function AppRoutes() {
       />
 
       {/* Rutas privadas sin nav (pantallas secundarias) */}
+      <Route
+        path={rutasCliente.mapaNavegacion}
+        element={
+          <RouteGuardSinNav empleado={empleado} checking={checking}>
+            <NavMapScreen />
+          </RouteGuardSinNav>
+        }
+      />
+
       <Route
         path={rutasCliente.notificaciones}
         element={

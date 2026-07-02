@@ -65,6 +65,62 @@ test('GET /api/v1/users responde 410 para modulo legacy retirado', async () => {
   }
 });
 
+test('PATCH /auth/preferencias guarda preferencia de recordatorios por WhatsApp', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'PATCH', '/auth/preferencias', {
+      token: fixture.token,
+      payload: {
+        vegetariano: true,
+        recibir_recordatorios_whatsapp: true,
+      },
+    });
+
+    assert.equal(respuesta.status, 200);
+    assert.equal(respuesta.body.data.vegetariano, true);
+    assert.equal(respuesta.body.data.recibir_recordatorios_whatsapp, true);
+
+    const sesion = await requestJson(servidor.baseUrl, 'GET', '/auth/me', {
+      token: fixture.token,
+    });
+
+    assert.equal(sesion.status, 200);
+    assert.equal(sesion.body.data.preferencias_alimentarias.recibir_recordatorios_whatsapp, true);
+  });
+});
+
+test('POST /auth/registro exige telefono y fecha de nacimiento', async () => {
+  await conFixture({}, async (fixture) => {
+    const incompleto = await requestJson(servidor.baseUrl, 'POST', '/auth/registro', {
+      payload: {
+        codigo: fixture.empresa.codigo_registro,
+        nombre: 'Alta',
+        apellido: 'Incompleta',
+        email: `${fixture.prefijo}+registro-incompleto@test.local`,
+        password: 'Password123',
+      },
+    });
+
+    assert.equal(incompleto.status, 400);
+    assert.match(incompleto.body.message, /Faltan campos/);
+
+    const completo = await requestJson(servidor.baseUrl, 'POST', '/auth/registro', {
+      payload: {
+        codigo: fixture.empresa.codigo_registro,
+        nombre: 'Alta',
+        apellido: 'Completa',
+        email: `${fixture.prefijo}+registro-completo@test.local`,
+        telefono: '+54 261 555-0101',
+        fecha_nacimiento: '1991-05-20',
+        password: 'Password123',
+      },
+    });
+
+    assert.equal(completo.status, 201);
+    assert.equal(completo.body.data.empleado.telefono, '+54 261 555-0101');
+    assert.equal(String(completo.body.data.empleado.fecha_nacimiento).split('T')[0], '1991-05-20');
+  });
+});
+
 test('POST /api/v1/pedidos crea pedido valido y persiste items', async () => {
   await conFixture({}, async (fixture) => {
     const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
@@ -165,7 +221,7 @@ test('POST sinPedido true con plato cargado devuelve 422 y no guarda parcial', a
   });
 });
 
-test('POST dia sin servicio permite pedido si la empresa entrega anticipado', async () => {
+test('POST dia sin servicio rechaza modificaciones', async () => {
   await conFixture({}, async (fixture) => {
     const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
       token: fixture.token,
@@ -179,9 +235,29 @@ test('POST dia sin servicio permite pedido si la empresa entrega anticipado', as
       }),
     });
 
-    assert.equal(respuesta.status, 201);
-    assert.equal(await contarPedidosFixture(fixture), 1);
-    assert.equal(respuesta.body.data.pedido.dias[0].diaId, 'jueves');
+    assert.equal(respuesta.status, 422);
+    assert.match(respuesta.body.message, /no tiene servicio/);
+    assert.equal(await contarPedidosFixture(fixture), 0);
+  });
+});
+
+test('GET /pedidos/semanas muestra sin servicio aunque el motivo sea null', async () => {
+  await conFixture({}, async (fixture) => {
+    await query(
+      'UPDATE menu_semanal_sin_servicio SET motivo = NULL WHERE menu_semanal_id = $1 AND dia = $2',
+      [fixture.menu.id, 'jueves'],
+    );
+
+    const respuesta = await requestJson(servidor.baseUrl, 'GET', '/pedidos/semanas', {
+      token: fixture.token,
+    });
+
+    assert.equal(respuesta.status, 200);
+    const semana = respuesta.body.data.semanas.find((item) => item.id === fixture.semanaInicio);
+    const jueves = semana.dias.find((dia) => dia.id === 'jueves');
+    assert.equal(jueves.estado, 'sin_pedido_por_defecto');
+    assert.equal(jueves.plato, 'Sin pedido por defecto');
+    assert.match(jueves.motivo, /No hay servicio este dia/);
   });
 });
 
@@ -395,6 +471,25 @@ test('PUT con dia vencido por regla diaria devuelve 409', async () => {
   });
 });
 
+test('GET /pedidos/semanas marca cerrada una semana diaria sin dias editables', async () => {
+  await conFixture({
+    semanaInicio: '2026-06-22',
+    modoPedido: 'diario',
+    limiteHora: '00:01',
+    limiteAnticipacionDias: 0,
+    incluirDiaSinServicio: false,
+  }, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'GET', '/pedidos/semanas', {
+      token: fixture.token,
+    });
+
+    assert.equal(respuesta.status, 200);
+    const semana = respuesta.body.data.semanas.find((item) => item.id === fixture.semanaInicio);
+    assert.equal(semana.estado, 'cerrado');
+    assert.equal(semana.dias.every((dia) => dia.bloqueado), true);
+  });
+});
+
 test('PUT con guarnicion indebida devuelve 422', async () => {
   await conFixture({}, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture);
@@ -494,6 +589,34 @@ test('PATCH pedido inexistente devuelve 404', async () => {
   });
 });
 
+test('DELETE /pedidos/mi-pedido cancela pedido pendiente desde historial', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
+
+    const respuesta = await requestJson(
+      servidor.baseUrl,
+      'DELETE',
+      `/pedidos/mi-pedido?semana_inicio=${fixture.semanaInicio}`,
+      { token: fixture.token },
+    );
+
+    assert.equal(respuesta.status, 200);
+    assert.equal(respuesta.body.data.estado, 'cancelado');
+
+    const cancelado = await obtenerPedidoDb(pedido.id);
+    assert.equal(cancelado.estado, 'cancelado');
+    assert.equal(cancelado.items.length, 0);
+    assert.ok(cancelado.eventos.some((evento) => evento.tipo === 'pedido_cancelado'));
+  });
+});
+
 test('GET /pedidos/semanas refleja pedido confirmado luego de PATCH', async () => {
   await conFixture({}, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture, {
@@ -518,5 +641,49 @@ test('GET /pedidos/semanas refleja pedido confirmado luego de PATCH', async () =
     assert.ok(semana);
     assert.equal(semana.estado, 'confirmado');
     assert.equal(semana.metadata.pedidoId, pedido.id);
+  });
+});
+
+test('PATCH estado admin crea notificacion interna aunque WhatsApp este desactivado', async () => {
+  await conFixture({}, async (fixture) => {
+    await requestJson(servidor.baseUrl, 'PATCH', '/auth/preferencias', {
+      token: fixture.token,
+      payload: { recibir_recordatorios_whatsapp: false },
+    });
+
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
+
+    const emailAdmin = `${fixture.prefijo}+admin@test.local`;
+    const admin = (await query(
+      `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol, activo)
+       VALUES ('Admin', 'Notificaciones', $1, 'test', 'admin', true)
+       RETURNING id`,
+      [emailAdmin],
+    )).rows[0];
+    const tokenAdmin = jwt.sign({ sub: admin.id, tipo: 'admin' }, env.JWT_SECRET, { expiresIn: '1h' });
+
+    try {
+      const respuesta = await requestJson(servidor.baseUrl, 'PATCH', `/pedidos/${pedido.id}/estado`, {
+        token: tokenAdmin,
+        payload: { estado: 'listo' },
+      });
+
+      assert.equal(respuesta.status, 200);
+
+      const total = Number((await query(
+        'SELECT COUNT(*) AS total FROM notificaciones WHERE empleado_id = $1',
+        [fixture.empleado.id],
+      )).rows[0].total);
+      assert.equal(total, 1);
+    } finally {
+      await query('DELETE FROM usuarios_admin WHERE id = $1', [admin.id]);
+    }
   });
 });

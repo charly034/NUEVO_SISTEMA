@@ -2,6 +2,15 @@ schema: la_quinta_debt_v2
 updated_at: "2026-07-02"
 
 technical_debt:
+  - id: "platos-fotos-reales-pendientes"
+    status: open
+    area: "API_LA_QUINTA.platos"
+    evidence:
+      - "API/admin ya permite subir imagenes de platos y las comprime a WebP en uploads/platos."
+      - "backfill-platos-metadata-aproximada.js actualiza descripcion, descripcion_larga, kcal, alergenos y vegetariano, pero no carga foto_url para los platos existentes."
+    risk: "El cliente ve placeholders en MenuViewScreen hasta que admin cargue fotos reales."
+    recommended_cut: "Cargar fotos propias desde front_menu /platos o preparar import de imagenes con derechos claros; no usar URLs externas sin validar licencia."
+
   - id: "debt-users-module-legacy"
     status: resolved
     area: "API_LA_QUINTA"
@@ -117,7 +126,9 @@ technical_debt:
     evidence:
       - "API_LA_QUINTA/scripts/seed-full-reset.js ejecuta TRUNCATE ... RESTART IDENTITY CASCADE."
       - "seed-full-reset.js bloquea NODE_ENV=production y requiere SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
-      - "seed-full-reset.js exige SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, DEFAULT_DEMO_PASSWORD y TEST_USER_PASSWORD por env."
+      - "seed-full-reset.js exige SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD, DEFAULT_DEMO_PASSWORD y TEST_USER_PASSWORD por env."
+      - "seed-full-reset.js crea superadmin y admin operativo en usuarios_admin; DEMO_ADMIN_EMAIL debe ser distinto de SUPERADMIN_EMAIL."
+      - "seed-admin.js crea usuarios del panel en usuarios_admin, no empleados, y preserva rol superadmin para usuarios existentes."
       - "seed-test-data.js exige TEST_DATA_PASSWORD por env."
       - "API_LA_QUINTA/.env.example y .env.example usan placeholders para passwords demo/dev."
     risk: "Riesgo residual medio: seed-full-reset sigue siendo destructivo si se confirma explicitamente en dev/test."
@@ -187,6 +198,22 @@ technical_debt:
       - "front_clientes/src/pages/SugerenciasPage.jsx fue alineado el 2026-07-02 para usar /api/v1/pedidos/sugerencias."
     risk: "Medio: mantener dos sistemas de sugerencias puede fragmentar datos si un consumidor nuevo usa /mis-sugerencias."
     recommended_cut: "Confirmar si /mis-sugerencias se conserva como feature separada o se elimina/consolida antes de exponerlo a usuarios."
+
+  - id: "debt-notificaciones-origen-admin"
+    status: resolved
+    area: "notificaciones"
+    evidence:
+      - "API_LA_QUINTA/src/modules/notificaciones expone endpoints cliente para listar, contar no leidas y marcar leidas."
+      - "API_LA_QUINTA/src/modules/notificaciones/notificaciones.routes.js expone GET/POST /api/v1/notificaciones/admin detras de requireAdmin."
+      - "front_menu/src/pages/NotificacionesAdmin.jsx separa panel Internas y panel WhatsApp."
+      - "API_LA_QUINTA/src/modules/notificaciones expone reglas configurables por canal/evento y filtros de destinatarios."
+      - "API_LA_QUINTA/src/database/migrations/1719000038000_notificaciones-reglas-whatsapp.js crea notificacion_reglas, notificacion_configuracion, notificacion_destinatarios_whatsapp y notificacion_envios_whatsapp."
+      - "API_LA_QUINTA/src/modules/auth/auth.service.js dispara nuevo_registro."
+      - "API_LA_QUINTA/src/modules/menus-semanales/menus-semanales.service.js dispara menu_publicado."
+      - "API_LA_QUINTA/src/modules/pedidos/pedidos.service.js dispara pedido_estado_cambiado."
+      - "API_LA_QUINTA/src/database/migrations/1719000037000_notificaciones-dedupe-key.js agrega dedupe_key para evitar duplicados automaticos."
+    risk: "Bajo; existe scheduler semanal para pedido_semanal_pendiente, pero no hay aun politicas mas complejas de frecuencia/reintentos/cierre por empresa."
+    recommended_cut: "Agregar recordatorios por vencimiento u horarios multiples solo si se define una politica operativa mas especifica."
 
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."

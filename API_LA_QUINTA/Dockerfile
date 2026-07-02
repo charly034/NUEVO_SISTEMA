@@ -12,6 +12,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY src ./src
 COPY scripts ./scripts
 COPY database.json .pgmigraterc.js ./
+RUN mkdir -p uploads/platos && chown -R node:node uploads
 
 USER node
 

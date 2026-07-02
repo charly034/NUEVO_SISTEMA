@@ -1,6 +1,7 @@
 import * as repo from './pedidos.repository.js';
 import * as empresasRepo from '../empresas/empresas.repository.js';
 import * as guarnicionesRepo from '../guarniciones/guarniciones.repository.js';
+import * as notificacionesService from '../notificaciones/notificaciones.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { getClient } from '../../database/connection.js';
 import { validarPedidoInput } from './pedidos.validation.js';
@@ -102,13 +103,18 @@ function mapearPlatoEspecial(plato, guarniciones) {
     platoId: plato.plato_id,
     opcion: plato.opcion || null,
     nombre: plato.plato_nombre,
-    descripcion: plato.descripcion || 'Menu publicado',
+    descripcion: plato.descripcion || plato.descripcion_larga || 'Menu publicado',
+    descripcionLarga: plato.descripcion_larga || null,
     categoria: 'menu',
     tipo: plato.tiene_guarnicion ? 'principal_con_guarnicion' : 'plato_completo',
     requiereGuarnicion: Boolean(plato.tiene_guarnicion),
     destacado: true,
     grupo: 'especiales',
     estado: 'disponible',
+    calorias: plato.calorias ?? null,
+    alergenos: plato.alergenos || [],
+    foto_url: plato.foto_url || null,
+    vegetariano: Boolean(plato.vegetariano),
     etiquetas: crearEtiquetasPlato(plato, [`Opcion ${plato.opcion || ''}`.trim()]),
     guarniciones: plato.tiene_guarnicion ? guarniciones : [],
   };
@@ -120,23 +126,37 @@ function mapearPlatoFijo(plato, guarniciones) {
     platoId: plato.plato_id,
     opcion: null,
     nombre: plato.plato_nombre,
-    descripcion: plato.descripcion || 'Plato fijo',
+    descripcion: plato.descripcion || plato.descripcion_larga || 'Plato fijo',
+    descripcionLarga: plato.descripcion_larga || null,
     categoria: 'fijo',
     tipo: plato.tiene_guarnicion ? 'principal_con_guarnicion' : 'plato_completo',
     requiereGuarnicion: Boolean(plato.tiene_guarnicion),
     destacado: false,
     grupo: 'fijos',
     estado: 'disponible',
+    calorias: plato.calorias ?? null,
+    alergenos: plato.alergenos || [],
+    foto_url: plato.foto_url || null,
+    vegetariano: Boolean(plato.vegetariano),
     etiquetas: crearEtiquetasPlato(plato, ['Fijo']),
     guarniciones: plato.tiene_guarnicion ? guarniciones : [],
     diasDisponibles: plato.dias_disponibles || null,
   };
 }
 
-function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible }) {
+function todosLosDiasCerrados(menuSemana, diasPedido) {
+  const diasCerrados = menuSemana?.limiteEmpresa?.diasCerrados || [];
+  return diasPedido.length > 0 && diasPedido.every((dia) => diasCerrados.includes(dia));
+}
+
+function obtenerDiasSinServicio(menu) {
+  return new Set((menu?.sin_servicio || []).map((item) => item.dia));
+}
+
+function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible, diasPedido = [] }) {
   if (pedidoVisible) return 'confirmado';
   if (!menuSemana?.menu?.id) return semanaInicio > lunesDeSemana() ? 'sin_menu' : 'sin_pedido';
-  if (menuSemana.cerrado || menuSemana.limiteEmpresa?.vencido) return 'cerrado';
+  if (menuSemana.cerrado || menuSemana.limiteEmpresa?.vencido || todosLosDiasCerrados(menuSemana, diasPedido)) return 'cerrado';
   return 'sin_pedido';
 }
 
@@ -502,12 +522,14 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
     const pedidoVisible = pedidosPorSemana.get(semanaInicio) || null;
     const sugerenciaVisible = sugerenciasPorSemana.get(semanaInicio) || null;
     const tipo = obtenerTipoSemana(semanaInicio, semanaActual);
-    const estado = obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible });
+    const estado = obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible, diasPedido });
     const fechaFin = addDias(semanaInicio, Math.max(diasPedido.length - 1, 0));
     const tieneMenuPublicado = Boolean(menuSemana?.menu?.id);
     const esSemanaSugerencias = !tieneMenuPublicado && semanaInicio > semanaActual;
     const itemsPorDia = new Map((pedidoVisible?.items || []).map((item) => [item.dia, item]));
-    const sinServicioPorDia = new Map((menuSemana.menu?.sin_servicio || []).map((item) => [item.dia, item.motivo]));
+    const sinServicioPorDia = new Map(
+      (menuSemana.menu?.sin_servicio || []).map((item) => [item.dia, item.motivo || 'Sin servicio']),
+    );
 
     return {
       id: semanaInicio,
@@ -536,11 +558,12 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
           .map((plato) => mapearPlatoEspecial(plato, guarniciones));
         const fijos = (menuSemana.menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
         const opciones = [...especiales, ...fijos];
-        const motivoSinServicio = sinServicioPorDia.get(dia);
+        const tieneSinServicio = sinServicioPorDia.has(dia);
+        const motivoSinServicio = sinServicioPorDia.get(dia) || null;
         const sinPedidoGuardado = Boolean(item?.sin_pedido);
         const sinPedidoPorDefecto = !item && (
           diasPorDefectoSinPedido.includes(dia) ||
-          Boolean(motivoSinServicio)
+          tieneSinServicio
         );
         const seleccion = construirSeleccionItem(item, opciones);
         const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
@@ -558,9 +581,9 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
                   ? 'sin_menu'
                   : 'sin_seleccionar',
           bloqueado: (menuSemana.limiteEmpresa?.diasCerrados || []).includes(dia),
-          motivo: motivoSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
-          mensajeMenu: motivoSinServicio
-            ? 'Este dia no tiene servicio normal. Queda sin vianda por defecto, pero podes elegir plato si tu empresa recibe entrega anticipada.'
+          motivo: tieneSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
+          mensajeMenu: tieneSinServicio
+            ? 'Este dia no tiene servicio. Queda sin vianda por defecto y no se puede editar.'
             : sinMenuEspecial
               ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
               : null,
@@ -573,7 +596,11 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
           especiales,
           fijos,
           opciones,
-          regla: empresa.modo_pedido === 'diario' ? 'diario' : 'semanal',
+          regla: empresa.modo_pedido === 'diario'
+            ? 'diario'
+            : empresa.modo_pedido === 'ambos'
+              ? 'mixto'
+              : 'semanal',
         };
       }),
       metadata: {
@@ -642,8 +669,8 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
   return {
     semanaId,
     dias: diasPedido.map((dia, indice) => {
-      const motivoSinServicio = (menu?.sin_servicio || [])
-        .find((item) => item.dia === dia)?.motivo || null;
+      const sinServicio = (menu?.sin_servicio || []).find((item) => item.dia === dia) || null;
+      const motivoSinServicio = sinServicio?.motivo || 'Sin servicio';
       const especiales = (menu?.variables || [])
           .filter((plato) => plato.dia === dia)
           .map((plato) => mapearPlatoEspecial(plato, guarniciones));
@@ -653,20 +680,20 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
       return {
         diaId: dia,
         fecha: menu?.fecha_inicio ? addDias(menu.fecha_inicio, indice) : null,
-        estadoMenu: motivoSinServicio
+        estadoMenu: sinServicio
           ? 'sin_servicio'
           : especiales.length > 0
             ? 'con_menu_especial'
             : sinMenuEspecial
               ? 'sin_menu_especial'
               : 'sin_menu',
-        mensaje: motivoSinServicio
-          ? 'Este dia no tiene servicio normal. Queda sin vianda por defecto, pero podes elegir plato si tu empresa recibe entrega anticipada.'
+        mensaje: sinServicio
+          ? 'Este dia no tiene servicio. Queda sin vianda por defecto y no se puede editar.'
           : sinMenuEspecial
             ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
             : null,
-        sinServicio: Boolean(motivoSinServicio),
-        motivoSinServicio,
+        sinServicio: Boolean(sinServicio),
+        motivoSinServicio: sinServicio ? motivoSinServicio : null,
         especiales,
         fijos,
         opciones: [...especiales, ...fijos],
@@ -814,6 +841,12 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
   const errorLimite = verificarLimiteEmpresa(empresa, semana_inicio, items.map(i => i.dia));
   if (errorLimite) throw ApiError.conflict(errorLimite);
 
+  const diasSinServicio = obtenerDiasSinServicio(menuActivo);
+  const itemSinServicio = items.find((item) => diasSinServicio.has(item.dia));
+  if (itemSinServicio) {
+    throw ApiError.unprocessable(`El ${itemSinServicio.dia} no tiene servicio y no se puede modificar`);
+  }
+
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -857,7 +890,10 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
       observaciones,
     }, client);
 
-    await repo.deleteItemsNotInDays(pedido.id, [...diasUnicos], client);
+    const diasProtegidos = (pedidoPrevio?.items || [])
+      .filter((item) => verificarLimiteEmpresa(empresa, semana_inicio, [item.dia]))
+      .map((item) => item.dia);
+    await repo.deleteItemsNotInDays(pedido.id, [...new Set([...diasUnicos, ...diasProtegidos])], client);
     const itemsGuardados = [];
     for (const item of items) {
       itemsGuardados.push(await repo.upsertItem(pedido.id, item, client));
@@ -1006,6 +1042,10 @@ export const cambiarEstado = async (id, estado, actor = {}) => {
       estado_nuevo: estado,
       resumen: `Estado cambiado de ${anterior.estado} a ${estado}`,
       metadata: {},
+    }, client);
+    await notificacionesService.notificarCambioEstadoPedido({
+      pedido,
+      estadoAnterior: anterior.estado,
     }, client);
 
     await client.query('COMMIT');

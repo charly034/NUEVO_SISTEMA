@@ -109,15 +109,52 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
   const [form, setForm] = useState(() => ({
     nombre:           initial?.nombre           ?? '',
     descripcion:      initial?.descripcion      ?? '',
+    descripcion_larga: initial?.descripcion_larga ?? '',
+    calorias:         initial?.calorias         ?? '',
+    alergenos:        initial?.alergenos        ?? [],
+    vegetariano:      initial?.vegetariano      ?? false,
+    foto:             null,
     tipo:             initial?.tipo             ?? 'especial',
     tiene_guarnicion: initial?.tiene_guarnicion ?? false,
     tags:             initial?.tags             ?? [],
   }));
+  const [fotoPreview, setFotoPreview] = useState(initial?.foto_url ?? '');
   const [errors, setErrors] = useState({});
 
   const set = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
     setErrors((er) => ({ ...er, [field]: '' }));
+  };
+
+  const handleFoto = (e) => {
+    const file = e.target.files?.[0] || null;
+    setErrors((er) => ({ ...er, foto: '' }));
+    if (!file) {
+      setForm((f) => ({ ...f, foto: null }));
+      setFotoPreview(initial?.foto_url ?? '');
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setErrors((er) => ({ ...er, foto: 'La imagen debe ser JPG, PNG o WebP' }));
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((er) => ({ ...er, foto: 'La imagen no puede superar 5 MB' }));
+      e.target.value = '';
+      return;
+    }
+
+    setForm((f) => ({ ...f, foto: file }));
+    setFotoPreview(URL.createObjectURL(file));
+  };
+
+  const setAlergenos = (value) => {
+    setForm((f) => ({
+      ...f,
+      alergenos: value.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 20),
+    }));
   };
 
   const validate = () => {
@@ -134,6 +171,11 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
     onSubmit({
       nombre:           form.nombre.trim(),
       descripcion:      form.descripcion.trim() || undefined,
+      descripcion_larga: form.descripcion_larga.trim() || undefined,
+      calorias:         form.calorias === '' ? null : Number(form.calorias),
+      alergenos:        form.alergenos,
+      vegetariano:      form.vegetariano,
+      foto:             form.foto,
       tipo:             form.tipo,
       tiene_guarnicion: form.tiene_guarnicion,
       tags:             form.tags,
@@ -161,6 +203,32 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
       </div>
 
+      {/* Imagen */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Foto <span className="text-gray-400 font-normal">(JPG, PNG o WebP)</span>
+        </label>
+        <div className="flex items-center gap-3">
+          <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+            {fotoPreview ? (
+              <img src={fotoPreview} alt="Vista previa del plato" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs text-gray-400 text-center px-2">Sin foto</span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFoto}
+              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+            />
+            <p className="mt-1 text-xs text-gray-400">Se comprime y guarda automaticamente como WebP.</p>
+            {errors.foto && <p className="text-xs text-red-500 mt-1">{errors.foto}</p>}
+          </div>
+        </div>
+      </div>
+
       {/* Descripción */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -175,6 +243,71 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
             focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
         />
       </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Descripcion ampliada / receta <span className="text-gray-400 font-normal">(opcional)</span>
+        </label>
+        <textarea
+          value={form.descripcion_larga}
+          onChange={set('descripcion_larga')}
+          placeholder="Preparacion, ingredientes principales, porcion sugerida..."
+          rows={3}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none resize-none
+            focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Calorias aproximadas
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="3000"
+            value={form.calorias}
+            onChange={set('calorias')}
+            placeholder="Ej: 420"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none
+              focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Alergenos
+          </label>
+          <input
+            type="text"
+            value={form.alergenos.join(', ')}
+            onChange={(e) => setAlergenos(e.target.value)}
+            placeholder="Gluten, lactosa, huevo"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none
+              focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setForm((f) => ({ ...f, vegetariano: !f.vegetariano }))}
+        className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all text-left
+          ${form.vegetariano
+            ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
+            : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
+          }`}
+      >
+        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors
+          ${form.vegetariano ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 bg-white'}`}>
+          {form.vegetariano && (
+            <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
+              <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </span>
+        <span>{form.vegetariano ? 'Marcado como vegetariano' : 'No marcado como vegetariano'}</span>
+      </button>
 
       {/* Guarnición */}
       <div>

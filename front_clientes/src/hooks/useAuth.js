@@ -23,6 +23,15 @@ export function useAuth() {
   const [empleado, setEmpleado] = useState(() => readStoredEmpleado());
   const [checking, setChecking] = useState(() => hasToken() && !readStoredEmpleado());
 
+  const setAuthenticatedSession = useCallback((data, remember = false) => {
+    if (!data?.token || !data?.empleado) {
+      throw new Error('La sesion de autenticacion es invalida.');
+    }
+    saveClientSession({ token: data.token, empleado: data.empleado }, remember);
+    setEmpleado(data.empleado);
+    return data.empleado;
+  }, []);
+
   const logout = useCallback(() => {
     clearClientSession();
     setEmpleado(null);
@@ -52,10 +61,8 @@ export function useAuth() {
     const data = await medirPromesaPerformance('auth:login', () =>
       authApi.login(email, password, remember),
     );
-    saveClientSession({ token: data.token, empleado: data.empleado }, remember);
-    setEmpleado(data.empleado);
-    return data.empleado;
-  }, []);
+    return setAuthenticatedSession(data, remember);
+  }, [setAuthenticatedSession]);
 
   const setSession = useCallback((emp) => {
     setEmpleado(emp);
@@ -64,5 +71,5 @@ export function useAuth() {
     if (token) saveClientSession({ token, empleado: emp }, remember);
   }, []);
 
-  return { empleado, login, logout, setSession, checking };
+  return { empleado, login, logout, setSession, setAuthenticatedSession, checking };
 }

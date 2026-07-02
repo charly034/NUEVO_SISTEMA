@@ -11,7 +11,9 @@ export const menuSemana = async (semanaInicio) => {
   // Solo menús publicados
   const variablesRes = await query(
     `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
-            p.nombre AS plato_nombre, p.descripcion, p.tags, p.tiene_guarnicion,
+            p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
+            p.tags, p.tiene_guarnicion, p.vegetariano,
+            p.calorias, p.alergenos, p.foto_url,
             ms.id AS menu_semanal_id, ms.nombre AS menu_nombre,
             ms.fecha_inicio, ms.fecha_fin, ms.estado,
             ms.fecha_limite_pedidos
@@ -25,7 +27,8 @@ export const menuSemana = async (semanaInicio) => {
 
   // Platos fijos activos
   const fijosRes = await query(
-    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, tags, tiene_guarnicion
+    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, descripcion_larga,
+            tags, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url
      FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
   );
 
@@ -35,7 +38,8 @@ export const menuSemana = async (semanaInicio) => {
 // Carga las variables y fijos de un menú dado su row de DB
 function cargarPlatosFijos(db = query) {
   return execute(db,
-    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, tags, tiene_guarnicion
+    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, descripcion_larga,
+            tags, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url
      FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
   );
 }
@@ -43,7 +47,9 @@ function cargarPlatosFijos(db = query) {
 async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null) {
   const variablesRes = await execute(db,
       `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
-              p.nombre AS plato_nombre, p.descripcion, p.tags, p.tiene_guarnicion,
+              p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
+              p.tags, p.tiene_guarnicion, p.vegetariano,
+              p.calorias, p.alergenos, p.foto_url,
               ms.id AS menu_semanal_id
        FROM menus_semanales ms
        JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
@@ -147,7 +153,9 @@ export const menuHoy = async () => {
 
   const variablesRes = await query(
     `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
-            p.nombre AS plato_nombre, p.descripcion, p.tags, p.tiene_guarnicion,
+            p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
+            p.tags, p.tiene_guarnicion, p.vegetariano,
+            p.calorias, p.alergenos, p.foto_url,
             ms.id AS menu_semanal_id
      FROM menus_semanales ms
      JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
@@ -163,7 +171,8 @@ export const menuHoy = async () => {
   );
 
   const fijosRes = await query(
-    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, tags, tiene_guarnicion
+    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, descripcion_larga,
+            tags, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url
      FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
   );
 

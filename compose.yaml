@@ -42,6 +42,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - api_uploads:/app/uploads
     ports:
       - "3000:3000"
 
@@ -69,5 +71,25 @@ services:
     ports:
       - "5175:8080"
 
+  cloudflared:
+    image: cloudflare/cloudflared:2026.6.1
+    restart: unless-stopped
+    profiles:
+      - tunnel
+    command:
+      [
+        "tunnel",
+        "--no-autoupdate",
+        "run",
+        "--token",
+        "${CLOUDFLARED_TUNNEL_TOKEN:-}",
+      ]
+    depends_on:
+      admin:
+        condition: service_healthy
+      clientes:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  api_uploads:

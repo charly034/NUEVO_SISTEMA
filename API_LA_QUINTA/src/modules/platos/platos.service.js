@@ -1,4 +1,5 @@
 import * as platosRepository from './platos.repository.js';
+import { borrarImagenPlato, guardarImagenPlato } from './platos-imagen.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 
 export const getAllPlatos = async ({ page = 1, limit = 20, activo, search, tag, tipo, sort_by, sort_dir } = {}) => {
@@ -28,14 +29,22 @@ export const getPlatoById = async (id) => {
   return plato;
 };
 
-export const createPlato = async (data) => {
-  return platosRepository.create(data);
+export const createPlato = async (data, file = null) => {
+  const foto_url = file ? await guardarImagenPlato(file, data.nombre) : data.foto_url;
+  return platosRepository.create({ ...data, foto_url });
 };
 
-export const updatePlato = async (id, data) => {
+export const updatePlato = async (id, data, file = null) => {
   const plato = await platosRepository.findById(id);
   if (!plato) throw ApiError.notFound(`Plato con id ${id} no encontrado`);
-  return platosRepository.update(id, data);
+
+  const fields = { ...data };
+  if (file) {
+    fields.foto_url = await guardarImagenPlato(file, data.nombre || plato.nombre);
+    await borrarImagenPlato(plato.foto_url);
+  }
+
+  return platosRepository.update(id, fields);
 };
 
 export const deletePlato = async (id) => {
@@ -50,4 +59,5 @@ export const deletePlato = async (id) => {
   }
 
   await platosRepository.remove(id);
+  await borrarImagenPlato(plato.foto_url);
 };

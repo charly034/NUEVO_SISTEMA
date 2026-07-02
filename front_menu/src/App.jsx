@@ -17,6 +17,7 @@ const PedidosAdmin = lazy(() => import('./pages/PedidosAdmin.jsx'));
 const PedidosHoy = lazy(() => import('./pages/PedidosHoy.jsx'));
 const RecomendacionesMenu = lazy(() => import('./pages/RecomendacionesMenu.jsx'));
 const Administradores = lazy(() => import('./pages/Administradores.jsx'));
+const NotificacionesAdmin = lazy(() => import('./pages/NotificacionesAdmin.jsx'));
 
 function PageFallback() {
   return (
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="empresas" element={<Suspense fallback={<PageFallback />}><Empresas /></Suspense>} />
           <Route path="empleados" element={<Suspense fallback={<PageFallback />}><Empresas /></Suspense>} />
           <Route path="guarniciones" element={<Suspense fallback={<PageFallback />}><Guarniciones /></Suspense>} />
+          <Route path="notificaciones" element={<Suspense fallback={<PageFallback />}><NotificacionesAdmin /></Suspense>} />
           <Route path="administradores" element={<Suspense fallback={<PageFallback />}><Administradores /></Suspense>} />
         </Route>
       </Routes>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { ChevronRight, LogOut, Lock, Leaf, Wheat, Milk, Fish, TreeDeciduous, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, LogOut, Lock, Leaf, Wheat, Milk, Fish, TreeDeciduous, AlertCircle, CheckCircle2, MessageCircle } from 'lucide-react';
 import { apiPatch } from '../services/apiCliente.js';
 import { authApi } from '../services/api.js';
 import BtnPrimary from '../components/ui/BtnPrimary.jsx';
@@ -14,12 +14,14 @@ const PREFS = [
   { key: 'sin_frutos_secos', label: 'Sin frutos secos', Icon: TreeDeciduous },
 ];
 
-function Toggle({ active, onChange }) {
+function Toggle({ active, onChange, disabled = false }) {
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onChange}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${active ? 'bg-[#5B6B2A]' : 'bg-[#D8D5C8]'}`}
+      disabled={disabled}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 ${active ? 'bg-[#5B6B2A]' : 'bg-[#D8D5C8]'}`}
     >
       <span
         className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${active ? 'translate-x-6' : 'translate-x-1'}`}
@@ -28,10 +30,32 @@ function Toggle({ active, onChange }) {
   );
 }
 
+function FilaToggle({ label, sublabel, Icon, active, onChange, disabled }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#F0EDE6] last:border-0">
+      <div className="w-8 h-8 bg-[#EDF0E4] rounded-xl flex items-center justify-center shrink-0">
+        <Icon size={15} className="text-[#5B6B2A]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-[#2A2C1F]">{label}</p>
+        {sublabel && <p className="text-xs text-[#9A9885] mt-0.5">{sublabel}</p>}
+      </div>
+      <Toggle active={active} onChange={onChange} disabled={disabled} />
+    </div>
+  );
+}
+
 function SectionHeader({ title }) {
   return (
     <p className="px-4 text-xs font-bold text-[#9A9885] uppercase tracking-wider mt-6 mb-2">{title}</p>
   );
+}
+
+function formatFecha(fecha) {
+  if (!fecha) return 'Sin cargar';
+  const [year, month, day] = String(fecha).split('T')[0].split('-');
+  if (!year || !month || !day) return 'Sin cargar';
+  return `${day}/${month}/${year}`;
 }
 
 function FilaConfig({ label, sublabel, onPress, right }) {
@@ -111,6 +135,7 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
   const [showPassword, setShowPassword] = useState(false);
 
   const prefs = empleado?.preferencias_alimentarias || {};
+  const recibeRecordatoriosWhatsapp = Boolean(prefs.recibir_recordatorios_whatsapp);
 
   const prefsMutation = useMutation({
     mutationFn: (nuevasPrefs) => apiPatch('/auth/preferencias', nuevasPrefs),
@@ -119,8 +144,8 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
     },
   });
 
-  const togglePref = (key) => {
-    const nuevas = { ...prefs, [key]: !prefs[key] };
+  const togglePref = (key, nextValue = undefined) => {
+    const nuevas = { ...prefs, [key]: nextValue ?? !prefs[key] };
     prefsMutation.mutate(nuevas);
     // Optimistic update en UI
     if (onEmpleadoUpdate) onEmpleadoUpdate({ ...empleado, preferencias_alimentarias: nuevas });
@@ -158,8 +183,31 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
           />
           <FilaConfig
             label="Plan"
-            sublabel={empleado?.plan || 'basico'}
+            sublabel={empleado?.empresa?.plan || empleado?.plan || 'basico'}
             right={<span />}
+          />
+          <FilaConfig
+            label="Teléfono"
+            sublabel={empleado?.telefono || 'Sin cargar'}
+            right={<span />}
+          />
+          <FilaConfig
+            label="Cumpleaños"
+            sublabel={formatFecha(empleado?.fecha_nacimiento)}
+            right={<span />}
+          />
+        </div>
+
+        {/* WhatsApp */}
+        <SectionHeader title="WhatsApp" />
+        <div className="mx-4 bg-white rounded-2xl border border-[#E8E5DC] overflow-hidden">
+          <FilaToggle
+            label="Recibir recordatorios"
+            sublabel="Avisos al telÃ©fono cargado por WhatsApp"
+            Icon={MessageCircle}
+            active={recibeRecordatoriosWhatsapp}
+            onChange={() => togglePref('recibir_recordatorios_whatsapp', !recibeRecordatoriosWhatsapp)}
+            disabled={prefsMutation.isPending}
           />
         </div>
 
@@ -167,16 +215,14 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
         <SectionHeader title="Preferencias alimentarias" />
         <div className="mx-4 bg-white rounded-2xl border border-[#E8E5DC] overflow-hidden">
           {PREFS.map(({ key, label, Icon }) => (
-            <div
+            <FilaToggle
               key={key}
-              className="flex items-center gap-3 px-4 py-3.5 border-b border-[#F0EDE6] last:border-0"
-            >
-              <div className="w-8 h-8 bg-[#EDF0E4] rounded-xl flex items-center justify-center shrink-0">
-                <Icon size={15} className="text-[#5B6B2A]" />
-              </div>
-              <p className="flex-1 text-sm font-semibold text-[#2A2C1F]">{label}</p>
-              <Toggle active={Boolean(prefs[key])} onChange={() => togglePref(key)} />
-            </div>
+              label={label}
+              Icon={Icon}
+              active={Boolean(prefs[key])}
+              onChange={() => togglePref(key)}
+              disabled={prefsMutation.isPending}
+            />
           ))}
         </div>
 

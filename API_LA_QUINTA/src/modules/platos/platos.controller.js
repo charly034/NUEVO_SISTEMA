@@ -14,12 +14,12 @@ export const getPlato = asyncHandler(async (req, res) => {
 });
 
 export const createPlato = asyncHandler(async (req, res) => {
-  const plato = await platosService.createPlato(req.body);
+  const plato = await platosService.createPlato(req.body, req.file);
   sendCreated(res, plato, 'Plato creado exitosamente');
 });
 
 export const updatePlato = asyncHandler(async (req, res) => {
-  const plato = await platosService.updatePlato(req.params.id, req.body);
+  const plato = await platosService.updatePlato(req.params.id, req.body, req.file);
   sendSuccess(res, plato, 'Plato actualizado exitosamente');
 });
 

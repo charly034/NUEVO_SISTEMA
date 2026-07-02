@@ -375,7 +375,7 @@ export function adaptarSemanasPedido({
                 : "sin_seleccionar",
           motivo: motivoSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
           mensajeMenu: motivoSinServicio
-            ? "Este dia no tiene servicio normal. Queda sin vianda por defecto, pero podes elegir plato si tu empresa recibe entrega anticipada."
+            ? "Este dia no tiene servicio. Queda sin vianda por defecto y no se puede editar."
             : sinMenuEspecial
               ? "Todavia no hay menu especial para este dia. Podes elegir un plato fijo."
               : null,

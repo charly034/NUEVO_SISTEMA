@@ -65,12 +65,18 @@ export default function NotificacionesPage() {
 
   const marcarLeida = useMutation({
     mutationFn: (id) => apiPatch(`/notificaciones/${id}/leer`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notificaciones'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-no-leidas'] });
+    },
   });
 
   const marcarTodas = useMutation({
     mutationFn: () => apiPatch('/notificaciones/leer-todas'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notificaciones'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-no-leidas'] });
+    },
   });
 
   const noLeidas = notificaciones.filter(n => !n.leida).length;

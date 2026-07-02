@@ -13,8 +13,10 @@
     "seed": "node scripts/import-menus-csv.js",
     "seed:fijos": "node scripts/seed-platos-fijos.js",
     "seed:reset": "node scripts/seed-full-reset.js",
+    "seed:setup": "node scripts/seed-full-reset.js",
     "seed:demo": "node scripts/seed-empresa-demo.js",
     "seed:admin": "node scripts/seed-admin.js",
+    "seed:platos-metadata": "node scripts/backfill-platos-metadata-aproximada.js",
     "admin:reset-password": "node scripts/reset-admin-password.js",
     "setup": "npm run migrate && npm run seed && npm run seed:fijos",
     "test": "node --test",
@@ -29,8 +31,10 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
+    "multer": "^2.2.0",
     "node-pg-migrate": "^7.4.0",
     "pg": "^8.12.0",
+    "sharp": "^0.35.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {

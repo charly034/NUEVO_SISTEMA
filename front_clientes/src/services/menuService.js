@@ -37,6 +37,13 @@ function normalizarPlato(plato) {
     tipo: plato.tipo ?? (requiereGuarnicion ? "principal_con_guarnicion" : "plato_completo"),
     requiereGuarnicion,
     destacado: Boolean(plato.destacado ?? plato.especial),
+    calorias: plato.calorias ?? plato.calories ?? null,
+    alergenos: Array.isArray(plato.alergenos)
+      ? plato.alergenos
+      : Array.isArray(plato.allergens)
+        ? plato.allergens
+        : [],
+    foto_url: plato.foto_url ?? plato.fotoUrl ?? plato.photo ?? "",
     grupo: plato.grupo ?? (plato.destacado || plato.especial ? "especiales" : "fijos"),
     estado: plato.estado ?? (plato.disponible === false ? "deshabilitado" : "disponible"),
     diasDisponibles: plato.diasDisponibles ?? plato.dias_disponibles ?? null,

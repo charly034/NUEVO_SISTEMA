@@ -4,7 +4,7 @@ updated_at: "2026-07-02"
 product_summary:
   from_chat_summary:
     - "La Quinta es una app web mobile-first para pedidos semanales."
-    - "El diseno aprobado usa fondo calido, verde oliva, card semanal centrada y navegacion inferior Pedido / Mis pedidos / Mi cuenta."
+    - "El diseno aprobado usa fondo calido, verde oliva, card semanal centrada y navegacion inferior Inicio / Historial / Perfil."
     - "El flujo actual a desarrollar es posterior a Hacer pedido o Modificar pedido."
     - "Cada dia puede tener hasta aproximadamente 15 opciones de plato."
     - "Algunos platos requieren elegir guarnicion y otros no."
@@ -12,7 +12,7 @@ product_summary:
     - "Si el plan es semanal, la modificacion vence el lunes de esa semana salvo regla especifica."
   verified_in_repo:
     - "Backend Express + PostgreSQL con prefijo /api/v1."
-    - "front_clientes tiene rutas Pedido semanal, Mis pedidos y Mi cuenta."
+    - "front_clientes tiene rutas Inicio/Pedido semanal, Historial/Mis pedidos y Perfil/Mi cuenta."
     - "front_clientes usa BottomNavigation dentro de rutas privadas."
     - "API implementa empresas con modo_pedido, dias_laborales, limite_hora, limite_dia_semana y limite_anticipacion_dias."
     - "API implementa dias sin servicio en menus semanales."
@@ -28,7 +28,7 @@ confirmed_decisions:
   from_chat_summary:
     - "Mantener nombres del dominio en espanol."
     - "Mantener UI cliente mobile-first."
-    - "Un dia de menu marcado sin servicio/feriado debe quedar como sin vianda por defecto, pero el cliente puede cambiarlo para empresas con entrega anticipada."
+    - "Un dia de menu marcado sin servicio/feriado debe quedar como sin vianda por defecto y bloqueado para edicion cliente/API."
 
 current_project_state:
   verified_in_repo:
@@ -70,6 +70,8 @@ conversation_decisions_or_context:
 
 timeline:
   verified_in_repo:
+    - date: "2026-07-02"
+      event: "WeeklyOrderView bloquea filas sin servicio para seleccion, API rechaza items enviados para esos dias y Confirmar pedido semanal solo se habilita con cambios reales contra el pedido inicial."
     - date: "2026-06-30"
       event: "Pedido cliente deja de bloquear dias marcados sin servicio: se muestran como sin pedido por defecto y POST/PUT permite guardar plato si pasa validacion."
     - date: "2026-06-27"
@@ -162,6 +164,40 @@ timeline:
       event: "Admin empleados agrega telefono y fecha_nacimiento al formulario/listado y API empleados los acepta/devuelve; Pedido semanal corrige z-index del selector de plato para que el boton Listo para el dia no quede tapado por BottomNavigation."
     - date: "2026-07-02"
       event: "Pedido semanal ajusta el footer fijo de accion/confirmacion para que Pedido confirmado y Volver al inicio se vean completos por encima de BottomNavigation en mobile."
+    - date: "2026-07-02"
+      event: "Mi cuenta cliente muestra telefono y cumpleanos del empleado; auth login/registro alinean el empleado de sesion con /auth/me para incluir telefono, fecha_nacimiento y preferencias_alimentarias."
+    - date: "2026-07-02"
+      event: "Front cliente porta el flujo del mockup Figma Make: tabs Inicio/Historial/Perfil, SuggestionSheet para semanas sin menu, MenuViewScreen previo a pedido para semanas con menu, WeeklyOrderView solo lectura en semanas cerradas y /mapa-navegacion como referencia interna. API pedidos expone calorias/alergenos/foto_url opcionales de platos para la lectura de menu."
+    - date: "2026-07-02"
+      event: "Inicio cliente se ajusta visualmente al mockup Figma: header verde con saludo e iconos, aviso Primera semana, card blanca de Semana actual y cards separadas en Proximas semanas; BottomNavigation usa pill activa."
+    - date: "2026-07-02"
+      event: "Platos se enriquecen end-to-end: API acepta metadata nutricional/receta y upload de imagen JPG/PNG/WebP, comprime a WebP en uploads/platos, admin permite cargar/editar esos datos y cliente consume foto/kcal/alergenos/vegetariano/descripcion_larga en MenuViewScreen. Se ejecuto backfill aproximado para 146 platos existentes sin cargar fotos reales."
+    - date: "2026-07-02"
+      event: "Proximas semanas con menu publicado pasan a card amplia tipo Semana actual; cuando no hay pedido cargado invitan explicitamente a hacer el pedido antes del cierre."
+    - date: "2026-07-02"
+      event: "Inicio deja de mostrar contador hardcodeado en campana de notificaciones y usa GET /api/v1/notificaciones/no-leidas/count; queda documentado que falta origen admin/automatico para crear notificaciones."
+    - date: "2026-07-02"
+      event: "Notificaciones gana origen real: API agrega GET/POST /notificaciones/admin, front_menu agrega pantalla /notificaciones, publicar menu notifica a empleados activos y cambios de estado de pedido notifican al cliente con dedupe_key."
+    - date: "2026-07-02"
+      event: "Permisos de pedido se centralizan para empresas semanales, diarias y mixtas: MenuViewScreen oculta Hacer mi pedido fuera de plazo, WeeklyOrderView solo edita dias habilitados, GET /pedidos/semanas marca cerradas las semanas diarias sin dias editables y PUT conserva items vencidos de pedidos existentes."
+    - date: "2026-07-02"
+      event: "Pedido cliente corrige dias sin servicio con motivo null: el backend detecta la fila de menu_semanal_sin_servicio por existencia y WeeklyOrderView muestra Sin servicio en vez de plato normal."
+    - date: "2026-07-02"
+      event: "LoginPage cliente se refactoriza en subcomponentes y hooks de formularios; registro usa la sesion devuelta por /auth/registro y recuperacion queda alineada al flujo real de reset code."
+    - date: "2026-07-02"
+      event: "Historial cliente corrige Cancelar pedido: usa toast.success/error, actualiza cache mi-historial, invalida la query y muestra el CTA solo para estados pendiente/en_proceso."
+    - date: "2026-07-02"
+      event: "Perfil cliente corrige el toggle de notificaciones: ahora es Recibir recordatorios por WhatsApp, guarda recibir_recordatorios_whatsapp y no afecta las notificaciones internas de la app."
+    - date: "2026-07-02"
+      event: "Registro cliente exige telefono y cumpleanos como campos obligatorios en front_clientes y POST /api/v1/auth/registro."
+    - date: "2026-07-02"
+      event: "Notificaciones admin se convierte en panel de control con dos canales: Internas y WhatsApp. API agrega reglas configurables por evento/filtros, destinatarios externos de WhatsApp, configuracion de webhook n8n en DB, auditoria de envios y evento nuevo_registro."
+    - date: "2026-07-02"
+      event: "Notificaciones agrega scheduler interno de API para reglas evento pedido_semanal_pendiente; permite programar dia/hora semanal, por ejemplo lunes 09:00, y envia solo a empleados sin pedido no-cancelado para la semana publicada objetivo."
+    - date: "2026-07-02"
+      event: "Auditoria de puesta en marcha corrige seeds admin: seed-admin y seed-demo escriben usuarios_admin para login real del panel; seed:setup queda como alias de seed-full-reset y crea superadmin + admin operativo con credenciales demo por env, limpiando tambien tablas nuevas de notificaciones/sugerencias."
+    - date: "2026-07-02"
+      event: "Docker Compose agrega servicio opcional cloudflared bajo profile tunnel usando CLOUDFLARED_TUNNEL_TOKEN; los public hostnames esperados en Cloudflare Zero Trust apuntan a http://clientes:8080 y http://admin:8080."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."

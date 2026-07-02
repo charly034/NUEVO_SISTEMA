@@ -9,10 +9,37 @@ import {
   findByResetCode, clearResetCode, setPassword,
   findWithPasswordById,
 } from '../empleados/empleados.repository.js';
+import * as notificacionesService from '../notificaciones/notificaciones.service.js';
+
+const CAMPOS_PREFERENCIAS = [
+  'vegetariano',
+  'sin_gluten',
+  'sin_lacteos',
+  'sin_pescado',
+  'sin_frutos_secos',
+  'recibir_recordatorios_whatsapp',
+];
+
+function normalizarPreferenciasSesion(preferencias = {}) {
+  return {
+    recibir_recordatorios_whatsapp: false,
+    ...(preferencias || {}),
+  };
+}
+
+function normalizarPreferenciasParciales(preferencias = {}) {
+  return CAMPOS_PREFERENCIAS.reduce((acc, campo) => {
+    if (Object.prototype.hasOwnProperty.call(preferencias, campo)) {
+      acc[campo] = Boolean(preferencias[campo]);
+    }
+    return acc;
+  }, {});
+}
 
 export const login = async (email, password, { remember = false } = {}) => {
   const result = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.password_hash, e.activo, e.rol,
+            e.telefono, e.fecha_nacimiento, e.preferencias_alimentarias,
             emp.activo AS empresa_activa,
             e.empresa_id, emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido
      FROM empleados e
@@ -47,6 +74,9 @@ export const login = async (email, password, { remember = false } = {}) => {
       nombre: empleado.nombre,
       apellido: empleado.apellido,
       email: empleado.email,
+      telefono: empleado.telefono,
+      fecha_nacimiento: empleado.fecha_nacimiento,
+      preferencias_alimentarias: normalizarPreferenciasSesion(empleado.preferencias_alimentarias),
       rol: empleado.rol,
       empresa: {
         id: empleado.empresa_id,
@@ -88,6 +118,10 @@ export const registro = async ({ codigo, nombre, apellido, email, password, tele
     rol: 'cliente',
   });
 
+  notificacionesService.notificarNuevoRegistro({ empleado, empresa }).catch((error) => {
+    console.error('Error al disparar notificaciones de nuevo registro:', error.message);
+  });
+
   const payload = { sub: empleado.id, empresa_id: empresa.id, nombre: empleado.nombre, apellido: empleado.apellido, rol: 'cliente' };
   const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN_SHORT || '8h' });
 
@@ -98,6 +132,9 @@ export const registro = async ({ codigo, nombre, apellido, email, password, tele
       nombre: empleado.nombre,
       apellido: empleado.apellido,
       email: empleado.email,
+      telefono: empleado.telefono,
+      fecha_nacimiento: empleado.fecha_nacimiento,
+      preferencias_alimentarias: normalizarPreferenciasSesion(empleado.preferencias_alimentarias),
       rol: 'cliente',
       empresa: { id: empresa.id, nombre: empresa.nombre },
     },
@@ -154,7 +191,7 @@ export const getSession = async (empleadoId) => {
     email:                    empleado.email,
     telefono:                 empleado.telefono,
     fecha_nacimiento:         empleado.fecha_nacimiento,
-    preferencias_alimentarias: empleado.preferencias_alimentarias || {},
+    preferencias_alimentarias: normalizarPreferenciasSesion(empleado.preferencias_alimentarias),
     rol:                      empleado.rol,
     empresa: {
       id:          empleado.empresa_id,
@@ -166,12 +203,19 @@ export const getSession = async (empleadoId) => {
 };
 
 export const actualizarPreferencias = async (empleadoId, preferencias) => {
+  const preferenciasNormalizadas = normalizarPreferenciasParciales(preferencias);
+  if (Object.keys(preferenciasNormalizadas).length === 0) {
+    throw ApiError.badRequest('Sin preferencias para actualizar');
+  }
+
   const r = await query(
-    `UPDATE empleados SET preferencias_alimentarias = $1 WHERE id = $2
+    `UPDATE empleados
+     SET preferencias_alimentarias = COALESCE(preferencias_alimentarias, '{}'::jsonb) || $1::jsonb
+     WHERE id = $2
      RETURNING preferencias_alimentarias`,
-    [JSON.stringify(preferencias), empleadoId]
+    [JSON.stringify(preferenciasNormalizadas), empleadoId]
   );
-  return r.rows[0]?.preferencias_alimentarias || {};
+  return normalizarPreferenciasSesion(r.rows[0]?.preferencias_alimentarias || {});
 };
 
 export const actualizarPerfil = async (empleadoId, { nombre, apellido, telefono, fecha_nacimiento }) => {

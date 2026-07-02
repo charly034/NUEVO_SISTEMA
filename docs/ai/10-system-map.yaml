@@ -1,5 +1,5 @@
 schema: la_quinta_system_map_v2
-updated_at: "2026-06-28"
+updated_at: "2026-07-02"
 
 runtime_surfaces:
   verified_in_repo:
@@ -26,6 +26,9 @@ runtime_surfaces:
     docker_compose:
       file: "compose.yaml"
       services: ["db", "api", "admin", "clientes"]
+      optional_profile_services:
+        tunnel: ["cloudflared"]
+      volumes: ["postgres_data", "api_uploads"]
 
 load_order:
   verified_in_repo:
@@ -44,6 +47,7 @@ load_order:
       - "GET / raiz informativa"
       - "notFoundMiddleware"
       - "errorMiddleware"
+      - "API_LA_QUINTA/src/server.js inicia startNotificacionesScheduler despues de app.listen"
     admin:
       - "front_menu/src/main.jsx monta App"
       - "front_menu/src/App.jsx restaura adminAuth.storedUser"
@@ -54,7 +58,7 @@ load_order:
       - "front_clientes/src/main.jsx monta App"
       - "QueryClientProvider envuelve HashRouter"
       - "useAuth maneja sesion cliente"
-      - "PrivateRoute protege Pedido / Mis pedidos / Mi cuenta"
+      - "PrivateRoute protege Inicio / Historial / Perfil"
 
 load_order_contracts:
   verified_in_repo:
@@ -63,6 +67,7 @@ load_order_contracts:
     - "middlewares requireAuth/requireAdminAuth pueblan req.empleado o req.adminUser antes de controladores protegidos"
     - "front_menu depende de apiClient para Authorization y manejo de 401"
     - "front_clientes depende de services/api.js y apiCliente.js para Authorization y manejo de 401"
+    - "notificaciones.scheduler corre dentro del proceso API; usa APP_TIMEZONE via process.env.TZ y dedupe por notificacion_ejecuciones_programadas"
 
 state_owners:
   verified_in_repo:
@@ -110,6 +115,18 @@ storage_owners:
       - "pedido_items"
       - "pedido_eventos"
       - "pedido_sugerencias"
+      - "notificaciones"
+      - "notificacion_reglas"
+      - "notificacion_configuracion"
+      - "notificacion_destinatarios_whatsapp"
+      - "notificacion_envios_whatsapp"
+      - "notificacion_ejecuciones_programadas"
+    filesystem:
+      api_uploads:
+        path: "API_LA_QUINTA/uploads/platos"
+        served_as: "/uploads/platos"
+        docker_volume: "api_uploads -> /app/uploads"
+        contents: "imagenes de platos convertidas y comprimidas a WebP; archivos reales ignorados por git"
 
 global_variables_and_env:
   verified_in_repo:
@@ -155,6 +172,7 @@ global_variables_and_env:
       - "DB_CONNECTION_TIMEOUT_MS"
       - "CORS_ORIGINS"
       - "APP_TIMEZONE"
+      - "CLOUDFLARED_TUNNEL_TOKEN"
     frontend_env_names:
       - "VITE_API_URL"
       - "VITE_USAR_ENDPOINT_LEGACY_PEDIDOS"
@@ -174,6 +192,10 @@ interface_limits:
     menu_nombre_max_chars: 150
     plato_nombre_max_chars: 150
     plato_descripcion_max_chars: 1000
+    plato_descripcion_larga_max_chars: 4000
+    plato_imagen_upload_max: "5 MB"
+    plato_imagen_input_formats: ["image/jpeg", "image/png", "image/webp"]
+    plato_imagen_storage_format: "image/webp comprimido, max 1200x900"
   from_chat_summary:
     opciones_por_dia_aproximadas: 15
 
@@ -187,6 +209,7 @@ production_readiness:
       admin_template: "front_menu/nginx/default.conf.template"
       clientes_template: "front_clientes/nginx/default.conf.template"
       proxy_api: "location /api/ proxya a API_UPSTREAM"
+      proxy_uploads: "location /uploads/ proxya a API_UPSTREAM para imagenes de platos"
       static_assets_cache: "location /assets/ usa expires 1y y Cache-Control public, immutable"
       index_cache: "location / usa Cache-Control no-cache"
     server_shutdown:
@@ -204,6 +227,7 @@ production_readiness:
       status: "verified_in_repo"
       evidence:
         - "compose.yaml define db, api, admin y clientes."
+        - "compose.yaml define cloudflared como servicio opcional bajo profile tunnel; usa CLOUDFLARED_TUNNEL_TOKEN y depende de admin/clientes healthy."
         - "compose.yaml exige POSTGRES_PASSWORD y JWT_SECRET mediante expansion con error; CORS_ORIGINS tiene valor por defecto con localhost y dominios de laquinta."
         - "api depende de db healthy; admin/clientes dependen de api healthy."
         - "front_menu y front_clientes usan API_UPSTREAM=http://api:3000 en Docker."

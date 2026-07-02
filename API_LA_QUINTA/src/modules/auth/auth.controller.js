@@ -46,15 +46,21 @@ export const cambiarPasswordController = asyncHandler(async (req, res) => {
 });
 
 export const actualizarPreferenciasController = asyncHandler(async (req, res) => {
-  const { vegetariano, sin_gluten, sin_lacteos, sin_pescado, sin_frutos_secos } = req.body;
-  const prefs = { vegetariano: Boolean(vegetariano), sin_gluten: Boolean(sin_gluten), sin_lacteos: Boolean(sin_lacteos), sin_pescado: Boolean(sin_pescado), sin_frutos_secos: Boolean(sin_frutos_secos) };
-  const data = await authService.actualizarPreferencias(req.empleado.sub, prefs);
+  const data = await authService.actualizarPreferencias(req.empleado.sub, req.body);
   sendSuccess(res, data, 'Preferencias actualizadas');
 });
 
 export const registroController = asyncHandler(async (req, res) => {
   const { codigo, nombre, apellido, email, password, telefono, fecha_nacimiento } = req.body;
-  if (!codigo || !nombre || !apellido || !email || !password) {
+  if (
+    !String(codigo || '').trim() ||
+    !String(nombre || '').trim() ||
+    !String(apellido || '').trim() ||
+    !String(email || '').trim() ||
+    !String(telefono || '').trim() ||
+    !String(fecha_nacimiento || '').trim() ||
+    !password
+  ) {
     return res.status(400).json({ success: false, message: 'Faltan campos obligatorios' });
   }
   if (password.length < 8) {

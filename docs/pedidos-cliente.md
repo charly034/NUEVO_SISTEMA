@@ -91,7 +91,7 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Sábado y domingo pueden venir como `sin_pedido` por defecto en empresas que trabajan lunes a domingo.
 - Si un día no tiene menú especial, se pueden mostrar platos fijos con el aviso: "Todavía no hay menú especial para este día. Podés elegir un plato fijo".
 - Si un día está vencido, no se puede editar.
-- Si un día está marcado sin servicio/feriado en el menú, aparece como `sin_pedido` por defecto para evitar viandas accidentales, pero el usuario puede cambiarlo y elegir plato cuando su empresa recibe entrega anticipada.
+- Si un día está marcado sin servicio/feriado en el menú, aparece como `sin_pedido` por defecto para evitar viandas accidentales y no se puede editar desde el cliente.
 - Si la semana está fuera de plazo, el backend debe rechazar POST/PUT aunque el frontend haya mostrado el botón por error.
 - El plazo vigente para POST/PUT lo define la empresa (`modo_pedido`, `limite_hora`, `limite_dia_semana`, `limite_anticipacion_dias` y `plazo_override_hasta` si aplica); `menus_semanales.fecha_limite_pedidos` no debe bloquear el pedido cliente.
 - En la pantalla de sugerencias no se debe llamar a crear/modificar pedido ni exigir días seleccionados; debe usar `POST /pedidos/sugerencias`.
@@ -104,7 +104,7 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Pedido ajeno.
 - Semana fuera de plazo.
 - Día vencido.
-- Día sin servicio/feriado: no bloquea por sí solo; se valida como cualquier otro día si el usuario elige plato.
+- Día sin servicio/feriado: debe quedar bloqueado para edición desde el cliente.
 - Día no laboral para la empresa.
 - Plato inexistente, agotado o deshabilitado.
 - Plato especial que no pertenece al menú/día enviado.
@@ -130,7 +130,9 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Las opciones de pantalla principal son cards grandes por semana/accion: semana actual, semanas proximas con menu publicado y sugerir menu cuando todavia no hay menu.
 - Las semanas con menú se abren primero en lectura para mostrar fecha, días y todas las opciones especiales publicadas antes de entrar a cargar pedido.
 - Las semanas con menú publicado y sin pedido cargado usan `Ver menú` en la pantalla principal; `Hacer mi pedido` aparece recién dentro de la lectura del menú si todavía hay días editables.
+- Si no hay días editables para una semana publicada y no hay pedido cargado, `MenuViewScreen` no debe mostrar `Hacer mi pedido`; solo permite consultar el menú y explicar el motivo.
 - Si no hay días editables para una semana publicada, no debe mostrarse `Confirmar pedido`.
+- En empresas diarias o mixtas, un pedido existente conserva los días ya vencidos y solo permite modificar los días que siguen editables.
 - Las semanas futuras montan la vista completa recién cuando el usuario toca la acción correspondiente y ocultan el resto para ocupar el alto disponible.
 - La semana activa se conserva por `semana.id` en `localStorage` para mantener contexto al recargar.
 - La tab principal `Pedido` vuelve a la pantalla principal de pedido si el usuario quedó mirando otra acción.

@@ -1,6 +1,7 @@
 import * as repo from './menus-semanales.repository.js';
 import * as platosRepository from '../platos/platos.repository.js';
 import * as historialRepo from './historial.repository.js';
+import * as notificacionesService from '../notificaciones/notificaciones.service.js';
 import { calcularFechaServicio } from '../../utils/fecha.js';
 import { ApiError } from '../../utils/ApiError.js';
 
@@ -65,7 +66,13 @@ export const cambiarEstadoMenu = async (id, estado, extra = {}) => {
     datosExtra.fecha_limite_pedidos = extra.fecha_limite_pedidos || null;
   }
 
-  return repo.cambiarEstado(id, estado, datosExtra);
+  const menuActualizado = await repo.cambiarEstado(id, estado, datosExtra);
+
+  if (estado === 'publicado' && menu.estado !== 'publicado') {
+    await notificacionesService.notificarMenuPublicado(menuActualizado);
+  }
+
+  return menuActualizado;
 };
 
 // ── Platos por día ────────────────────────────────────────────────

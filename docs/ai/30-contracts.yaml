@@ -106,9 +106,11 @@ endpoints:
       - "GET /api/v1/platos/tags"
       - "GET /api/v1/platos"
       - "GET /api/v1/platos/:id"
-      - "POST /api/v1/platos"
-      - "PUT /api/v1/platos/:id"
+      - "POST /api/v1/platos (JSON o multipart/form-data con field foto)"
+      - "PUT /api/v1/platos/:id (JSON o multipart/form-data con field foto)"
       - "DELETE /api/v1/platos/:id"
+    uploads:
+      - "GET /uploads/platos/:archivo.webp"
     guarniciones:
       - "GET /api/v1/guarniciones"
       - "POST /api/v1/guarniciones"
@@ -140,6 +142,20 @@ endpoints:
     sugerencias:
       - "GET /api/v1/sugerencias/semana"
     notificaciones:
+      - "GET /api/v1/notificaciones/admin"
+      - "POST /api/v1/notificaciones/admin"
+      - "GET /api/v1/notificaciones/admin/reglas?canal=interna|whatsapp&evento=nuevo_registro|menu_publicado|pedido_estado_cambiado|pedido_semanal_pendiente"
+      - "POST /api/v1/notificaciones/admin/reglas"
+      - "PATCH /api/v1/notificaciones/admin/reglas/:id"
+      - "DELETE /api/v1/notificaciones/admin/reglas/:id"
+      - "GET /api/v1/notificaciones/admin/whatsapp/config"
+      - "PATCH /api/v1/notificaciones/admin/whatsapp/config"
+      - "GET /api/v1/notificaciones/admin/whatsapp/destinatarios"
+      - "POST /api/v1/notificaciones/admin/whatsapp/destinatarios"
+      - "PATCH /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
+      - "DELETE /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
+      - "GET /api/v1/notificaciones/admin/whatsapp/envios"
+      - "POST /api/v1/notificaciones/admin/whatsapp/probar"
       - "GET /api/v1/notificaciones"
       - "GET /api/v1/notificaciones/no-leidas/count"
       - "PATCH /api/v1/notificaciones/leer-todas"
@@ -182,25 +198,75 @@ payload_formats:
         - "pedido_items unico por pedido_id + dia"
         - "el plazo de POST/PUT se valida con la configuracion de empresa; menus_semanales.fecha_limite_pedidos no debe bloquear el pedido cliente"
         - "un dia marcado en menu_semanal_sin_servicio se muestra como sin_pedido por defecto, pero POST/PUT puede guardar plato para ese dia si pasa validacion de menu/plato/guarnicion y plazo"
+        - "menu_semanal_sin_servicio cuenta por existencia de fila aunque motivo sea null; el cliente debe mostrarlo como Sin servicio"
+        - "GET /api/v1/pedidos/semanas marca estado=cerrado cuando una empresa diaria/mixta ya tiene todos los dias laborales bloqueados por limiteEmpresa.diasCerrados"
+        - "En PUT de un pedido existente, los items previos de dias ya vencidos se conservan aunque el frontend solo reenvie dias todavia editables; esos dias vencidos no pueden modificarse"
     pedido_estado_admin:
       endpoint: "PATCH /api/v1/pedidos/:id/estado"
       body: "{ estado: pendiente|en_proceso|listo|entregado|cancelado }"
+    pedido_cancelar_cliente:
+      endpoint: "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
+      invariants:
+        - "requiere Authorization Bearer cliente"
+        - "identifica el pedido por req.empleado.sub + semana_inicio"
+        - "cancela solo estados pendiente/en_proceso"
+        - "borra pedido_items y registra pedido_eventos tipo pedido_cancelado"
     pedido_sugerencia_cliente:
       endpoint: "POST /api/v1/pedidos/sugerencias"
       body: "{ semana_inicio: YYYY-MM-DD, ideas?: string[], comentario?: string }"
       invariants:
         - "requiere Authorization Bearer cliente"
         - "backend usa req.empleado.sub y req.empleado.empresa_id"
-        - "front_clientes/src/pages/SugerenciasPage.jsx usa este endpoint canonico para semanas sin menu"
+        - "front_clientes/src/components/pedido/SuggestionSheet.jsx y front_clientes/src/pages/SugerenciasPage.jsx usan este endpoint canonico para semanas sin menu"
         - "ideas maximo 12 items; cada item <=120 caracteres"
         - "comentario <=500 caracteres"
         - "debe llegar al menos una idea o comentario"
         - "un registro por empleado y semana: UNIQUE (empleado_id, semana_inicio)"
+    menu_opciones_cliente:
+      endpoints:
+        - "GET /api/v1/pedidos/semanas"
+        - "GET /api/v1/menu/semanas/:semanaId/opciones"
+      response_option_fields:
+        - "id"
+        - "platoId"
+        - "opcion"
+        - "nombre"
+        - "descripcion"
+        - "categoria"
+        - "tipo"
+        - "requiereGuarnicion"
+        - "destacado"
+        - "grupo"
+        - "estado"
+        - "etiquetas"
+        - "guarniciones"
+        - "diasDisponibles solo para fijos cuando aplica"
+        - "calorias opcional"
+        - "alergenos array opcional"
+        - "foto_url opcional"
+        - "vegetariano boolean opcional"
+        - "descripcionLarga opcional"
+      note: "API_LA_QUINTA/src/modules/pedidos/pedidos.repository.js selecciona calorias/alergenos/foto_url/vegetariano/descripcion_larga de platos y pedidos.service.js los expone para lectura de menu cliente."
     auth_preferencias_cliente:
       endpoint: "PATCH /api/v1/auth/preferencias"
-      body: "{ vegetariano?, sin_gluten?, sin_lacteos?, sin_pescado?, sin_frutos_secos? }"
+      body: "{ vegetariano?, sin_gluten?, sin_lacteos?, sin_pescado?, sin_frutos_secos?, recibir_recordatorios_whatsapp? }"
       response_data: "preferencias_alimentarias"
       storage: "empleados.preferencias_alimentarias JSONB"
+      note: "recibir_recordatorios_whatsapp default false si falta; PATCH mergea campos enviados y preserva preferencias existentes. No controla las notificaciones internas de la app."
+    auth_session_cliente:
+      endpoints:
+        - "POST /api/v1/auth/login"
+        - "POST /api/v1/auth/registro"
+        - "GET /api/v1/auth/me"
+      response_data: "token? y empleado con id, nombre, apellido, email, telefono, fecha_nacimiento, preferencias_alimentarias, rol y empresa"
+      note: "PerfilPage muestra telefono y cumpleanos desde el empleado de sesion; login/registro deben devolverlos igual que /auth/me."
+    auth_registro_cliente:
+      endpoint: "POST /api/v1/auth/registro"
+      body: "{ codigo, nombre, apellido, email, telefono, fecha_nacimiento, password }"
+      invariants:
+        - "todos los campos son obligatorios"
+        - "password minimo 8 caracteres"
+        - "codigo debe corresponder a una empresa activa"
     empleado_create_update:
       endpoints:
         - "POST /api/v1/empleados"
@@ -218,6 +284,83 @@ payload_formats:
         - "requiere Authorization Bearer cliente"
         - "todas las consultas filtran por req.empleado.id"
         - "tipos validos: menu, recordatorio, confirmado, sistema"
+        - "la creacion de notificaciones internas no depende de recibir_recordatorios_whatsapp; esa preferencia es solo para futuros avisos por WhatsApp/telefono"
+        - "front_clientes/src/pages/PedidoPage.jsx usa GET /notificaciones/no-leidas/count para el badge real del header Inicio."
+        - "front_clientes/src/pages/NotificacionesPage.jsx invalida notificaciones y notificaciones-no-leidas al marcar leidas."
+    notificaciones_admin:
+      endpoints:
+        - "GET /api/v1/notificaciones/admin"
+        - "POST /api/v1/notificaciones/admin"
+      body_post: "{ alcance: todos|empresa|empleado, tipo?: menu|recordatorio|confirmado|sistema, titulo: string<=120, cuerpo: string<=700, empresa_id?: integer, empleado_id?: integer }"
+      response_post_data: "{ enviadas: number, destinatarios: number }"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "alcance=empresa exige empresa_id; alcance=empleado exige empleado_id"
+        - "solo crea notificaciones para empleados activos de empresas activas con rol distinto de admin"
+        - "front_menu/src/pages/NotificacionesAdmin.jsx consume estos endpoints via front_menu/src/hooks/useNotificaciones.js en el panel Internas"
+    notificaciones_reglas:
+      endpoints:
+        - "GET /api/v1/notificaciones/admin/reglas"
+        - "POST /api/v1/notificaciones/admin/reglas"
+        - "PATCH /api/v1/notificaciones/admin/reglas/:id"
+        - "DELETE /api/v1/notificaciones/admin/reglas/:id"
+      body_create_update: "{ canal: interna|whatsapp, evento: nuevo_registro|menu_publicado|pedido_estado_cambiado|pedido_semanal_pendiente, nombre: string<=160, activo: boolean, titulo: string<=160, cuerpo: string<=900, filtros: object, programacion?: object }"
+      filtros:
+        alcance: "todos|empresa|empleado|empleado_evento|destinatarios_whatsapp"
+        optional_fields: ["empresa_id", "empleado_id", "rol", "plan", "modo_pedido", "dias_laborales", "solo_preferencia_whatsapp", "requiere_telefono", "destinatario_whatsapp_ids"]
+      programacion:
+        applies_to: "evento=pedido_semanal_pendiente"
+        shape: "{ tipo: semanal, dia_semana: 0..6 donde 0=domingo y 1=lunes, hora: HH:mm }"
+      storage: "notificacion_reglas"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "canal=interna no acepta alcance=destinatarios_whatsapp"
+        - "alcance=empresa exige empresa_id; alcance=empleado exige empleado_id"
+        - "empleado_evento usa el empleado asociado al evento, por ejemplo el pedido o el nuevo registro"
+        - "templates aceptan variables simples con sintaxis {{variable}}"
+        - "pedido_semanal_pendiente es ejecutado por scheduler interno de API y filtra solo empleados sin pedido no-cancelado para la semana publicada objetivo"
+    notificaciones_whatsapp_n8n:
+      endpoints:
+        - "GET /api/v1/notificaciones/admin/whatsapp/config"
+        - "PATCH /api/v1/notificaciones/admin/whatsapp/config"
+        - "GET /api/v1/notificaciones/admin/whatsapp/destinatarios"
+        - "POST /api/v1/notificaciones/admin/whatsapp/destinatarios"
+        - "PATCH /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
+        - "DELETE /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
+        - "GET /api/v1/notificaciones/admin/whatsapp/envios"
+        - "POST /api/v1/notificaciones/admin/whatsapp/probar"
+      config_body: "{ activo: boolean, webhook_url: string http/https }"
+      destinatario_body: "{ nombre: string<=160, telefono: string<=40, email?: string<=255, empresa_id?: integer, activo?: boolean }"
+      webhook_payload: "{ canal: whatsapp, evento, regla: { id, nombre }, destinatario, mensaje: { titulo, cuerpo }, contexto }"
+      prueba_response:
+        ok_201: "{ success: true, data: { enviado: true, envio_id, estado, status_code, respuesta, error } }"
+        webhook_error_502: "{ success: false, message: El webhook respondio con error, data: { enviado: false, envio_id, estado, status_code, respuesta, error } }"
+      storage:
+        - "notificacion_configuracion clave whatsapp_n8n"
+        - "notificacion_destinatarios_whatsapp"
+        - "notificacion_envios_whatsapp"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "el webhook_url se guarda en DB para administrarlo desde front_menu; no documentar valores reales"
+        - "si WhatsApp esta inactivo o no tiene webhook_url, los eventos no llaman a n8n"
+        - "cada intento de webhook registra estado pendiente/enviado/fallido, status_code, respuesta o error"
+    notificaciones_eventos_automaticos:
+      storage:
+        - "notificaciones.dedupe_key opcional con indice unico parcial"
+        - "notificacion_reglas define canal, evento, filtros y templates"
+        - "notificacion_ejecuciones_programadas registra dedupe de reglas programadas por regla_id + run_key"
+      triggers:
+        - "API_LA_QUINTA/src/modules/auth/auth.service.js dispara nuevo_registro despues de crear empleado."
+        - "API_LA_QUINTA/src/modules/menus-semanales/menus-semanales.service.js dispara menu_publicado al pasar un menu a publicado."
+        - "API_LA_QUINTA/src/modules/pedidos/pedidos.service.js dispara pedido_estado_cambiado cuando admin cambia estado de pedido."
+        - "API_LA_QUINTA/src/modules/notificaciones/notificaciones.scheduler.js dispara pedido_semanal_pendiente segun programacion semanal por regla."
+      dedupe:
+        - "menu-publicado:<menu_id>:<empleado_id>"
+        - "pedido-estado:<pedido_id>:<estado>"
+        - "nuevo-registro:<empleado_id>"
+        - "pedido-semanal-pendiente:<semana_inicio>:<run_key>:regla:<regla_id>:<empleado_id>"
+      fallback:
+        - "Si notificacion_reglas todavia no existe, el service conserva comportamiento interno legacy para no romper bases parcialmente migradas."
     mis_sugerencias_cliente:
       endpoint: "POST /api/v1/mis-sugerencias"
       body: "{ semana_inicio: YYYY-MM-DD, ideas: string, comentario?: string }"
@@ -236,12 +379,25 @@ payload_formats:
       body: "{ dia, opcion?: A-Z default A, plato_id }"
     menu_sin_servicio:
       body: "{ dia, motivo?: string <=200 }"
+      invariant: "motivo es opcional; una fila con motivo=null sigue representando dia sin servicio"
+      client_behavior: "front_clientes muestra el dia como sin vianda por defecto y no lo permite editar ni enviar como item editable."
+      pedidos_behavior: "POST/PUT /api/v1/pedidos rechaza items enviados para ese dia con 422."
     menu_estado:
       endpoint: "PATCH /api/v1/menus-semanales/:id/estado"
       body: "{ estado: borrador|publicado|cerrado, fecha_limite_pedidos?: timestamptz|null }"
       note: "front_menu envia fecha_limite_pedidos=null al reabrir para limpiar limites vencidos; el pedido cliente usa el plazo de empresa."
     plato_create:
-      body: "{ nombre, descripcion?, tags?, tipo?: fijo|especial|ambos, tiene_guarnicion?: boolean }"
+      content_types: ["application/json", "multipart/form-data"]
+      body: "{ nombre, descripcion?, descripcion_larga?, tags?, tipo?: fijo|especial|ambos, tiene_guarnicion?: boolean, vegetariano?: boolean, calorias?: integer|null, alergenos?: string[], foto_url?: string|null }"
+      multipart_file: "foto: JPG|PNG|WebP <=5MB; API convierte y comprime a /uploads/platos/<slug>-<timestamp>.webp"
+      response_data: "id, nombre, descripcion, descripcion_larga, tags, tipo, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url, activo, created_at, updated_at"
+    plato_update:
+      content_types: ["application/json", "multipart/form-data"]
+      body: "mismos campos opcionales que plato_create + activo?"
+      invariants:
+        - "calorias debe ser null o >=0"
+        - "foto_url local debe apuntar a /uploads/platos/*.webp si no es URL absoluta http/https"
+        - "si se envia foto nueva, reemplaza foto_url y se intenta borrar el archivo local anterior"
     empresa_create:
       body: "{ nombre, slug, plan?, modo_pedido?, dias_laborales?, limite_hora?, limite_dia_semana?, limite_anticipacion_dias?, email?, telefono? }"
       enums:
@@ -261,6 +417,10 @@ runtime_events:
     db_events:
       table: "pedido_eventos"
       examples: ["pedido_creado", "pedido_actualizado", "pedido_confirmado", "pedido_cancelado", "estado_cambiado"]
+    notification_events:
+      - "menu publicado -> notificaciones tipo menu para empleados activos"
+      - "estado de pedido cambiado por admin -> notificacion al empleado del pedido"
+      - "scheduler pedido_semanal_pendiente -> recordatorio para empleados sin pedido semanal"
 
 ports:
   verified_in_repo:
@@ -273,7 +433,7 @@ ports:
 env_vars:
   verified_in_repo:
     api: ["NODE_ENV", "PORT", "DATABASE_URL", "DB_SSL", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "JWT_SECRET", "JWT_EXPIRES_IN", "JWT_EXPIRES_IN_SHORT", "JWT_EXPIRES_IN_REMEMBER", "APP_TIMEZONE", "TRUST_PROXY_HOPS", "CORS_ORIGINS", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DEMO_ADMIN_EMAIL", "DEMO_ADMIN_PASSWORD", "DEMO_CLIENT_PASSWORD", "TEST_DATA_PASSWORD", "SEED_FULL_RESET_CONFIRM", "SUPERADMIN_EMAIL", "SUPERADMIN_PASSWORD", "DEFAULT_DEMO_PASSWORD", "TEST_USER_PASSWORD", "ADMIN_EMAIL", "ADMIN_NEW_PASSWORD"]
-    docker_root: ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "JWT_SECRET", "JWT_EXPIRES_IN", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "CORS_ORIGINS", "APP_TIMEZONE"]
+    docker_root: ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "JWT_SECRET", "JWT_EXPIRES_IN", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "CORS_ORIGINS", "APP_TIMEZONE", "CLOUDFLARED_TUNNEL_TOKEN"]
     frontends: ["VITE_API_URL", "VITE_USAR_ENDPOINT_LEGACY_PEDIDOS", "VITE_USAR_MOCKS_PEDIDO", "VITE_DEBUG_PERFORMANCE", "API_UPSTREAM"]
 
 frontend_references_to_unverified_endpoints:

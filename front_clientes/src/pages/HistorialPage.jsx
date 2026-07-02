@@ -31,11 +31,15 @@ function estadoCfg(estado) {
   return ESTADO_CFG[estado] || { label: estado || 'Confirmado', Icon: CheckCircle2, color: '#1B7B5E', bg: '#E6F6F0' };
 }
 
-function FilaPedido({ pedido, onEliminar }) {
+const ESTADOS_CANCELABLES = new Set(['pendiente', 'en_proceso']);
+
+function FilaPedido({ cancelando, pedido, onEliminar }) {
   const [abierto, setAbierto] = useState(false);
   const cfg = estadoCfg(pedido.estado);
   const Icon = cfg.Icon;
   const items = pedido.items || pedido.dias || [];
+  const semanaInicio = String(pedido.semana_inicio || pedido.semanaId || '').split('T')[0];
+  const puedeCancelar = Boolean(pedido.id && semanaInicio && ESTADOS_CANCELABLES.has(pedido.estado));
 
   return (
     <div className="bg-white rounded-2xl border border-[#E8E5DC] overflow-hidden">
@@ -85,12 +89,14 @@ function FilaPedido({ pedido, onEliminar }) {
             );
           })}
 
-          {pedido.id && pedido.estado !== 'cancelado' && (
+          {puedeCancelar && (
             <button
-              onClick={() => onEliminar(String(pedido.semana_inicio || pedido.semanaId).split('T')[0])}
-              className="mt-3 flex items-center gap-1.5 text-red-500 text-xs font-bold"
+              type="button"
+              onClick={() => onEliminar(semanaInicio)}
+              disabled={cancelando}
+              className="mt-3 flex items-center gap-1.5 text-red-500 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Trash2 size={13} /> Cancelar pedido
+              <Trash2 size={13} /> {cancelando ? 'Cancelando...' : 'Cancelar pedido'}
             </button>
           )}
         </div>
@@ -110,12 +116,23 @@ export default function HistorialPage({ empleado }) {
   });
 
   const eliminar = useMutation({
-    mutationFn: (semanaInicio) => apiDelete(`/pedidos/mi-pedido?semana_inicio=${encodeURIComponent(semanaInicio)}`),
-    onSuccess: () => {
-      toast({ titulo: 'Pedido cancelado', icono: 'success' });
-      queryClient.invalidateQueries({ queryKey: ['mi-historial'] });
+    mutationFn: (semanaInicio) => apiDelete(
+      `/pedidos/mi-pedido?semana_inicio=${encodeURIComponent(semanaInicio)}`,
+      { requiereAuth: true },
+    ),
+    onSuccess: async (_pedidoCancelado, semanaInicio) => {
+      toast.success('Pedido cancelado');
+      queryClient.setQueryData(['mi-historial', userId], (actual = []) =>
+        actual.map((pedido) => {
+          const pedidoSemana = String(pedido.semana_inicio || pedido.semanaId || '').split('T')[0];
+          return pedidoSemana === semanaInicio
+            ? { ...pedido, estado: 'cancelado', items: [], dias: [] }
+            : pedido;
+        }),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['mi-historial', userId] });
     },
-    onError: (err) => toast({ titulo: err?.message || 'No se pudo cancelar', icono: 'error' }),
+    onError: (err) => toast.error(err?.message || 'No se pudo cancelar'),
   });
 
   const handleEliminar = async (semanaInicio) => {
@@ -163,7 +180,12 @@ export default function HistorialPage({ empleado }) {
         )}
 
         {pedidos.map(p => (
-          <FilaPedido key={p.id} pedido={p} onEliminar={handleEliminar} />
+          <FilaPedido
+            key={p.id}
+            cancelando={eliminar.isPending}
+            pedido={p}
+            onEliminar={handleEliminar}
+          />
         ))}
       </div>
     </div>

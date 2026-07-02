@@ -2,11 +2,17 @@ import 'dotenv/config';
 import app from './app.js';
 import { env } from './config/env.js';
 import pool, { testConnection } from './database/connection.js';
+import { startNotificacionesScheduler } from './modules/notificaciones/notificaciones.scheduler.js';
 
 let server;
+let stopNotificacionesScheduler = null;
 
 const shutdown = (signal) => {
   console.log(`Recibida senal ${signal}. Cerrando servidor...`);
+  if (stopNotificacionesScheduler) {
+    stopNotificacionesScheduler();
+    stopNotificacionesScheduler = null;
+  }
 
   const forceExit = setTimeout(() => {
     console.error('Timeout durante shutdown. Forzando salida.');
@@ -54,6 +60,7 @@ const startServer = async () => {
       console.log(`📌 Entorno: ${env.NODE_ENV}`);
       console.log(`🏥 Health check: http://localhost:${env.PORT}/api/v1/health`);
     });
+    stopNotificacionesScheduler = startNotificacionesScheduler();
   } catch (error) {
     console.error('❌ Error al iniciar el servidor:', error.message);
     await pool.end().catch(() => {});

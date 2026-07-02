@@ -1,6 +1,10 @@
 import { query } from '../../database/connection.js';
 
-const SELECT_COLS = 'id, nombre, descripcion, tags, tipo, tiene_guarnicion, activo, created_at, updated_at';
+const SELECT_COLS = `
+  id, nombre, descripcion, tags, tipo, tiene_guarnicion, activo,
+  vegetariano, calorias, alergenos, foto_url, descripcion_larga,
+  created_at, updated_at
+`;
 
 const SORT_MAP = {
   nombre:     'p.nombre',
@@ -40,7 +44,8 @@ export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, tip
   values.push(limit, offset);
   const result = await query(
     `SELECT p.id, p.nombre, p.descripcion, p.tags, p.tipo, p.tiene_guarnicion,
-            p.activo, p.created_at, p.updated_at,
+            p.activo, p.vegetariano, p.calorias, p.alergenos, p.foto_url,
+            p.descripcion_larga, p.created_at, p.updated_at,
             h.fecha_servicio AS ultimo_uso_fecha,
             h.dia            AS ultimo_uso_dia,
             h.opcion         AS ultimo_uso_opcion,
@@ -63,7 +68,10 @@ export const findAll = async ({ limit = 20, offset = 0, activo, search, tag, tip
   return result.rows.map(r => ({
     id: r.id, nombre: r.nombre, descripcion: r.descripcion,
     tags: r.tags, tipo: r.tipo, tiene_guarnicion: r.tiene_guarnicion,
-    activo: r.activo, created_at: r.created_at, updated_at: r.updated_at,
+    activo: r.activo, vegetariano: r.vegetariano, calorias: r.calorias,
+    alergenos: r.alergenos, foto_url: r.foto_url,
+    descripcion_larga: r.descripcion_larga,
+    created_at: r.created_at, updated_at: r.updated_at,
     ultimo_uso: r.ultimo_uso_fecha
       ? { fecha_servicio: r.ultimo_uso_fecha, dia: r.ultimo_uso_dia, opcion: r.ultimo_uso_opcion, menu_semanal_nombre: r.ultimo_uso_menu }
       : null,
@@ -111,12 +119,37 @@ export const findAllTags = async () => {
   return result.rows.map((r) => r.tag);
 };
 
-export const create = async ({ nombre, descripcion, tags = [], tipo = 'especial', tiene_guarnicion = false }) => {
+export const create = async ({
+  nombre,
+  descripcion,
+  tags = [],
+  tipo = 'especial',
+  tiene_guarnicion = false,
+  vegetariano = false,
+  calorias = null,
+  alergenos = [],
+  foto_url = null,
+  descripcion_larga = null,
+}) => {
   const result = await query(
-    `INSERT INTO platos (nombre, descripcion, tags, tipo, tiene_guarnicion)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO platos (
+       nombre, descripcion, tags, tipo, tiene_guarnicion,
+       vegetariano, calorias, alergenos, foto_url, descripcion_larga
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING ${SELECT_COLS}`,
-    [nombre, descripcion ?? null, tags, tipo, tiene_guarnicion]
+    [
+      nombre,
+      descripcion ?? null,
+      tags,
+      tipo,
+      tiene_guarnicion,
+      vegetariano,
+      calorias,
+      alergenos,
+      foto_url,
+      descripcion_larga,
+    ]
   );
   return result.rows[0];
 };

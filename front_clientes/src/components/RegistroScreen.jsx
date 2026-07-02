@@ -84,6 +84,9 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
   const handleRegistro = async (e) => {
     e.preventDefault();
     setError("");
+    if (!nombre.trim() || !apellido.trim() || !email.trim() || !telefono.trim() || !nacimiento) {
+      return setError("Completá todos los campos");
+    }
     if (password !== password2) return setError("Las contraseñas no coinciden");
     if (password.length < 8)
       return setError("La contraseña debe tener al menos 8 caracteres");
@@ -213,20 +216,22 @@ export default function RegistroScreen({ onRegistrado, onVolver }) {
 
           <CampoTexto
             id="registro-telefono"
-            label="Teléfono (opcional)"
+            label="Teléfono"
             type="tel"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
             placeholder="+54 261 555-0000"
             inputMode="tel"
+            required
           />
 
           <CampoTexto
             id="registro-nacimiento"
-            label="Fecha de nacimiento (opcional)"
+            label="Fecha de nacimiento"
             type="date"
             value={nacimiento}
             onChange={(e) => setNacimiento(e.target.value)}
+            required
           />
 
           <CampoPassword

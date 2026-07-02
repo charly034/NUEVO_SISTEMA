@@ -105,19 +105,44 @@ function DetallePlatoModal({ plato, onClose, onEdit }) {
         <div className="space-y-4">
           {/* Info básica */}
           <div className="space-y-2">
+            {plato?.foto_url && (
+              <img
+                src={plato.foto_url}
+                alt={plato.nombre}
+                className="h-44 w-full rounded-xl object-cover border border-gray-100"
+              />
+            )}
             {plato?.descripcion && (
               <p className="text-sm text-gray-600">{plato.descripcion}</p>
+            )}
+            {plato?.descripcion_larga && (
+              <p className="text-sm text-gray-500 whitespace-pre-line">{plato.descripcion_larga}</p>
             )}
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`badge ${plato?.activo ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
                 {plato?.activo ? '● Activo' : '○ Inactivo'}
               </span>
+              {plato?.calorias ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700">
+                  {plato.calorias} kcal
+                </span>
+              ) : null}
+              {plato?.vegetariano ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                  Vegetariano
+                </span>
+              ) : null}
               {plato?.tipo && <TipoBadge tipo={plato.tipo} />}
               {plato?.tiene_guarnicion && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
                   🥗 Con guarnición
                 </span>
               )}
+              {(plato?.alergenos ?? []).map((alergeno) => (
+                <span key={alergeno} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
+                  {alergeno}
+                </span>
+              ))}
               {(plato?.tags ?? []).map((t) => (
                 <TagBadge key={t} tag={t} />
               ))}
@@ -201,8 +226,16 @@ function PlatoMobileCard({ plato, loading, onOpen, onToggleActivo, onEdit, onDel
     <div className="px-4 py-3.5 bg-white relative">
       {/* Fila principal: nombre + menú */}
       <div className="flex items-start gap-2">
+        <button onClick={onOpen} className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center flex-shrink-0">
+          {plato.foto_url ? (
+            <img src={plato.foto_url} alt={plato.nombre} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-lg">🍽️</span>
+          )}
+        </button>
         <button onClick={onOpen} className="flex-1 text-left min-w-0">
           <p className="font-semibold text-gray-900 leading-snug">{plato.nombre}</p>
+          {plato.calorias ? <p className="text-xs text-orange-600 mt-0.5">{plato.calorias} kcal</p> : null}
         </button>
 
         {/* Estado badge tappable */}
@@ -557,8 +590,23 @@ export default function Platos() {
                 ) : platos.map((plato) => (
                   <tr key={plato.id} onClick={() => setDetalle(plato)} className="group hover:bg-gray-50/80 transition-colors cursor-pointer">
                     <td className="px-5 py-3.5">
-                      <p className="font-medium text-gray-900">{plato.nombre}</p>
-                      {plato.descripcion && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{plato.descripcion}</p>}
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center flex-shrink-0">
+                          {plato.foto_url ? (
+                            <img src={plato.foto_url} alt={plato.nombre} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-base">🍽️</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900">{plato.nombre}</p>
+                          {plato.descripcion && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{plato.descripcion}</p>}
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {plato.calorias ? <span className="text-xs text-orange-600">{plato.calorias} kcal</span> : null}
+                            {plato.vegetariano ? <span className="text-xs text-emerald-600">Vegetariano</span> : null}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 hidden md:table-cell">
                       <div className="flex flex-col gap-1.5">

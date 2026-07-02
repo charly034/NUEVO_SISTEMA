@@ -51,10 +51,12 @@
 |   |-- Dockerfile
 |   |-- database.json
 |   |-- scripts/
-|   |   Seeds, import CSV, reset admin y backfill historial.
+|   |   Seeds, import CSV, reset admin, backfill historial y metadata aproximada de platos.
 |   |-- test/
 |   |   Tests node:test de pedidos.
 |   |-- test_helpers/
+|   |-- uploads/
+|   |   Imagenes subidas por admin; uploads/platos guarda WebP comprimidos y solo .gitkeep se versiona.
 |   `-- src/
 |       |-- server.js
 |       |-- app.js
@@ -86,6 +88,7 @@
 |           |-- platos/
 |           |-- sugerencias/
 |           |-- notificaciones/
+|           |   Notificaciones internas, reglas configurables, scheduler semanal, webhook WhatsApp/n8n y auditoria de envios.
 |           |-- sugerencias-empleados/
 |           |-- users/
 |           `-- usuarios-admin/
@@ -111,8 +114,8 @@
 |       |   apiClient, confirm, queryClient, toast.
 |       |-- pages/
 |       |   Dashboard, Platos, Semanas, SemanaDetalle, Historial, Estadisticas,
-|       |   Sugeridor, PedidosAdmin, PedidosHoy, Empresas, Guarniciones,
-|       |   Administradores.
+|       |   Sugeridor, PedidosAdmin, PedidosHoy, NotificacionesAdmin, Empresas,
+|       |   Guarniciones, Administradores.
 |       `-- services/
 |
 `-- front_clientes/
@@ -141,16 +144,17 @@
         |-- constants/
         |-- data/
         |-- hooks/
-        |   useAuth, usePedidoSemanal, useOpcionesMenu, useSeleccionDia.
+        |   useAuth, useLoginPage, usePedidoSemanal, useOpcionesMenu, useSeleccionDia.
         |-- lib/
         |-- mappers/
         |   pedidoMapper.js.
         |-- pages/
         |   PedidoPage, HistorialPage, PerfilPage, LoginPage, SplashPage,
-        |   OnboardingPage, NotificacionesPage y SugerenciasPage.
+        |   OnboardingPage, NotificacionesPage, SugerenciasPage y NavMapScreen.
         |-- routes/
         |   rutasCliente.js.
         |-- services/
         |   api.js, apiCliente.js, pedidoService.js, menuService.js.
         |-- tests/
         `-- utils/
+            permisosPedido.js centraliza permisos de pedido por semana/dia.
