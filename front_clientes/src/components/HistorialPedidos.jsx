@@ -1,47 +1,39 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Badge from "../compartido/ui/Badge.jsx";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  Trash2,
+} from "lucide-react";
 import Boton from "../compartido/ui/Boton.jsx";
 import Pagina from "../compartido/ui/Pagina.jsx";
-import Tarjeta from "../compartido/ui/Tarjeta.jsx";
 import { confirmar, toast } from "../lib/swal.js";
 import { menuApi, pedidoApi } from "../services/api.js";
 import { DIAS_LABEL, getDiasSemana } from "../utils/dias.js";
 
 const ESTADO_CONFIG = {
-  pendiente: { label: "Confirmado", variante: "verde" },
-  en_proceso: { label: "En proceso", variante: "naranja" },
-  listo: { label: "Listo", variante: "azul" },
-  entregado: { label: "Entregado", variante: "gris" },
-  cancelado: { label: "Cancelado", variante: "rojo" },
+  pendiente: { label: "Pendiente", tono: "pendiente" },
+  en_proceso: { label: "Pendiente", tono: "pendiente" },
+  listo: { label: "Confirmado", tono: "confirmado" },
+  entregado: { label: "Confirmado", tono: "confirmado" },
+  cancelado: { label: "Cancelado", tono: "cancelado" },
 };
 const STALE_HISTORIAL_MS = 5 * 60 * 1000;
 const GC_HISTORIAL_MS = 30 * 60 * 1000;
 
-function formatSemana(fechaISO) {
+const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function formatSemanaCorta(fechaISO) {
   if (!fechaISO) return "";
   const [y, m, d] = String(fechaISO).split("T")[0].split("-").map(Number);
   const lunes = new Date(y, m - 1, d);
   const viernes = new Date(y, m - 1, d + 4);
-  const fmt = (dt) => `${dt.getDate()}/${dt.getMonth() + 1}`;
-  return `${fmt(lunes)} al ${fmt(viernes)} de ${viernes.getFullYear()}`;
-}
-
-function lunesDeHoy() {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const dia = hoy.getDay();
-  const diff = dia === 0 ? -6 : 1 - dia;
-  hoy.setDate(hoy.getDate() + diff);
-  return hoy;
-}
-
-function esEstaSemana(fechaISO) {
-  if (!fechaISO) return false;
-  const [y, m, d] = String(fechaISO).split("T")[0].split("-").map(Number);
-  const semana = new Date(y, m - 1, d);
-  const lunes = lunesDeHoy();
-  return semana.getTime() === lunes.getTime();
+  const mesLunes = meses[lunes.getMonth()];
+  const mesViernes = meses[viernes.getMonth()];
+  const inicio = mesLunes === mesViernes ? `${lunes.getDate()}` : `${lunes.getDate()} ${mesLunes}`;
+  return `${inicio} - ${viernes.getDate()} ${mesViernes}`;
 }
 
 function fechaKey(fechaISO) {
@@ -57,17 +49,56 @@ function construirDiasPedido(pedido, menuSemana) {
   return dias.map((dia) => ({ dia, item: porDia.get(dia) || null }));
 }
 
-function EncabezadoPagina({ cantidad }) {
+function contarSinVianda(diasPedido) {
+  return diasPedido.filter(({ item }) => !item || item.sin_pedido).length;
+}
+
+function EstadoPedido({ tono, label }) {
+  const confirmado = tono === "confirmado";
   return (
-    <header className="mb-4">
-      <h2 className="text-2xl font-extrabold text-slate-950">Mis pedidos</h2>
-      {cantidad !== undefined && (
-        <p className="mt-1 text-sm text-slate-500">
-          {cantidad} semana{cantidad !== 1 ? "s" : ""} registrada
-          {cantidad !== 1 ? "s" : ""}
-        </p>
+    <span
+      className={
+        confirmado
+          ? "inline-flex items-center gap-1.5 text-[0.95rem] font-extrabold text-[#1d8a78]"
+          : "inline-flex items-center gap-1.5 text-[0.95rem] font-extrabold text-[#b17623]"
+      }
+    >
+      {confirmado ? (
+        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-current text-[0.65rem] leading-none">
+          !
+        </span>
       )}
-    </header>
+      {label}
+    </span>
+  );
+}
+
+function ResumenDerecha({ diasPedido, items }) {
+  const total = items.length;
+  const sinVianda = contarSinVianda(diasPedido);
+
+  if (total === 0) return <span>Sin dias cargados</span>;
+  return (
+    <span className="text-right leading-tight">
+      <span className="block">{total} dias</span>
+      {sinVianda > 0 && (
+        <span className="block text-[0.88rem] font-semibold text-[#aaa79f]">
+          {sinVianda} sin vianda
+        </span>
+      )}
+    </span>
+  );
+}
+
+function SkeletonHistorial() {
+  return (
+    <div className="space-y-4 px-6 pt-8">
+      <div className="h-24 animate-pulse rounded-[1.15rem] bg-white" />
+      <div className="h-24 animate-pulse rounded-[1.15rem] bg-white" />
+      <div className="h-24 animate-pulse rounded-[1.15rem] bg-white" />
+    </div>
   );
 }
 
@@ -111,9 +142,7 @@ export default function HistorialPedidos({ empleado }) {
       queryClient.invalidateQueries({ queryKey: ["pedido-semanal", empleado.id] });
       queryClient.invalidateQueries({ queryKey: ["menus-publicados"] });
       setExpandido(null);
-      toast.success(
-        "Pedido eliminado. Podés volver a cargarlo mientras siga abierto.",
-      );
+      toast.success("Pedido eliminado. Podes volver a cargarlo mientras siga abierto.");
     },
     onError: (error) =>
       toast.error(error?.message || "No se pudo eliminar el pedido"),
@@ -122,10 +151,10 @@ export default function HistorialPedidos({ empleado }) {
   const eliminarPedido = async (pedido) => {
     if (
       !(await confirmar({
-        titulo: "¿Eliminar pedido?",
+        titulo: "Eliminar pedido?",
         texto:
-          "Se eliminará el pedido completo de esa semana. Si el plazo sigue abierto, vas a poder cargarlo de nuevo.",
-        botonConfirmar: "Sí, eliminar",
+          "Se eliminara el pedido completo de esa semana. Si el plazo sigue abierto, vas a poder cargarlo de nuevo.",
+        botonConfirmar: "Si, eliminar",
         color: "#dc2626",
       }))
     ) {
@@ -134,136 +163,115 @@ export default function HistorialPedidos({ empleado }) {
     mutationCancelar.mutate(fechaKey(pedido.semana_inicio));
   };
 
-  if (isLoading) {
-    return (
-      <Pagina>
-        <p className="py-16 text-center text-sm text-slate-500">
-          Cargando pedidos...
-        </p>
-      </Pagina>
-    );
-  }
-
-  if (pedidosVisibles.length === 0) {
-    return (
-      <Pagina>
-        <EncabezadoPagina />
-        <Tarjeta className="mt-6 px-5 py-14 text-center">
-          <div className="mb-3 text-5xl" aria-hidden="true">
-            📋
-          </div>
-          <p className="text-sm text-slate-500">
-            Todavía no tenés pedidos registrados.
-          </p>
-        </Tarjeta>
-      </Pagina>
-    );
-  }
-
   return (
-    <Pagina>
-      <EncabezadoPagina cantidad={pedidosVisibles.length} />
+    <Pagina className="min-h-dvh max-w-[480px] overflow-hidden bg-[#f7f8f3] px-0 pt-0 md:max-w-[480px] md:px-0 md:pt-0 lg:max-w-[480px]">
+      <header className="shrink-0 bg-[#586b24] px-6 pb-8 pt-[calc(4.75rem+env(safe-area-inset-top))] text-white">
+        <h1 className="text-[1.82rem] font-extrabold leading-tight">Mis pedidos</h1>
+        <p className="mt-2 text-[1.13rem] font-semibold text-white/58">
+          Historial de semanas
+        </p>
+      </header>
 
-      <div className="flex flex-col gap-2.5">
-        {pedidosVisibles.map((pedido) => {
-          const cfg = ESTADO_CONFIG[pedido.estado] ?? ESTADO_CONFIG.pendiente;
-          const esActual = esEstaSemana(pedido.semana_inicio);
-          const abierto = expandido === pedido.id;
-          const items = pedido.items ?? [];
-          const menuSemana = menusPorSemana.get(fechaKey(pedido.semana_inicio));
-          const diasPedido = construirDiasPedido(pedido, menuSemana);
-          const puedeEliminar =
-            ["pendiente", "en_proceso"].includes(pedido.estado) &&
-            menuSemana?.disponible &&
-            !menuSemana?.limiteEmpresa?.vencido;
+      {isLoading ? (
+        <SkeletonHistorial />
+      ) : pedidosVisibles.length === 0 ? (
+        <div className="px-6 pt-8">
+          <section className="rounded-[1.15rem] border border-[#deded8] bg-white px-5 py-14 text-center shadow-[0_2px_8px_rgba(26,26,26,0.12)]">
+            <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef3e9] text-[#586b24]">
+              <ClipboardList className="h-7 w-7" aria-hidden="true" />
+            </span>
+            <p className="text-sm font-bold text-[#716c64]">
+              Todavia no tenes pedidos registrados.
+            </p>
+          </section>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-7">
+          <div className="space-y-4">
+            {pedidosVisibles.map((pedido) => {
+              const cfg = ESTADO_CONFIG[pedido.estado] ?? ESTADO_CONFIG.pendiente;
+              const abierto = expandido === pedido.id;
+              const items = pedido.items ?? [];
+              const menuSemana = menusPorSemana.get(fechaKey(pedido.semana_inicio));
+              const diasPedido = construirDiasPedido(pedido, menuSemana);
+              const puedeEliminar =
+                ["pendiente", "en_proceso"].includes(pedido.estado) &&
+                menuSemana?.disponible &&
+                !menuSemana?.limiteEmpresa?.vencido;
 
-          return (
-            <Tarjeta key={pedido.id} className="overflow-hidden">
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
-                onClick={() => setExpandido(abierto ? null : pedido.id)}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[15px] font-bold text-slate-950">
-                      Semana del {formatSemana(pedido.semana_inicio)}
-                    </span>
-                    {esActual && <Badge variante="verde">Esta semana</Badge>}
-                  </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Badge variante={cfg.variante}>{cfg.label}</Badge>
-                    <span className="text-xs text-slate-500">
-                      {items.length} día{items.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </div>
-                <span className="shrink-0 text-lg text-slate-500">
-                  {abierto ? "▲" : "▼"}
-                </span>
-              </button>
-
-              {abierto && (
-                <div className="flex flex-col gap-2 border-t border-[var(--borde)] px-4 py-3">
-                  {diasPedido.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      Sin platos registrados.
-                    </p>
-                  ) : (
-                    diasPedido.map(({ dia, item }) => (
-                      <div
-                        key={dia}
-                        className={item ? "flex gap-3" : "flex gap-3 opacity-80"}
-                      >
-                        <span
-                          className={
-                            item
-                              ? "w-[72px] shrink-0 text-sm font-bold text-[var(--verde)]"
-                              : "w-[72px] shrink-0 text-sm font-bold text-slate-500"
-                          }
-                        >
-                          {DIAS_LABEL[dia] ?? dia}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          {item ? (
-                            <>
-                              <div className="text-sm font-semibold text-slate-950">
-                                {item.plato_nombre}
-                              </div>
-                              {item.guarnicion_nombre && (
-                                <div className="mt-0.5 text-xs text-slate-500">
-                                  + {item.guarnicion_nombre}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <Badge variante="gris">No pedís vianda</Badge>
-                          )}
-                        </div>
+              return (
+                <section
+                  key={pedido.id}
+                  className="overflow-hidden rounded-[1.15rem] border border-[#deded8] bg-white shadow-[0_2px_8px_rgba(26,26,26,0.12)]"
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-start gap-3 px-5 py-4 text-left transition hover:bg-[#fbfbf7]"
+                    onClick={() => setExpandido(abierto ? null : pedido.id)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[1.22rem] font-extrabold leading-tight text-[#272723]">
+                        {formatSemanaCorta(pedido.semana_inicio)}
+                      </p>
+                      <div className="mt-2">
+                        <EstadoPedido tono={cfg.tono} label={cfg.label} />
                       </div>
-                    ))
-                  )}
+                    </div>
+                    <div className="flex shrink-0 items-start gap-3 text-[1rem] font-semibold text-[#8c8981]">
+                      <ResumenDerecha diasPedido={diasPedido} items={items} />
+                      {abierto ? (
+                        <ChevronUp className="mt-1 h-5 w-5" aria-hidden="true" />
+                      ) : (
+                        <ChevronDown className="mt-1 h-5 w-5" aria-hidden="true" />
+                      )}
+                    </div>
+                  </button>
 
-                  {puedeEliminar && (
-                    <Boton
-                      type="button"
-                      variante="peligro"
-                      anchoCompleto
-                      disabled={mutationCancelar.isPending}
-                      onClick={() => eliminarPedido(pedido)}
-                      className="mt-2 text-sm"
-                    >
-                      {mutationCancelar.isPending
-                        ? "Eliminando..."
-                        : "Eliminar pedido de esta semana"}
-                    </Boton>
+                  {abierto && (
+                    <div className="border-t border-[#ecebe5] px-5 py-5">
+                      {items.length === 0 ? (
+                        <p className="text-[0.98rem] font-semibold text-[#aaa79f]">
+                          Pedido pendiente, sin platos cargados aun.
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          {diasPedido.map(({ dia, item }) => (
+                            <div key={dia} className="grid grid-cols-[6.5rem_1fr] gap-3">
+                              <span className="text-[1rem] font-extrabold text-[#848178]">
+                                {DIAS_LABEL[dia] ?? dia}
+                              </span>
+                              <span className="text-right text-[1rem] font-semibold text-[#272723]">
+                                {item && !item.sin_pedido ? item.plato_nombre : "Sin vianda"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {puedeEliminar && (
+                        <div className="mt-5 border-t border-[#ecebe5] pt-4">
+                          <Boton
+                            type="button"
+                            variante="peligro"
+                            disabled={mutationCancelar.isPending}
+                            onClick={() => eliminarPedido(pedido)}
+                            className="min-h-11 rounded-full px-5 text-[1rem]"
+                          >
+                            {!mutationCancelar.isPending && (
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            )}
+                            {mutationCancelar.isPending ? "Eliminando..." : "Eliminar pedido"}
+                          </Boton>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-            </Tarjeta>
-          );
-        })}
-      </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </Pagina>
   );
 }

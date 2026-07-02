@@ -1,5 +1,5 @@
 schema: la_quinta_project_history_v2
-updated_at: "2026-06-29"
+updated_at: "2026-07-02"
 
 product_summary:
   from_chat_summary:
@@ -28,6 +28,7 @@ confirmed_decisions:
   from_chat_summary:
     - "Mantener nombres del dominio en espanol."
     - "Mantener UI cliente mobile-first."
+    - "Un dia de menu marcado sin servicio/feriado debe quedar como sin vianda por defecto, pero el cliente puede cambiarlo para empresas con entrega anticipada."
 
 current_project_state:
   verified_in_repo:
@@ -69,6 +70,8 @@ conversation_decisions_or_context:
 
 timeline:
   verified_in_repo:
+    - date: "2026-06-30"
+      event: "Pedido cliente deja de bloquear dias marcados sin servicio: se muestran como sin pedido por defecto y POST/PUT permite guardar plato si pasa validacion."
     - date: "2026-06-27"
       event: "Se crea docs/contexto-proyecto.md."
     - date: "2026-06-27"
@@ -143,10 +146,25 @@ timeline:
       event: "Auditoria elimina la dependencia vulnerable xlsx de front_menu y reemplaza la exportacion de PedidosAdmin por CSV compatible con Excel; npm audit --omit=dev de front_menu queda sin vulnerabilidades."
     - date: "2026-06-29"
       event: "Por requerimiento operativo del usuario se restablece la exportacion XLSX en front_menu/src/pages/PedidosAdmin.jsx y se reinstala xlsx; la vulnerabilidad queda como deuda aceptada al no existir fix directo."
+    - date: "2026-06-29"
+      event: "Se ajusta iniciar-servicios.ps1 para que iniciar.bat abra API, Clientes, Admin y Cloudflare Tunnel en una sola ventana de Windows Terminal con pestanas visibles; si wt.exe no existe conserva fallback a consolas separadas."
+    - date: "2026-06-29"
+      event: "Se endurece iniciar-servicios.ps1 para no cerrar la Windows Terminal desde donde se ejecuta, reutilizar la ventana La Quinta Servicios y limpiar pestanas/procesos previos antes de reabrir API, Clientes, Admin y Cloudflare Tunnel."
+    - date: "2026-06-29"
+      event: "Se actualiza el seed de menus historicos: CSV sincronizado a 23 semanas, normalizacion compartida de platos/alias/typos, nuevos platos agregados a seeds completos y auditoria CSV->platos sin faltantes."
+    - date: "2026-06-29"
+      event: "Se ejecuta reset operativo local de pedidos, menus, historial, platos y guarniciones; se cargan 146 platos corregidos y 23 menus historicos sin duplicados normalizados."
+    - date: "2026-07-01"
+      event: "Front cliente alinea visualmente Pedido semanal, bottom sheet de seleccion y Mis pedidos a capturas Figma mobile 576x1280; cambios limitados a React/Tailwind, sin cambios de contratos API ni reglas backend. Validacion local: front_clientes lint/build/test OK; navegador 390x844 redirige a login sin errores de consola por falta de sesion activa."
+    - date: "2026-07-02"
+      event: "Auditoria de merge corrige lint cliente, alinea SugerenciasPage con POST /api/v1/pedidos/sugerencias, estabiliza npm test con vitest --pool=threads, actualiza smoke e2e a Onboarding -> Login y corrige rollback de migracion 1719000034000 para no dropear columnas historicas telefono/fecha_nacimiento."
+    - date: "2026-07-02"
+      event: "Admin empleados agrega telefono y fecha_nacimiento al formulario/listado y API empleados los acepta/devuelve; Pedido semanal corrige z-index del selector de plato para que el boton Listo para el dia no quede tapado por BottomNavigation."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."
   - "Confirmar si funciones legacy del cliente deben conservar compatibilidad o eliminarse."
+  - "Confirmar si /api/v1/mis-sugerencias debe conservarse como modulo separado o consolidarse con /api/v1/pedidos/sugerencias."
   - "Confirmar politica de cache de opciones de menu."
   - "Confirmar entorno objetivo de deploy actual: Docker Compose local, Easypanel o ambos."
 

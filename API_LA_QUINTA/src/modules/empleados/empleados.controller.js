@@ -17,7 +17,7 @@ export const getEmpleado = asyncHandler(async (req, res) => {
 });
 
 export const createEmpleado = asyncHandler(async (req, res) => {
-  const { empresa_id, nombre, apellido, email, password, rol = 'cliente' } = req.body;
+  const { empresa_id, nombre, apellido, email, password, rol = 'cliente', telefono, fecha_nacimiento } = req.body;
   if (!empresa_id || !nombre || !apellido || !email || !password) {
     throw ApiError.badRequest('empresa_id, nombre, apellido, email y password son requeridos');
   }
@@ -34,6 +34,8 @@ export const createEmpleado = asyncHandler(async (req, res) => {
     email: email.trim().toLowerCase(),
     password_hash,
     rol,
+    telefono: telefono?.trim() || null,
+    fecha_nacimiento: fecha_nacimiento || null,
   });
   sendCreated(res, empleado, 'Empleado creado');
 });
@@ -43,10 +45,12 @@ export const updateEmpleado = asyncHandler(async (req, res) => {
   if (!e) throw ApiError.notFound('Empleado no encontrado');
 
   const { password, ...rest } = req.body;
-  const allowed = ['empresa_id', 'nombre', 'apellido', 'email', 'activo', 'rol'];
+  const allowed = ['empresa_id', 'nombre', 'apellido', 'email', 'activo', 'rol', 'telefono', 'fecha_nacimiento'];
   const fields = Object.fromEntries(
     Object.entries(rest).filter(([key]) => allowed.includes(key))
   );
+  if ('telefono' in fields) fields.telefono = fields.telefono?.trim() || null;
+  if ('fecha_nacimiento' in fields) fields.fecha_nacimiento = fields.fecha_nacimiento || null;
   if (fields.rol && !['cliente', 'admin'].includes(fields.rol)) {
     throw ApiError.badRequest('rol inválido');
   }

@@ -5,6 +5,19 @@ import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 import { adminAuth } from '../auth.js';
 
+function normalizarFechaInput(fecha) {
+  return fecha ? String(fecha).split('T')[0] : '';
+}
+
+function formatearFechaCorta(fecha) {
+  if (!fecha) return null;
+  return new Date(fecha).toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
 const PLANES = { basico: 'Básico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
 const MODOS = { semanal: 'Semanal', diario: 'Diario', ambos: 'Ambos' };
 const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sábado', lunes_domingo: 'Lunes a domingo' };
@@ -215,6 +228,12 @@ function EmpleadosPanel({ empresa, esSuperAdmin }) {
             <div>
               <p className="font-medium text-sm">{emp.nombre} {emp.apellido}</p>
               <p className="text-xs text-gray-400">{emp.email} · {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
+              {(emp.telefono || emp.fecha_nacimiento) && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {emp.telefono || 'Sin teléfono'}
+                  {emp.fecha_nacimiento ? ` · Nac. ${formatearFechaCorta(emp.fecha_nacimiento)}` : ''}
+                </p>
+              )}
             </div>
             <div className="flex gap-2 items-center">
               <button
@@ -430,6 +449,8 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
     nombre: empleado?.nombre || '',
     apellido: empleado?.apellido || '',
     email: empleado?.email || '',
+    telefono: empleado?.telefono || '',
+    fecha_nacimiento: normalizarFechaInput(empleado?.fecha_nacimiento),
     password: '',
     rol: empleado?.rol || 'cliente',
   });
@@ -467,6 +488,14 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
         <Campo label="Email">
           <input className={input} type="email" required value={form.email} onChange={e => set('email', e.target.value)} placeholder="martin@empresa.com" />
         </Campo>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Campo label="Teléfono">
+            <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" />
+          </Campo>
+          <Campo label="Fecha de nacimiento">
+            <input className={input} type="date" value={form.fecha_nacimiento} onChange={e => set('fecha_nacimiento', e.target.value)} />
+          </Campo>
+        </div>
         <Campo label={esNuevo ? 'Contraseña' : 'Nueva contraseña (dejar vacío para no cambiar)'}>
           <input className={input} type="password" required={esNuevo} value={form.password} onChange={e => set('password', e.target.value)} placeholder={esNuevo ? '' : '••••••••'} />
         </Campo>

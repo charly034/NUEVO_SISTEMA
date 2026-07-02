@@ -6,6 +6,7 @@ import { tieneJornadaExtendida } from "./adaptadoresPedido.js";
 import SemanaCardEditable from "./SemanaCardEditable.jsx";
 import SemanaCardDetalle from "./SemanaCardDetalle.jsx";
 import SemanaCardLectura from "./SemanaCardLectura.jsx";
+import SemanaCardMenuInteractivo from "./SemanaCardMenuInteractivo.jsx";
 import SemanaCardRecomendacion from "./SemanaCardRecomendacion.jsx";
 
 const ConfirmacionPedido = lazy(() => import("./ConfirmacionPedido.jsx"));
@@ -90,16 +91,25 @@ export default function SemanaPedidoCard({
 
   return (
     <Card
-      className="h-full min-h-0 p-3 max-[700px]:p-2.5"
+      className="h-full min-h-0 overflow-hidden rounded-[1.5rem] border-0 bg-[#f5f6f0] p-0 shadow-none"
       aria-label={semana.titulo}
     >
-      <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex h-full min-h-0 flex-col">
         {modoActual === "detalle" ? (
           <SemanaCardDetalle
             compacta={compacta}
             mensajeLimite={mensajeLimite}
             semana={semana}
             onVolver={() => cambiarModo("lectura")}
+          />
+        ) : modoActual === "menu" ? (
+          <SemanaCardMenuInteractivo
+            fechaActual={fechaActual}
+            guardando={guardando}
+            semana={semana}
+            onCancelar={(opciones) => cambiarModo("lectura", opciones)}
+            onDirtyChange={onDirtyChange}
+            onGuardar={guardarSemana}
           />
         ) : modoActual === "edicion" ? (
           <SemanaCardEditable

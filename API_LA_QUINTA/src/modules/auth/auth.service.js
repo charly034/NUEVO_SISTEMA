@@ -137,7 +137,7 @@ export const cambiarPassword = async (empleadoId, currentPassword, newPassword) 
 export const getSession = async (empleadoId) => {
   const result = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.rol, e.activo,
-            e.telefono, e.fecha_nacimiento,
+            e.telefono, e.fecha_nacimiento, e.preferencias_alimentarias,
             e.empresa_id, emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido
      FROM empleados e
      JOIN empresas emp ON emp.id = e.empresa_id
@@ -148,20 +148,30 @@ export const getSession = async (empleadoId) => {
   if (!empleado) throw ApiError.unauthorized('La sesión ya no es válida');
 
   return {
-    id:               empleado.id,
-    nombre:           empleado.nombre,
-    apellido:         empleado.apellido,
-    email:            empleado.email,
-    telefono:         empleado.telefono,
-    fecha_nacimiento: empleado.fecha_nacimiento,
-    rol:              empleado.rol,
+    id:                       empleado.id,
+    nombre:                   empleado.nombre,
+    apellido:                 empleado.apellido,
+    email:                    empleado.email,
+    telefono:                 empleado.telefono,
+    fecha_nacimiento:         empleado.fecha_nacimiento,
+    preferencias_alimentarias: empleado.preferencias_alimentarias || {},
+    rol:                      empleado.rol,
     empresa: {
-      id:         empleado.empresa_id,
-      nombre:     empleado.empresa_nombre,
-      plan:       empleado.plan,
+      id:          empleado.empresa_id,
+      nombre:      empleado.empresa_nombre,
+      plan:        empleado.plan,
       modo_pedido: empleado.modo_pedido,
     },
   };
+};
+
+export const actualizarPreferencias = async (empleadoId, preferencias) => {
+  const r = await query(
+    `UPDATE empleados SET preferencias_alimentarias = $1 WHERE id = $2
+     RETURNING preferencias_alimentarias`,
+    [JSON.stringify(preferencias), empleadoId]
+  );
+  return r.rows[0]?.preferencias_alimentarias || {};
 };
 
 export const actualizarPerfil = async (empleadoId, { nombre, apellido, telefono, fecha_nacimiento }) => {

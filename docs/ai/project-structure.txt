@@ -85,6 +85,8 @@
 |           |-- pedidos/
 |           |-- platos/
 |           |-- sugerencias/
+|           |-- notificaciones/
+|           |-- sugerencias-empleados/
 |           |-- users/
 |           `-- usuarios-admin/
 |
@@ -144,6 +146,8 @@
         |-- mappers/
         |   pedidoMapper.js.
         |-- pages/
+        |   PedidoPage, HistorialPage, PerfilPage, LoginPage, SplashPage,
+        |   OnboardingPage, NotificacionesPage y SugerenciasPage.
         |-- routes/
         |   rutasCliente.js.
         |-- services/

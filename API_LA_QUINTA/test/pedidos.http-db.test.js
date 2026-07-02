@@ -165,7 +165,7 @@ test('POST sinPedido true con plato cargado devuelve 422 y no guarda parcial', a
   });
 });
 
-test('POST dia sin servicio devuelve 422 y no guarda parcial', async () => {
+test('POST dia sin servicio permite pedido si la empresa entrega anticipado', async () => {
   await conFixture({}, async (fixture) => {
     const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
       token: fixture.token,
@@ -179,9 +179,9 @@ test('POST dia sin servicio devuelve 422 y no guarda parcial', async () => {
       }),
     });
 
-    assert.equal(respuesta.status, 422);
-    assert.match(respuesta.body.message, /sin servicio/);
-    assert.equal(await contarPedidosFixture(fixture), 0);
+    assert.equal(respuesta.status, 201);
+    assert.equal(await contarPedidosFixture(fixture), 1);
+    assert.equal(respuesta.body.data.pedido.dias[0].diaId, 'jueves');
   });
 });
 

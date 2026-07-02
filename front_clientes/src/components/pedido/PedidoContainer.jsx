@@ -37,7 +37,6 @@ export default function PedidoContainer({ empleado }) {
     cargando,
     cambiarModoSemana,
     errorCarga,
-    errorGuardado,
     fechaReferencia,
     guardarCambios,
     guardarSugerencia,
@@ -64,11 +63,6 @@ export default function PedidoContainer({ empleado }) {
           >
             Reintentar
           </button>
-        </div>
-      )}
-      {errorGuardado && (
-        <div className="rounded-2xl border border-[#f0ccc3] bg-[#fff0ed] px-3 py-2 text-sm font-bold text-[#8a3d30]">
-          {errorGuardado}
         </div>
       )}
       {!cargando && !errorCarga && semanas.length === 0 && (

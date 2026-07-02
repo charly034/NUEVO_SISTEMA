@@ -28,21 +28,32 @@ export default function OpcionPlatoCard({
     <RadioCard compacto seleccionado={seleccionado} onClick={() => onSeleccionar?.(plato)}>
       <span className="block">
         <span className="flex items-start justify-between gap-2">
-          <span className="block min-w-0 text-[0.98rem] font-black leading-tight text-[#1a1a1a]">
+          <span className="block min-w-0 text-[1.12rem] font-extrabold leading-tight text-[#292925]">
             {plato.nombre}
           </span>
           {plato.destacado && (
-            <span className="shrink-0 rounded-full bg-[#2d5a27] px-2 py-1 text-[0.68rem] font-black uppercase tracking-wide text-white">
+            <span className="shrink-0 rounded-full bg-[#586b24] px-2 py-1 text-[0.68rem] font-black uppercase tracking-wide text-white">
               Especial
             </span>
           )}
         </span>
-        <span className="mt-0.5 block text-[0.84rem] font-bold leading-snug text-[#716c64]">
+        <span className="mt-1 block text-[0.98rem] font-semibold leading-snug text-[#6e6b64]">
           {plato.descripcion}
         </span>
-        {plato.etiquetas?.length > 0 && (
+        {(plato.etiquetas?.length > 0 || plato.guarniciones?.length > 0) && (
           <span className="mt-1.5 flex flex-wrap gap-1.5">
-            {plato.etiquetas.map((etiqueta) => (
+            {plato.guarniciones?.length > 0 &&
+              !plato.etiquetas?.includes("Requiere guarnición") && (
+                <span
+                  className={unirClases(
+                    "rounded-full border px-2 py-0.5 text-[0.72rem] font-extrabold",
+                    estiloEtiqueta("Requiere guarnición"),
+                  )}
+                >
+                  Requiere guarnición
+                </span>
+              )}
+            {plato.etiquetas?.map((etiqueta) => (
               <span
                 key={etiqueta}
                 className={unirClases(

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CheckCircle2, LockKeyhole, Pencil, ShieldCheck } from "lucide-react";
 import Alerta from "../compartido/ui/Alerta.jsx";
 import Boton from "../compartido/ui/Boton.jsx";
 import CampoPassword from "../compartido/ui/CampoPassword.jsx";
@@ -47,11 +48,11 @@ function CambiarPasswordForm({ onCerrar }) {
   if (ok) {
     return (
       <div className="py-2 text-center">
-        <div className="mb-2 text-4xl" aria-hidden="true">
-          ✅
-        </div>
-        <p className="mb-3 font-bold text-[var(--verde)]">
-          ¡Contraseña actualizada!
+        <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f7ee] text-[#2d5a27]">
+          <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <p className="mb-3 font-black text-[#2d5a27]">
+          Contraseña actualizada
         </p>
         <Boton type="button" anchoCompleto onClick={onCerrar}>
           Listo
@@ -120,12 +121,12 @@ function FilaDato({ label, valor, last }) {
     <div
       className={
         last
-          ? "flex items-center justify-between py-2.5"
-          : "flex items-center justify-between border-b border-[var(--borde)] py-2.5"
+          ? "flex items-center justify-between gap-4 py-3"
+          : "flex items-center justify-between gap-4 border-b border-[#eee8df] py-3"
       }
     >
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className="max-w-[60%] break-words text-right text-sm font-semibold text-slate-950">
+      <span className="text-sm font-bold text-[#716c64]">{label}</span>
+      <span className="max-w-[62%] break-words text-right text-sm font-black text-[#1a1a1a]">
         {valor}
       </span>
     </div>
@@ -134,7 +135,7 @@ function FilaDato({ label, valor, last }) {
 
 function TituloSeccion({ children }) {
   return (
-    <span className="mb-3 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+    <span className="mb-3 block text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]">
       {children}
     </span>
   );
@@ -147,7 +148,7 @@ export default function PerfilCliente({
 }) {
   const iniciales =
     `${empleado.nombre?.[0] ?? ""}${empleado.apellido?.[0] ?? ""}`.toUpperCase();
-  const plan = PLANES[empleado.empresa?.plan] ?? empleado.empresa?.plan ?? "—";
+  const plan = PLANES[empleado.empresa?.plan] ?? empleado.empresa?.plan ?? "-";
 
   const [editando, setEditando] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -201,22 +202,27 @@ export default function PerfilCliente({
   };
 
   return (
-    <Pagina className="max-w-[520px] pt-6">
+    <Pagina className="max-w-[480px] md:max-w-[760px] lg:max-w-[860px]">
       <header className="mb-6 flex items-center gap-4 px-1">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--verde)] text-2xl font-extrabold text-white">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#2d5a27] text-2xl font-black text-white shadow-[0_12px_26px_rgba(45,90,39,0.16)]">
           {iniciales}
         </div>
         <div className="min-w-0">
-          <h2 className="text-xl font-extrabold text-slate-950">
+          <p className="text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]">
+            Mi cuenta
+          </p>
+          <h2 className="mt-1 text-[1.35rem] font-black leading-tight text-[#1a1a1a]">
             {empleado.nombre} {empleado.apellido}
           </h2>
-          <p className="mt-1 text-sm text-slate-500">{empleado.empresa?.nombre}</p>
+          <p className="mt-1 text-[0.95rem] font-medium leading-tight text-[#716c64]">
+            {empleado.empresa?.nombre}
+          </p>
         </div>
       </header>
 
       {guardado && (
         <Alerta variante="exito" className="mb-3">
-          ✅ Datos actualizados
+          Datos actualizados
         </Alerta>
       )}
 
@@ -227,10 +233,11 @@ export default function PerfilCliente({
             <Boton
               type="button"
               variante="fantasma"
-              className="min-h-0 px-0 py-0 text-sm font-bold text-[var(--verde)]"
+              className="min-h-0 px-0 py-0 text-sm font-black text-[#2d5a27]"
               onClick={() => setEditando(true)}
             >
-              ✏️ Editar
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Editar
             </Boton>
           )}
         </div>
@@ -286,10 +293,10 @@ export default function PerfilCliente({
               valor={`${empleado.nombre} ${empleado.apellido}`}
             />
             <FilaDato label="Email" valor={empleado.email} />
-            <FilaDato label="Teléfono" valor={empleado.telefono || "—"} />
+            <FilaDato label="Teléfono" valor={empleado.telefono || "-"} />
             <FilaDato
               label="Cumpleaños"
-              valor={formatFecha(empleado.fecha_nacimiento) || "—"}
+              valor={formatFecha(empleado.fecha_nacimiento) || "-"}
               last
             />
           </div>
@@ -298,12 +305,17 @@ export default function PerfilCliente({
 
       <Tarjeta className="mb-3 px-4 py-4">
         <TituloSeccion>Mi empresa</TituloSeccion>
-        <FilaDato label="Empresa" valor={empleado.empresa?.nombre ?? "—"} />
+        <FilaDato label="Empresa" valor={empleado.empresa?.nombre ?? "-"} />
         <FilaDato label="Plan" valor={plan} last />
       </Tarjeta>
 
       <Tarjeta className="mb-3 px-4 py-4">
-        <TituloSeccion>Seguridad</TituloSeccion>
+        <div className="mb-3 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-[#2d5a27]" aria-hidden="true" />
+          <span className="block text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]">
+            Seguridad
+          </span>
+        </div>
         {showPass ? (
           <CambiarPasswordForm onCerrar={() => setShowPass(false)} />
         ) : (
@@ -313,7 +325,8 @@ export default function PerfilCliente({
             anchoCompleto
             onClick={() => setShowPass(true)}
           >
-            🔒 Cambiar contraseña
+            <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+            Cambiar contraseña
           </Boton>
         )}
       </Tarjeta>
@@ -322,7 +335,7 @@ export default function PerfilCliente({
         Cerrar sesión
       </Boton>
 
-      <p className="mt-6 text-center text-xs text-slate-300">
+      <p className="mt-6 text-center text-xs font-bold text-[#d8d4cc]">
         La Quinta · Sistema de pedidos
       </p>
     </Pagina>

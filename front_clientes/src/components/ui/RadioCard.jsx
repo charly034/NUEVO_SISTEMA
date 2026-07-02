@@ -1,4 +1,3 @@
-import { CheckCircle2, Circle } from "lucide-react";
 import { unirClases } from "../../compartido/utils/clases.js";
 
 export default function RadioCard({
@@ -13,19 +12,23 @@ export default function RadioCard({
       aria-pressed={seleccionado}
       onClick={onClick}
       className={unirClases(
-        "flex w-full items-start gap-3 rounded-3xl border bg-white text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2d5a27]",
-        compacto ? "p-2.5" : "p-3",
+        "flex w-full items-start gap-3 rounded-[1.15rem] border bg-white text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#586b24]",
+        compacto ? "px-5 py-4" : "p-4",
         seleccionado
-          ? "border-[#2d5a27] bg-[#f0f7ee] shadow-[0_10px_26px_rgba(45,90,39,0.12)]"
-          : "border-[#ebe6dc] hover:border-[#d8e6d4] hover:bg-[#fffdf9]",
+          ? "border-[#c9d2b7] bg-[#eef3e9]"
+          : "border-[#deded8] hover:border-[#c9d2b7] hover:bg-[#fffdf9]",
       )}
     >
-      {seleccionado ? (
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#2d5a27]" aria-hidden="true" />
-      ) : (
-        <Circle className="mt-0.5 h-5 w-5 shrink-0 text-[#b8b0a4]" aria-hidden="true" />
-      )}
       <span className="min-w-0 flex-1">{children}</span>
+      <span
+        className={unirClases(
+          "mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
+          seleccionado ? "border-[#586b24]" : "border-[#d6d6d0]",
+        )}
+        aria-hidden="true"
+      >
+        {seleccionado ? <span className="h-2.5 w-2.5 rounded-full bg-[#586b24]" /> : null}
+      </span>
     </button>
   );
 }

@@ -46,15 +46,15 @@ export default function BottomSheet({
         aria-modal="true"
         aria-labelledby={tituloId}
         aria-describedby={subtitulo ? subtituloId : undefined}
-        className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[88dvh] min-h-[70dvh] max-w-[480px] animate-[sheetUp_180ms_ease-out] flex-col overflow-hidden rounded-t-[2rem] bg-[#faf8f4] shadow-[0_-18px_44px_rgba(26,26,26,0.18)]"
+        className="absolute inset-x-0 bottom-0 mx-auto flex h-[82dvh] max-h-[760px] min-h-[66dvh] max-w-[480px] animate-[sheetUp_180ms_ease-out] flex-col overflow-hidden rounded-t-[1.7rem] bg-[#fbfbf7] shadow-[0_-18px_44px_rgba(26,26,26,0.18)]"
       >
         <div className={[
-          "shrink-0 border-b border-[#eee8df] bg-[#faf8f4] px-4",
-          encabezadoCompacto ? "pt-1.5 pb-1" : "pt-3 pb-3",
+          "shrink-0 bg-[#fbfbf7] px-6",
+          encabezadoCompacto ? "pt-5 pb-0" : "pt-3 pb-3 border-b border-[#eee8df]",
         ].join(" ")}>
           <div className={[
             "mx-auto h-1.5 w-12 rounded-full bg-[#d8d2c8]",
-            encabezadoCompacto ? "mb-1.5" : "mb-3",
+            encabezadoCompacto ? "hidden" : "mb-3",
           ].join(" ")} />
           <div className={encabezadoCompacto ? "flex justify-end" : "flex items-start justify-between gap-3"}>
             <div className={encabezadoCompacto ? "sr-only" : undefined}>
@@ -74,7 +74,7 @@ export default function BottomSheet({
               onClick={onCerrar}
               className={[
                 "flex shrink-0 items-center justify-center rounded-full bg-white text-[#5f5a52] shadow-[0_8px_22px_rgba(45,90,39,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2d5a27]",
-                encabezadoCompacto ? "h-10 w-10" : "h-11 w-11",
+                encabezadoCompacto ? "h-11 w-11 bg-[#f1f0eb] text-[#77736c] shadow-none" : "h-11 w-11",
               ].join(" ")}
             >
               <X className="h-5 w-5" aria-hidden="true" />

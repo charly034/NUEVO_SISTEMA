@@ -5,7 +5,7 @@ export const findAll = async (empresa_id) => {
   const vals = empresa_id ? [empresa_id] : [];
   const r = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.activo, e.rol, e.empresa_id,
-            emp.nombre AS empresa_nombre, e.created_at
+            e.telefono, e.fecha_nacimiento, emp.nombre AS empresa_nombre, e.created_at
      FROM empleados e
      JOIN empresas emp ON emp.id = e.empresa_id
      ${where}
@@ -18,7 +18,7 @@ export const findAll = async (empresa_id) => {
 export const findById = async (id) => {
   const r = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.activo, e.rol, e.empresa_id,
-            emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido
+            e.telefono, e.fecha_nacimiento, emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido
      FROM empleados e JOIN empresas emp ON emp.id = e.empresa_id
      WHERE e.id = $1`,
     [id]
@@ -48,7 +48,7 @@ export const update = async (id, fields) => {
   vals.push(id);
   const r = await query(
     `UPDATE empleados SET ${set}, updated_at = NOW() WHERE id = $${vals.length}
-     RETURNING id, nombre, apellido, email, activo, rol, empresa_id`,
+     RETURNING id, nombre, apellido, email, activo, rol, empresa_id, telefono, fecha_nacimiento`,
     vals
   );
   return r.rows[0] || null;

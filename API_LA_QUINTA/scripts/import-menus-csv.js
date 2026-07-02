@@ -26,6 +26,14 @@ import pg from 'pg';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import 'dotenv/config';
+import {
+  FECHAS_INICIO_MENUS_HISTORICOS,
+  canonicalizarNombrePlato,
+  estadoMenuHistorico,
+  fechaFinSemanaHistorica,
+  nombreSemanaHistorica,
+  normalizarClave,
+} from './menu-normalizacion.js';
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -90,7 +98,7 @@ function limpiarNombre(str) {
 
 // ── Normalizar nombre para comparar (sin mayúsculas/tildes extra) ─
 function normalizar(str) {
-  return str.toLowerCase().trim();
+  return normalizarClave(str);
 }
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
@@ -170,17 +178,18 @@ async function main() {
     }
 
     async function obtenerOCrearPlato(nombre) {
-      const key = normalizar(nombre);
+      const nombreCanonico = canonicalizarNombrePlato(nombre);
+      const key = normalizar(nombreCanonico);
       if (cachePlatos.has(key)) return cachePlatos.get(key);
 
-      const tags = inferirTags(nombre);
+      const tags = inferirTags(nombreCanonico);
 
       const { rows: ins } = await client.query(
         `INSERT INTO platos (nombre, activo, tags)
          VALUES ($1, true, $2)
          ON CONFLICT DO NOTHING
          RETURNING id`,
-        [nombre, tags]
+        [nombreCanonico, tags]
       );
 
       if (ins.length > 0) {
@@ -189,10 +198,11 @@ async function main() {
       }
 
       // Si ya existía, actualizar sus tags si los tiene vacíos
-      const { rows: found } = await client.query(
-        'SELECT id, tags FROM platos WHERE LOWER(nombre) = $1', [key]
-      );
-      const plato = found[0];
+      const { rows: found } = await client.query('SELECT id, nombre, tags FROM platos');
+      const plato = found.find((row) => normalizar(row.nombre) === key);
+      if (!plato) {
+        throw new Error(`No se pudo resolver el plato "${nombreCanonico}" luego del INSERT`);
+      }
       if (plato.tags.length === 0 && tags.length > 0) {
         await client.query('UPDATE platos SET tags = $1 WHERE id = $2', [tags, plato.id]);
       }
@@ -225,22 +235,30 @@ async function main() {
       const encabezado = encabezados[col];
       if (!encabezado || !encabezado.trim()) continue;
 
-      const fechas = parsearEncabezadoSemana(encabezado);
+      const fechaInicioHistorica = FECHAS_INICIO_MENUS_HISTORICOS[col - 1];
+      const fechas = fechaInicioHistorica
+        ? { inicio: fechaInicioHistorica, fin: fechaFinSemanaHistorica(fechaInicioHistorica) }
+        : parsearEncabezadoSemana(encabezado);
       if (!fechas) {
         console.warn(`⚠️  Columna ${col}: no se pudo parsear la fecha "${encabezado}" — omitida.`);
         continue;
       }
 
-      const d = fechas.inicio.slice(8, 10);
-      const m = fechas.inicio.slice(5, 7);
-      const df = fechas.fin.slice(8, 10);
-      const mf = fechas.fin.slice(5, 7);
-      const nombre = `Semana del ${d}/${m} al ${df}/${mf}`;
+      const nombre = nombreSemanaHistorica(fechas.inicio);
+      const estado = estadoMenuHistorico(fechas.inicio);
+      const ahora = new Date().toISOString();
 
       const { rows: menuIns } = await client.query(
-        `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin)
-         VALUES ($1, $2, $3) RETURNING id`,
-        [nombre, fechas.inicio, fechas.fin]
+        `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado, publicado_at, cerrado_at)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [
+          nombre,
+          fechas.inicio,
+          fechas.fin,
+          estado,
+          estado === 'publicado' || estado === 'cerrado' ? ahora : null,
+          estado === 'cerrado' ? ahora : null,
+        ]
       );
       const menuId = menuIns[0].id;
       semanasImportadas++;
@@ -269,7 +287,7 @@ async function main() {
         }
 
         // Opción A
-        const nombreA = limpiarNombre(celdaA);
+        const nombreA = canonicalizarNombrePlato(limpiarNombre(celdaA));
         if (nombreA) {
           const platoId = await obtenerOCrearPlato(nombreA);
           await client.query(
@@ -281,7 +299,7 @@ async function main() {
         }
 
         // Opción C
-        const nombreC = limpiarNombre(celdaC);
+        const nombreC = canonicalizarNombrePlato(limpiarNombre(celdaC));
         if (nombreC) {
           const platoId = await obtenerOCrearPlato(nombreC);
           await client.query(

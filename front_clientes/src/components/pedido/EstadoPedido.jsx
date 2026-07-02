@@ -66,6 +66,7 @@ const configuracionEstado = {
   },
 };
 
+// TODO: implementar ajuste de densidad para compacta=true
 export default function EstadoPedido({
   estado,
   diasSeleccionados = 0,

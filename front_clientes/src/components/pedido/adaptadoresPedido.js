@@ -352,6 +352,11 @@ export function adaptarSemanasPedido({
           ? construirOpcionesDia(menuSemana.menu, dia, guarniciones)
           : [];
         const seleccion = construirSeleccionPedido(item, opciones);
+        const motivoSinServicio = sinServicioPorDia.get(dia);
+        const sinPedidoPorDefecto = !item && Boolean(motivoSinServicio);
+        const especiales = opciones.filter((opcion) => opcion.destacado);
+        const fijos = opciones.filter((opcion) => !opcion.destacado);
+        const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
 
         return {
           dia: DIAS_LABEL[dia] || dia,
@@ -361,12 +366,26 @@ export function adaptarSemanasPedido({
           regla: menuSemana.limiteEmpresa?.tipo === "diario" ? "diario" : "semanal",
           opciones,
           seleccion,
+          estado: sinPedidoPorDefecto
+            ? "sin_pedido_por_defecto"
+            : seleccion
+              ? "seleccionado"
+              : sinMenuEspecial
+                ? "sin_menu"
+                : "sin_seleccionar",
+          motivo: motivoSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
+          mensajeMenu: motivoSinServicio
+            ? "Este dia no tiene servicio normal. Queda sin vianda por defecto, pero podes elegir plato si tu empresa recibe entrega anticipada."
+            : sinMenuEspecial
+              ? "Todavia no hay menu especial para este dia. Podes elegir un plato fijo."
+              : null,
           plato: seleccion
             ? obtenerTextoDia({ item, estado })
+            : sinPedidoPorDefecto
+              ? "Sin pedido por defecto"
             : obtenerTextoDia({
                 item,
                 estado,
-                motivoSinServicio: sinServicioPorDia.get(dia),
               }),
         };
       }),

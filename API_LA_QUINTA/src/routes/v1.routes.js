@@ -12,6 +12,8 @@ import guarnicionesRoutes from '../modules/guarniciones/guarniciones.routes.js';
 import empresasRoutes from '../modules/empresas/empresas.routes.js';
 import empleadosRoutes from '../modules/empleados/empleados.routes.js';
 import menuRoutes from '../modules/menu/menu.routes.js';
+import notificacionesRoutes from '../modules/notificaciones/notificaciones.routes.js';
+import sugerenciasEmpleadosRoutes from '../modules/sugerencias-empleados/sugerencias-empleados.routes.js';
 
 const router = Router();
 
@@ -28,5 +30,7 @@ router.use('/menu', menuRoutes);
 router.use('/guarniciones', guarnicionesRoutes);
 router.use('/empresas', empresasRoutes);
 router.use('/empleados', empleadosRoutes);
+router.use('/notificaciones', notificacionesRoutes);
+router.use('/mis-sugerencias', sugerenciasEmpleadosRoutes);
 
 export default router;

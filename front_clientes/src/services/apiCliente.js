@@ -181,7 +181,7 @@ export function apiPatch(recurso, payload, opciones = {}) {
     return pedirApi(recurso, {
       ...opciones,
       method: "PATCH",
-      body: JSON.stringify(payload),
+      body: payload !== undefined ? JSON.stringify(payload) : undefined,
     });
   }
 
@@ -189,4 +189,9 @@ export function apiPatch(recurso, payload, opciones = {}) {
     ...payload,
     actualizadoEn: new Date().toISOString(),
   });
+}
+
+export function apiDelete(recurso, opciones = {}) {
+  if (USAR_MOCKS) return responderMock({ eliminado: true });
+  return pedirApi(recurso, { ...opciones, method: "DELETE" });
 }

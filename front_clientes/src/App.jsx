@@ -11,12 +11,14 @@ import {
   rutasCompatibilidad,
 } from "./routes/rutasCliente.js";
 
-const LoginPage = lazy(() => import("./pages/LoginPage.jsx"));
-const RegistroPage = lazy(() => import("./pages/RegistroPage.jsx"));
-const RecuperarPage = lazy(() => import("./pages/RecuperarPage.jsx"));
-const PedidoPage = lazy(() => import("./pages/PedidoPage.jsx"));
-const HistorialPage = lazy(() => import("./pages/HistorialPage.jsx"));
-const PerfilPage = lazy(() => import("./pages/PerfilPage.jsx"));
+const LoginPage         = lazy(() => import("./pages/LoginPage.jsx"));
+const SplashPage        = lazy(() => import("./pages/SplashPage.jsx"));
+const OnboardingPage    = lazy(() => import("./pages/OnboardingPage.jsx"));
+const PedidoPage        = lazy(() => import("./pages/PedidoPage.jsx"));
+const HistorialPage     = lazy(() => import("./pages/HistorialPage.jsx"));
+const PerfilPage        = lazy(() => import("./pages/PerfilPage.jsx"));
+const NotificacionesPage = lazy(() => import("./pages/NotificacionesPage.jsx"));
+const SugerenciasPage   = lazy(() => import("./pages/SugerenciasPage.jsx"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,23 +36,22 @@ function FallbackRutaMobile({ conNavegacion = false }) {
     <>
       <AppMobileShell>
         <header className="shrink-0 px-1 pb-3">
-          <p className="text-[0.82rem] font-black uppercase tracking-wide text-[#5f7f55]">
+          <p className="text-[0.82rem] font-black uppercase tracking-wide text-[#5B6B2A]">
             La Quinta
           </p>
-          <div className="mt-2 h-8 w-48 animate-pulse rounded-full bg-[#e8e3da]" />
-          <div className="mt-2 h-4 w-56 animate-pulse rounded-full bg-[#efe9df]" />
+          <div className="mt-2 h-8 w-48 animate-pulse rounded-full bg-[#EDF0E4]" />
+          <div className="mt-2 h-4 w-56 animate-pulse rounded-full bg-[#F0EDE6]" />
         </header>
-
         <section
           aria-label="Cargando pantalla"
-          className="mt-2 flex min-h-0 flex-1 flex-col gap-3 rounded-3xl border border-[#eee8df] bg-white p-3 shadow-sm"
+          className="mt-2 flex min-h-0 flex-1 flex-col gap-3 rounded-3xl border border-[#E8E5DC] bg-white p-3 shadow-sm"
         >
-          <div className="h-5 w-32 animate-pulse rounded-full bg-[#e8e3da]" />
-          <div className="h-20 animate-pulse rounded-2xl bg-[#f0f7ee]" />
+          <div className="h-5 w-32 animate-pulse rounded-full bg-[#EDF0E4]" />
+          <div className="h-20 animate-pulse rounded-2xl bg-[#EDF0E4]" />
           <div className="space-y-2">
-            <div className="h-12 animate-pulse rounded-2xl bg-[#faf8f4]" />
-            <div className="h-12 animate-pulse rounded-2xl bg-[#faf8f4]" />
-            <div className="h-12 animate-pulse rounded-2xl bg-[#faf8f4]" />
+            <div className="h-12 animate-pulse rounded-2xl bg-[#FAF8F3]" />
+            <div className="h-12 animate-pulse rounded-2xl bg-[#FAF8F3]" />
+            <div className="h-12 animate-pulse rounded-2xl bg-[#FAF8F3]" />
           </div>
         </section>
       </AppMobileShell>
@@ -58,42 +59,6 @@ function FallbackRutaMobile({ conNavegacion = false }) {
     </>
   );
 }
-
-const rutasPublicas = [
-  {
-    path: rutasAutenticacion.iniciarSesion,
-    render: ({ login }) => <LoginPage onLogin={login} />,
-  },
-  {
-    path: rutasAutenticacion.crearCuenta,
-    render: ({ setSession }) => <RegistroPage onRegistrado={setSession} />,
-  },
-  {
-    path: rutasAutenticacion.recuperarAcceso,
-    render: () => <RecuperarPage />,
-  },
-];
-
-const rutasPrivadas = [
-  {
-    path: rutasCliente.pedidoSemanal,
-    render: ({ empleado }) => <PedidoPage empleado={empleado} />,
-  },
-  {
-    path: rutasCliente.misPedidos,
-    render: ({ empleado }) => <HistorialPage empleado={empleado} />,
-  },
-  {
-    path: rutasCliente.miCuenta,
-    render: ({ empleado, logout, setSession }) => (
-      <PerfilPage
-        empleado={empleado}
-        onLogout={logout}
-        onEmpleadoUpdate={setSession}
-      />
-    ),
-  },
-];
 
 function RouteGuard({ empleado, checking, children }) {
   return (
@@ -106,40 +71,98 @@ function RouteGuard({ empleado, checking, children }) {
   );
 }
 
+function RouteGuardSinNav({ empleado, checking, children }) {
+  return (
+    <PrivateRoute empleado={empleado} checking={checking}>
+      <Suspense fallback={<FallbackRutaMobile />}>
+        {children}
+      </Suspense>
+    </PrivateRoute>
+  );
+}
+
 function AppRoutes() {
   const { empleado, login, logout, setSession, checking } = useAuth();
-  const auth = { empleado, login, logout, setSession };
 
   return (
     <Routes>
-      {rutasPublicas.map((ruta) => (
-        <Route
-          key={ruta.path}
-          path={ruta.path}
-          element={
-            empleado && !checking ? (
-              <Navigate to={rutasCliente.inicio} replace />
-            ) : (
-              <Suspense fallback={<FallbackRutaMobile />}>
-                {ruta.render(auth)}
-              </Suspense>
-            )
-          }
-        />
-      ))}
+      {/* Splash + Onboarding */}
+      <Route
+        path="/"
+        element={
+          <Suspense fallback={null}>
+            <SplashPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/onboarding"
+        element={
+          <Suspense fallback={null}>
+            <OnboardingPage />
+          </Suspense>
+        }
+      />
 
-      {rutasPrivadas.map((ruta) => (
-        <Route
-          key={ruta.path}
-          path={ruta.path}
-          element={
-            <RouteGuard empleado={empleado} checking={checking}>
-              {ruta.render(auth)}
-            </RouteGuard>
-          }
-        />
-      ))}
+      {/* Autenticación */}
+      <Route
+        path={rutasAutenticacion.iniciarSesion}
+        element={
+          empleado && !checking ? (
+            <Navigate to={rutasCliente.inicio} replace />
+          ) : (
+            <Suspense fallback={<FallbackRutaMobile />}>
+              <LoginPage onLogin={login} />
+            </Suspense>
+          )
+        }
+      />
 
+      {/* Rutas privadas con nav */}
+      <Route
+        path={rutasCliente.pedidoSemanal}
+        element={
+          <RouteGuard empleado={empleado} checking={checking}>
+            <PedidoPage empleado={empleado} />
+          </RouteGuard>
+        }
+      />
+      <Route
+        path={rutasCliente.misPedidos}
+        element={
+          <RouteGuard empleado={empleado} checking={checking}>
+            <HistorialPage empleado={empleado} />
+          </RouteGuard>
+        }
+      />
+      <Route
+        path={rutasCliente.miCuenta}
+        element={
+          <RouteGuard empleado={empleado} checking={checking}>
+            <PerfilPage empleado={empleado} onLogout={logout} onEmpleadoUpdate={setSession} />
+          </RouteGuard>
+        }
+      />
+
+      {/* Rutas privadas sin nav (pantallas secundarias) */}
+      <Route
+        path={rutasCliente.notificaciones}
+        element={
+          <RouteGuardSinNav empleado={empleado} checking={checking}>
+            <NotificacionesPage />
+          </RouteGuardSinNav>
+        }
+      />
+      <Route
+        path={rutasCliente.sugerencias}
+        element={
+          <RouteGuardSinNav empleado={empleado} checking={checking}>
+            <SugerenciasPage />
+          </RouteGuardSinNav>
+        }
+      />
+
+      {/* Compatibilidad */}
       {rutasCompatibilidad.map((ruta) => (
         <Route
           key={ruta.desde}
@@ -152,7 +175,7 @@ function AppRoutes() {
         path="*"
         element={
           <Navigate
-            to={empleado ? rutasCliente.inicio : rutasAutenticacion.iniciarSesion}
+            to={empleado ? rutasCliente.inicio : "/"}
             replace
           />
         }

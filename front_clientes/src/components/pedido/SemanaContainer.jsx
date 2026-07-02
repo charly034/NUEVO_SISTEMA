@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, Lightbulb, Utensils } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronLeft, Lightbulb, Utensils } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatearRangoPedido } from "../../utils/fechasPedido.js";
 import Boton from "../ui/Boton.jsx";
@@ -29,14 +29,22 @@ function obtenerSemanaActual(semanas, indiceInicial) {
 
 function obtenerAccionSemanaActual(semana) {
   if (semana?.metadata?.pedidoId) return "Ver pedido";
-  if (semana?.metadata?.tieneMenuPublicado) return "Ver menu";
+  if (semana?.metadata?.tieneMenuPublicado) return "Ver menú";
   return "Ver semana";
 }
 
 function obtenerDescripcionSemanaActual(semana) {
   if (semana?.metadata?.pedidoId) return "Revisa el pedido que cargaste para esta semana.";
-  if (semana?.metadata?.tieneMenuPublicado) return "Revisa el menu publicado para esta semana.";
+  if (semana?.metadata?.tieneMenuPublicado) return "¡El menú ya está publicado! Elegí tus platos para esta semana.";
   return "Todavia no hay menu publicado para esta semana.";
+}
+
+function obtenerModoSemanaActual() {
+  return "lectura";
+}
+
+function esSemanaUrgente(semana) {
+  return Boolean(semana?.metadata?.tieneMenuPublicado && !semana?.metadata?.pedidoId);
 }
 
 function SemanaOpcionCard({
@@ -47,15 +55,36 @@ function SemanaOpcionCard({
   semana,
   subtitulo,
   titulo,
+  urgente = false,
 }) {
   return (
-    <section className="rounded-3xl border border-[#eee8df] bg-white p-4 shadow-[0_12px_26px_rgba(45,90,39,0.07)]">
+    <section
+      className={urgente
+        ? "rounded-3xl border-2 border-[#f0c040] bg-[#fffcf0] p-4 shadow-[0_12px_26px_rgba(139,100,20,0.10)]"
+        : "rounded-3xl border border-[#eee8df] bg-white p-4 shadow-[0_12px_26px_rgba(45,90,39,0.07)]"}
+    >
+      {urgente && (
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[#d4900c]" aria-hidden="true" />
+          <span className="text-[0.72rem] font-black uppercase tracking-wide text-[#8a5a18]">
+            Falta tu pedido
+          </span>
+        </div>
+      )}
       <div className="flex items-start gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f0f7ee] text-[#2d5a27]">
+        <span
+          className={urgente
+            ? "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#fef3c7] text-[#b45309]"
+            : "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f0f7ee] text-[#2d5a27]"}
+        >
           <Icono className="h-6 w-6" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]">
+          <p
+            className={urgente
+              ? "text-[0.72rem] font-black uppercase tracking-wide text-[#b45309]"
+              : "text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]"}
+          >
             {subtitulo}
           </p>
           <h3 className="mt-1 text-[1.15rem] font-black leading-tight text-[#1a1a1a]">
@@ -102,6 +131,14 @@ export default function SemanaContainer({
     () => semanas.filter((semana) =>
       semana.tipo === "proxima" &&
       esSemanaParaSugerirMenu(semana),
+    ),
+    [semanas],
+  );
+  const semanasConSugerenciaEnviada = useMemo(
+    () => semanas.filter((semana) =>
+      semana.tipo === "proxima" &&
+      (semana?.metadata?.esSemanaSugerencias || semana?.estado === "sin_menu") &&
+      tieneSugerenciaEnviada(semana),
     ),
     [semanas],
   );
@@ -206,11 +243,8 @@ export default function SemanaContainer({
       <header className="shrink-0 px-4 pb-2 md:px-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]">
-              Pedido
-            </p>
             <p className="mt-0.5 text-sm font-bold leading-snug text-[#716c64]">
-              Elegi una semana para ver el menu completo y despues cargar tu pedido.
+              Elegí una semana para ver el menú completo y después cargar tu pedido.
             </p>
           </div>
           <CalendarDays className="h-5 w-5 shrink-0 text-[#2d5a27]" aria-hidden="true" />
@@ -226,27 +260,32 @@ export default function SemanaContainer({
               icono={CalendarDays}
               semana={semanaActual}
               subtitulo="Semana actual"
-              titulo="Esta semana"
-              onClick={() => abrirAccionSemana(semanaActual, "lectura")}
+              titulo={esSemanaUrgente(semanaActual) ? "¡Todavía no pediste!" : "Esta semana"}
+              urgente={esSemanaUrgente(semanaActual)}
+              onClick={() => abrirAccionSemana(semanaActual, obtenerModoSemanaActual(semanaActual))}
             />
           )}
 
-          {semanasConMenu.map((semana) => (
-            <SemanaOpcionCard
-              key={semana.id}
-              accion={semana.metadata?.pedidoId ? "Ver pedido" : "Ver menu"}
-              descripcion={
-                semana.metadata?.pedidoId
-                  ? "Ya tenes un pedido cargado para esta semana."
-                  : "Primero mira todas las opciones y despues carga tu pedido."
-              }
-              icono={Utensils}
-              semana={semana}
-              subtitulo="Semana con menu"
-              titulo={semana.metadata?.pedidoId ? "Pedido cargado" : "Menu disponible"}
-              onClick={() => abrirAccionSemana(semana, "lectura")}
-            />
-          ))}
+          {semanasConMenu.map((semana) => {
+            const urgente = esSemanaUrgente(semana);
+            return (
+              <SemanaOpcionCard
+                key={semana.id}
+                accion={urgente ? "Ver menú" : "Ver pedido"}
+                descripcion={
+                  urgente
+                    ? "El menú ya está publicado. No olvides elegir tus platos antes del cierre."
+                    : "Ya tenés un pedido cargado para esta semana."
+                }
+                icono={Utensils}
+                semana={semana}
+                subtitulo={urgente ? "Próxima semana" : "Semana con menú"}
+                titulo={urgente ? "¡Hacé tu pedido!" : "Pedido cargado"}
+                urgente={urgente}
+                onClick={() => abrirAccionSemana(semana, "lectura")}
+              />
+            );
+          })}
 
           {semanasParaSugerir.map((semana) => (
             <SemanaOpcionCard
@@ -259,6 +298,30 @@ export default function SemanaContainer({
               titulo="Ayudanos a pensar el proximo menu"
               onClick={() => abrirAccionSemana(semana, "recomendacion")}
             />
+          ))}
+
+          {semanasConSugerenciaEnviada.map((semana) => (
+            <section
+              key={semana.id}
+              className="rounded-3xl border border-[#cde5c8] bg-[#f0f7ee] p-4 shadow-[0_12px_26px_rgba(45,90,39,0.07)]"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2d5a27]">
+                  <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[0.72rem] font-black uppercase tracking-wide text-[#5f7f55]">
+                    Sugerencias
+                  </p>
+                  <h3 className="mt-1 text-[1.15rem] font-black leading-tight text-[#1a1a1a]">
+                    ¡Gracias! Tu sugerencia fue enviada
+                  </h3>
+                  <p className="mt-1 text-sm font-bold leading-snug text-[#716c64]">
+                    Semana del {formatearRangoPedido(semana.rango)}. Ya enviamos tus ideas para esta semana.
+                  </p>
+                </div>
+              </div>
+            </section>
           ))}
         </div>
       </div>

@@ -1,5 +1,5 @@
 schema: la_quinta_modules_v2
-updated_at: "2026-06-27"
+updated_at: "2026-07-02"
 
 modules:
   - owner_module: "API_LA_QUINTA.auth"
@@ -38,7 +38,8 @@ modules:
     routes_file: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
     owns: ["semanas de pedido", "menu activo/hoy/semana legacy", "crear pedido", "modificar pedido", "confirmar", "sugerencias cliente para semanas sin menu", "listar sugerencias cliente para admin", "cancelar mi pedido", "historial", "estado admin"]
     boundaries:
-      - "Reglas de plazo, empresa, empleado, dia sin servicio, plato y guarnicion deben vivir en backend."
+      - "Reglas de plazo, empresa, empleado, dia laboral, plato y guarnicion deben vivir en backend."
+      - "Un dia marcado sin servicio en el menu no bloquea pedido cliente: queda como sin_pedido por defecto, pero puede elegirse plato si la empresa recibe entrega anticipada."
       - "Crear/modificar usa transacciones y upsert por empleado + semana."
 
   - owner_module: "API_LA_QUINTA.menu"
@@ -90,7 +91,7 @@ modules:
     kind: api_module
     paths: ["API_LA_QUINTA/src/modules/empleados"]
     routes_file: "API_LA_QUINTA/src/modules/empleados/empleados.routes.js"
-    owns: ["empleados", "reset code empleado", "activo/empresa/rol"]
+    owns: ["empleados", "reset code empleado", "activo/empresa/rol", "telefono empleado", "fecha_nacimiento empleado"]
 
   - owner_module: "API_LA_QUINTA.estadisticas"
     status: verified_in_repo
@@ -105,6 +106,25 @@ modules:
     paths: ["API_LA_QUINTA/src/modules/sugerencias"]
     routes_file: "API_LA_QUINTA/src/modules/sugerencias/sugerencias.routes.js"
     owns: ["sugerencias de semana para admin"]
+
+  - owner_module: "API_LA_QUINTA.notificaciones"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/notificaciones"
+      - "API_LA_QUINTA/src/database/migrations/1719000035000_notificaciones.js"
+    routes_file: "API_LA_QUINTA/src/modules/notificaciones/notificaciones.routes.js"
+    owns: ["notificaciones cliente", "contador no leidas", "marcar notificacion leida", "marcar todas leidas"]
+
+  - owner_module: "API_LA_QUINTA.sugerencias-empleados"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/sugerencias-empleados"
+      - "API_LA_QUINTA/src/database/migrations/1719000036000_sugerencias-empleados.js"
+    routes_file: "API_LA_QUINTA/src/modules/sugerencias-empleados/sugerencias-empleados.routes.js"
+    owns: ["sugerencias libres por empleado en tabla sugerencias_empleados"]
+    note: "El flujo cliente de semanas sin menu usa el contrato canonico POST /api/v1/pedidos/sugerencias para alimentar pedido_sugerencias y admin."
 
   - owner_module: "API_LA_QUINTA.users"
     status: retired
@@ -136,7 +156,8 @@ modules:
       - "front_clientes/src/components/RegistroScreen.jsx"
       - "front_clientes/src/components/RecuperarPassword.jsx"
       - "front_clientes/src/components/PerfilCliente.jsx"
-    owns: ["login", "registro", "recuperar acceso", "perfil", "storage token/empleado"]
+      - "front_clientes/src/pages/PerfilPage.jsx"
+    owns: ["login", "registro", "recuperar acceso", "perfil", "preferencias alimentarias", "storage token/empleado"]
 
   - owner_module: "front_clientes.pedido"
     status: verified_in_repo
@@ -151,6 +172,7 @@ modules:
       - "front_clientes/src/mappers/pedidoMapper.js"
       - "front_clientes/src/utils/reglasSeleccionPedido.js"
       - "front_clientes/src/utils/reglasModificacionPedido.js"
+      - "front_clientes/src/pages/SugerenciasPage.jsx"
     owns: ["pedido semanal mobile", "seleccion por dia", "guarniciones", "crear/modificar/confirmar", "sugerencias de semana sin menu", "estado local de semana"]
 
 safe_refactor_zones:

@@ -1,5 +1,5 @@
 schema: la_quinta_flows_v2
-updated_at: "2026-06-29"
+updated_at: "2026-07-02"
 
 flows:
   local_start:
@@ -8,7 +8,8 @@ flows:
       - "API: cd API_LA_QUINTA && npm run dev"
       - "Admin: cd front_menu && npm run dev"
       - "Clientes: cd front_clientes && npm run dev"
-      - "Alternativa Windows: .\\iniciar.bat abre ventanas visibles de consola para API, Admin, Clientes y cloudflared; frontends usan Vite con --force."
+      - "Alternativa Windows: .\\iniciar.bat abre una sola ventana de Windows Terminal llamada La Quinta Servicios con pestanas visibles para API, Clientes, Admin y cloudflared; frontends usan Vite con --force."
+      - "Al reejecutar .\\iniciar.bat, iniciar-servicios.ps1 limpia procesos previos del proyecto sin cerrar la terminal desde donde se lanza."
       - "front_menu y front_clientes sirven dev con Cache-Control no-store/no-cache para evitar modulos React viejos al pasar por Cloudflare Tunnel o navegador integrado."
       - "front_menu y front_clientes agregan en dev un query de sesion a imports relativos de src para romper cache de modulos entre reinicios de Vite."
     manual_smoke_checks:
@@ -86,9 +87,11 @@ flows:
     sequence:
       - "Admin abre /empresas para gestionar empresas."
       - "La gestion de empleados vive como panel dentro de Empresas.jsx segun empresa activa."
+      - "ModalEmpleado permite crear/editar empleado con telefono y fecha_nacimiento; API devuelve ambos campos en listado/detalle."
       - "La ruta /empleados renderiza Empresas.jsx para evitar pantalla en blanco y llevar al panel que contiene empleados."
     manual_smoke_checks:
       - "Abrir /empresas y verificar lista de empresas y panel de empleados."
+      - "Crear o editar empleado con telefono y fecha de nacimiento; verificar que se muestran en la fila del empleado."
       - "Abrir /empleados y verificar que no queda pantalla vacia."
 
   cliente_pedido_semanal:
@@ -112,12 +115,14 @@ flows:
       - "si se creo y vuelve id, usePedidoSemanal confirma con PATCH /api/v1/pedidos/:id/confirmar"
       - "modificar pedido: PUT /api/v1/pedidos/:id"
       - "si la semana no tiene menu publicado, SemanaCardRecomendacion guarda con POST /api/v1/pedidos/sugerencias"
+      - "front_clientes/src/pages/SugerenciasPage.jsx tambien usa POST /api/v1/pedidos/sugerencias para no desalinear admin ni pedido_sugerencias"
       - "si la semana sin menu ya tiene recomendacionesUsuario o comentarioRecomendacion, SemanaCardLectura muestra agradecimiento y no muestra CTA de sugerir"
       - "backend registra eventos y devuelve pedido normalizado"
     hard_rules:
       - "Frontend no debe enviar usuarioId ni empresaId como autoridad para guardar."
       - "Backend usa req.empleado.sub y req.empleado.empresa_id."
-      - "Backend valida dias laborales, dia sin servicio, plazo, plato, opcion y guarnicion."
+      - "Backend valida dias laborales, plazo, plato, opcion y guarnicion."
+      - "Si el menu marca un dia sin servicio/feriado, el cliente lo ve como sin vianda por defecto pero puede cambiarlo para empresas que reciben entrega anticipada."
       - "El plazo de POST/PUT lo define la empresa; menus_semanales.fecha_limite_pedidos no bloquea el pedido cliente."
       - "Si sin_pedido=true no se permite plato_id ni guarnicion_id."
       - "Transaccion debe hacer rollback ante error."
@@ -127,12 +132,15 @@ flows:
       - "La semana actual usa accion contextual: Ver pedido si ya existe pedido, Ver menu si hay menu publicado o Ver semana si aun no hay menu."
       - "La pantalla principal usa cards grandes por accion: semana actual, semanas proximas con menu publicado y sugerir menu cuando no hay menu."
       - "Las semanas con menu publicado abren primero en lectura para mostrar fecha, dias y todas las opciones especiales de la semana antes de entrar a cargar pedido."
+      - "Desde el panel principal, las semanas con menu publicado sin pedido cargado usan CTA Ver menu; la carga de pedido se ofrece recien dentro de la lectura si hay dias editables."
+      - "Si una semana publicada no tiene dias editables, la UI no debe mostrar Confirmar pedido."
       - "Las semanas futuras montan SemanaPedidoCard recien cuando el usuario toca la accion correspondiente; en ese modo se oculta el resto y la card ocupa el alto disponible."
       - "La semana activa se persiste por semana.id en localStorage y la tab Pedido vuelve a la pantalla principal."
       - "El estado de pedido muestra X de Y dias o Faltan N dias durante edicion."
       - "Semanas de sugerencias se etiquetan como Sin menu / Sugerencias abiertas y, al abrirse, explican que el usuario esta dejando ideas para esa semana y no cargando un pedido."
       - "El bottom sheet de seleccion aclara que elegir un plato no guarda el pedido; el guardado ocurre al tocar Confirmar pedido o Guardar cambios."
-      - "El bottom sheet de seleccion destaca dia/fecha y permite navegar al dia anterior o siguiente."
+      - "El bottom sheet de seleccion usa encabezado compacto con solo el dia, permite navegar al dia anterior o siguiente cuando aplica e indica visualmente si hay mas opciones hacia abajo."
+      - "El bottom sheet de seleccion debe quedar por encima de BottomNavigation; en viewport 480x608 el boton Listo para el dia debe ser visible y clickeable."
     error_behavior:
       - "401 carga pedido -> mensaje de iniciar sesion nuevamente"
       - "otros errores carga -> mensaje generico de intentar nuevamente"
@@ -198,10 +206,44 @@ flows:
     sequence:
       - "Historial usa endpoints cliente autenticados"
       - "Perfil usa authApi.actualizarPerfil y authApi.cambiarPassword"
+      - "PerfilPage usa PATCH /api/v1/auth/preferencias para preferencias alimentarias"
+      - "NotificacionesPage usa GET/PATCH /api/v1/notificaciones"
     manual_smoke_checks:
       - "Abrir /mis-pedidos con sesion cliente"
       - "Abrir /mi-cuenta y editar perfil"
       - "Cambiar password con validacion visible"
+      - "Abrir /notificaciones y verificar loading/empty/listado sin sesion cruzada"
+
+  seed_menus_historicos:
+    status: verified_in_repo
+    files:
+      - "API_LA_QUINTA/scripts/menu-normalizacion.js"
+      - "API_LA_QUINTA/scripts/import-menus-csv.js"
+      - "API_LA_QUINTA/scripts/seed-menus-completo.js"
+      - "API_LA_QUINTA/scripts/seed-platos-completo.js"
+      - "API_LA_QUINTA/scripts/seed-full-reset.js"
+      - "API_LA_QUINTA/scripts/menus-historicos.csv"
+      - "API_LA_QUINTA/src/database/seeds/menus-historicos.csv"
+    sequence:
+      - "El CSV historico fuente contiene 23 columnas de semanas entre 2026-01-26 y 2026-07-06."
+      - "Los seeds usan FECHAS_INICIO_MENUS_HISTORICOS para corregir encabezados humanos con fechas erroneas o incompletas."
+      - "canonicalizarNombrePlato limpia prefijos A/C, corrige typos frecuentes y agrupa alias equivalentes antes de crear o buscar platos."
+      - "import-menus-csv.js carga estado por fecha: semanas pasadas cerrado, semana actual publicado y futuras borrador."
+      - "import-menus-csv.js mantiene menus_semanales, menu_semanal_dias, menu_semanal_sin_servicio e historial_uso_platos alineados con el CSV."
+      - "seed-platos-completo.js incluye los platos canonicos detectados en el CSV para evitar creaciones sueltas sin metadata."
+    validation_2026_06_29:
+      - "Auditoria local: 215 entradas del CSV -> 123 platos canonicos; faltantes en seed-platos-completo: 0."
+      - "node --check OK en scripts/menu-normalizacion.js, import-menus-csv.js, seed-menus-completo.js, seed-platos-completo.js y seed-full-reset.js."
+      - "API_LA_QUINTA npm run lint OK."
+      - "API_LA_QUINTA npm test OK, 33 tests."
+      - "Seed ejecutado contra DB local: 146 platos, 14 fijos, 126 especiales, 6 ambos, 23 menus, 214 opciones, 214 historial, 8 dias sin servicio, sin duplicados normalizados."
+      - "Estados post-seed: 21 menus cerrados, 1 publicado y 1 borrador."
+
+validation_2026_07_02:
+  verified_in_repo:
+    - "front_clientes npm test usa vitest run --pool=threads para evitar timeout de workers forks en esta maquina."
+    - "front_clientes e2e/smoke.spec.js valida el flujo actual Splash/Onboarding -> Login."
+    - "Navegador integrado en /pedido-semanal viewport 480x608: el selector de plato muestra el boton Listo para el Martes visible/clickeable sobre BottomNavigation."
 
 from_chat_summary_flows:
   - id: "post_hacer_o_modificar_pedido"

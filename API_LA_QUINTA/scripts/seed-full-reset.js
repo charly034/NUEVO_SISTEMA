@@ -21,6 +21,14 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import pool, { getClient } from '../src/database/connection.js';
+import {
+  FECHAS_INICIO_MENUS_HISTORICOS,
+  canonicalizarNombrePlato,
+  fechaFinSemanaHistorica,
+  nombreSemanaHistorica,
+  normalizarClave,
+  sumarDias,
+} from './menu-normalizacion.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -68,13 +76,7 @@ function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
 // ─── CSV — misma lógica que seed-menus-completo.js ───────────────────────────
-const FECHAS_INICIO = [
-  '2026-01-26', '2026-02-02', '2026-02-09', '2026-02-16', '2026-02-23',
-  '2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-04-06',
-  '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11',
-  '2026-05-18', '2026-05-25', '2026-06-01', '2026-06-08', '2026-06-15',
-  '2026-06-22', '2026-06-29',
-];
+const FECHAS_INICIO = FECHAS_INICIO_MENUS_HISTORICOS;
 
 const ROW_MAP = [
   { dia: 'lunes',     opcion: 'A', offset: 0 },
@@ -90,17 +92,11 @@ const ROW_MAP = [
 ];
 
 function domingoDe(fechaInicio) {
-  const [y, m, d] = fechaInicio.split('-').map(Number);
-  const dom = new Date(y, m - 1, d + 6);
-  return dom.toISOString().split('T')[0];
+  return fechaFinSemanaHistorica(fechaInicio);
 }
 
 function nombreSemana(fechaInicio) {
-  const [y, m, d] = fechaInicio.split('-').map(Number);
-  const lun = new Date(y, m - 1, d);
-  const dom = new Date(y, m - 1, d + 6);
-  const fmt = dt => `${dt.getDate()}/${dt.getMonth() + 1}`;
-  return `Semana del ${fmt(lun)} al ${fmt(dom)}`;
+  return nombreSemanaHistorica(fechaInicio);
 }
 
 function estadoDe(fechaInicio) {
@@ -120,11 +116,11 @@ function parseCelda(celda, defaultOpcion) {
   if (txt.toUpperCase() === 'FERIADO') return 'FERIADO';
   const match = txt.match(/^([A-Ca-c]):\s*/);
   if (match) {
-    const nombre = txt.slice(match[0].length).trim();
+    const nombre = canonicalizarNombrePlato(txt.slice(match[0].length));
     if (!nombre) return null;
     return { opcion: match[1].toUpperCase(), nombre };
   }
-  return { opcion: defaultOpcion, nombre: txt };
+  return { opcion: defaultOpcion, nombre: canonicalizarNombrePlato(txt) };
 }
 
 function parseCSV(content) {
@@ -132,9 +128,7 @@ function parseCSV(content) {
 }
 
 function fechaServicioDe(fechaInicio, offset) {
-  const [y, m, d] = fechaInicio.split('-').map(Number);
-  const dt = new Date(y, m - 1, d + offset);
-  return dt.toISOString().split('T')[0];
+  return sumarDias(fechaInicio, offset);
 }
 
 // ─── Platos ───────────────────────────────────────────────────────────────────
@@ -258,10 +252,26 @@ const PLATOS_VARIABLES = [
   { nombre: 'Zapallitos rellenos con carne',       tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes', 'Vegetariano'] },
   { nombre: 'Zapallito relleno con salsa fileto',  tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
   { nombre: 'Pollo al horno con vegetales',        tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo'] },
+  { nombre: 'Pollo al limón con fideos al pesto',  tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Pasta'] },
+  { nombre: 'Carbonada de pollo',                  tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Guisos'] },
+  { nombre: 'Pata muslo con arroz primavera',      tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Arroz'] },
   { nombre: 'Hamburguesa de lentejas con puré de zapallo', tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano', 'Hamburguesas'] },
   { nombre: 'Puchero',                             tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes', 'Guisos'] },
   { nombre: 'Alitas rebozadas con puré',           tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo'] },
   { nombre: 'Wok de arroz y ternera',              tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
+  { nombre: 'Bondiola de cerdo braseada con puré de batata', tipo: 'especial', tiene_guarnicion: false, tags: ['Cerdo'] },
+  { nombre: 'Carne al horno con puré',             tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
+  { nombre: 'Carne al horno con verduras grilladas', tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
+  { nombre: 'Fetuchini con albóndigas',            tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta', 'Carnes'] },
+  { nombre: 'Lasaña',                              tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta'] },
+  { nombre: 'Lasaña de berenjena',                 tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta', 'Vegetariano'] },
+  { nombre: 'Ñoquis',                              tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta'] },
+  { nombre: 'Pastel de calabaza',                  tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Tarta de atún con remolacha y zanahoria cocida', tipo: 'especial', tiene_guarnicion: false, tags: ['Pescado', 'Tartas'] },
+  { nombre: 'Tortilla de papa con ensalada',       tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Tortilla de verduras con arroz integral', tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Zapallitos rellenos con salsa fileto', tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Canelones de Jamón y queso con salsa blanca', tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta'] },
 ];
 
 // ─── Empresas y empleados ─────────────────────────────────────────────────────
@@ -383,7 +393,7 @@ async function main() {
     const vistos = new Set();
     let varCount = 0;
     for (const p of PLATOS_VARIABLES) {
-      const key = p.nombre.toLowerCase().trim();
+      const key = normalizarClave(p.nombre);
       if (vistos.has(key)) continue;
       vistos.add(key);
       await client.query(
@@ -405,27 +415,27 @@ async function main() {
     const platoCache = new Map();
     const platosExistentesRes = await client.query(`SELECT id, nombre FROM platos WHERE activo = true`);
     for (const p of platosExistentesRes.rows) {
-      platoCache.set(p.nombre.toLowerCase().trim(), p.id);
+      platoCache.set(normalizarClave(p.nombre), p.id);
     }
 
     async function getOrCreatePlatoId(nombre) {
-      const key = nombre.toLowerCase().trim();
+      const nombreCanonico = canonicalizarNombrePlato(nombre);
+      const key = normalizarClave(nombreCanonico);
       if (platoCache.has(key)) return platoCache.get(key);
-      // Buscar aproximado
-      const res = await client.query(
-        `SELECT id, nombre FROM platos WHERE LOWER(nombre) ILIKE $1 LIMIT 1`,
-        [`%${key.replace(/\s+/g, '%')}%`]
-      );
-      if (res.rows.length > 0) {
-        platoCache.set(key, res.rows[0].id);
-        return res.rows[0].id;
+
+      const { rows: existentes } = await client.query('SELECT id, nombre FROM platos WHERE activo = true');
+      const existente = existentes.find((row) => normalizarClave(row.nombre) === key);
+      if (existente) {
+        platoCache.set(key, existente.id);
+        return existente.id;
       }
+
       // Crear nuevo
       const ins = await client.query(
         `INSERT INTO platos (nombre, activo) VALUES ($1, true) RETURNING id`,
-        [nombre.trim()]
+        [nombreCanonico]
       );
-      console.log(`    [nuevo plato desde CSV] ${nombre.trim()}`);
+      console.log(`    [nuevo plato desde CSV] ${nombreCanonico}`);
       platoCache.set(key, ins.rows[0].id);
       return ins.rows[0].id;
     }

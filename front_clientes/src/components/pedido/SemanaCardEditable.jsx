@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { confirmar } from "../../lib/swal.js";
 import { obtenerEstadoVisualDia } from "../../utils/reglasModificacionPedido.js";
 import { contarSeleccionesValidas } from "../../utils/reglasSeleccionPedido.js";
 import AccionesPedidoSemana from "./AccionesPedidoSemana.jsx";
-import AvisoModificacion from "./AvisoModificacion.jsx";
 import BottomSheetSeleccionDia from "./BottomSheetSeleccionDia.jsx";
-import EstadoPedido from "./EstadoPedido.jsx";
-import FilaPedidoDiaEditable from "./FilaPedidoDiaEditable.jsx";
+import Boton from "../ui/Boton.jsx";
 import SemanaHeader from "./SemanaHeader.jsx";
+import { DiaPedidoCard, ProgresoSemana } from "./SemanaPedidoVisual.jsx";
 
 function serializarDias(dias = []) {
   return JSON.stringify(
@@ -33,7 +32,6 @@ export default function SemanaCardEditable({
   const [diasEditados, setDiasEditados] = useState(semana.dias);
   const [diaActivo, setDiaActivo] = useState(null);
   const [mensajeError, setMensajeError] = useState("");
-  const aperturaInicialRealizada = useRef(false);
   const [diasIniciales] = useState(() => serializarDias(semana.dias));
   const modoCreacion = ["sin_pedido", "pendiente"].includes(semana.estado);
 
@@ -45,9 +43,6 @@ export default function SemanaCardEditable({
     () => serializarDias(diasEditados) !== diasIniciales,
     [diasEditados, diasIniciales],
   );
-  const mensajeAyudaEdicion = modoCreacion
-    ? "Elegir un plato no guarda el pedido. Avanzamos dia por dia y confirmas todo al final."
-    : mensajeLimite;
 
   useEffect(() => {
     onDirtyChange?.(cambiosSinGuardar);
@@ -59,10 +54,20 @@ export default function SemanaCardEditable({
 
   const puedeEditarDia = useCallback((dia) => {
     const estadoVisual = obtenerEstadoVisualDia(dia, semana, fechaActual);
-    return !["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual);
+    return !["bloqueado", "feriado", "vencido"].includes(estadoVisual);
   }, [fechaActual, semana]);
+
   const diasEditables = useMemo(
     () => diasEditados.filter((dia) => puedeEditarDia(dia)).length,
+    [diasEditados, puedeEditarDia],
+  );
+
+  const diasConRespuesta = useMemo(
+    () => diasEditados.filter((dia) => {
+      if (!puedeEditarDia(dia)) return false;
+      return Boolean(dia.seleccion?.plato) ||
+        (Boolean(dia.plato) && dia.plato !== "" && dia.plato !== "Sin seleccionar");
+    }).length,
     [diasEditados, puedeEditarDia],
   );
 
@@ -81,42 +86,24 @@ export default function SemanaCardEditable({
       .find((dia) => puedeEditarDia(dia)) || null;
   }
 
-  useEffect(() => {
-    if (!modoCreacion || aperturaInicialRealizada.current) return;
-
-    const primerDiaEditable = diasEditados.find((dia) => puedeEditarDia(dia));
-    if (!primerDiaEditable) return;
-
-    queueMicrotask(() => {
-      aperturaInicialRealizada.current = true;
-      setDiaActivo(primerDiaEditable);
-    });
-  }, [diasEditados, modoCreacion, puedeEditarDia]);
-
   function abrirSeleccionDia(dia, estadoVisual) {
-    if (["bloqueado", "feriado", "sin_servicio", "vencido"].includes(estadoVisual)) return;
+    if (["bloqueado", "feriado", "vencido"].includes(estadoVisual)) return;
     setMensajeError("");
     setDiaActivo(dia);
   }
 
   function actualizarDia(diaActualizado) {
-    setDiasEditados((diasActuales) => {
-      const diasActualizados = diasActuales.map((dia) =>
+    setDiasEditados((diasActuales) =>
+      diasActuales.map((dia) =>
         dia.clave === diaActualizado.clave ? diaActualizado : dia,
-      );
-
-      if (modoCreacion) {
-        setDiaActivo(obtenerSiguienteDiaEditable(diasActualizados, diaActualizado.clave));
-      }
-
-      return diasActualizados;
-    });
+      ),
+    );
   }
 
   async function cancelarEdicion() {
     if (cambiosSinGuardar) {
       const descartar = await confirmar({
-        titulo: "¿Descartar cambios?",
+        titulo: "Descartar cambios?",
         texto: "Los platos que cambiaste no se van a guardar.",
         botonConfirmar: "Descartar cambios",
         color: "#8a4b12",
@@ -129,9 +116,14 @@ export default function SemanaCardEditable({
   }
 
   function guardarCambios() {
-    if (modoCreacion && diasSeleccionados === 0) {
-      setMensajeError("Elegí al menos un día para confirmar el pedido.");
-      return;
+    if (modoCreacion) {
+      const faltantes = diasEditables - diasConRespuesta;
+      if (faltantes > 0) {
+        setMensajeError(
+          `Faltan ${faltantes} ${faltantes === 1 ? "dia sin completar" : "dias sin completar"}.`,
+        );
+        return;
+      }
     }
 
     onGuardar?.({
@@ -146,23 +138,27 @@ export default function SemanaCardEditable({
   return (
     <>
       <SemanaHeader semana={semana} compacta={compacta} />
-      <EstadoPedido
-        estado="editable"
-        diasSeleccionados={diasSeleccionados}
-        totalDias={diasEditables || diasEditados.length}
-        compacta={compacta}
+      <ProgresoSemana
+        completados={diasConRespuesta}
+        total={diasEditables || diasEditados.length}
       />
-      <AvisoModificacion mensaje={mensajeAyudaEdicion} tono="ayuda" />
 
-      <ul className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {mensajeLimite && !modoCreacion && (
+        <p className="mx-6 mt-4 rounded-2xl bg-[#eef2e9] px-4 py-3 text-sm font-bold leading-snug text-[#4e5f29]">
+          {mensajeLimite}
+        </p>
+      )}
+
+      <ul className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-[#f5f6f0] px-6 py-6">
         {diasEditados.map((dia) => {
           const estadoVisual = obtenerEstadoVisualDia(dia, semana, fechaActual);
+          const habilitado = puedeEditarDia(dia);
 
           return (
-            <FilaPedidoDiaEditable
+            <DiaPedidoCard
               key={dia.clave}
               dia={dia}
-              estadoVisual={estadoVisual}
+              estadoVisual={habilitado ? estadoVisual : "bloqueado"}
               onAbrir={() => abrirSeleccionDia(dia, estadoVisual)}
             />
           );
@@ -170,24 +166,33 @@ export default function SemanaCardEditable({
       </ul>
 
       {mensajeError && (
-        <p className="rounded-2xl bg-[#fff5eb] px-3 py-2 text-[0.82rem] font-extrabold text-[#8a4b12]">
+        <p className="mx-6 mb-3 rounded-2xl bg-[#fff5eb] px-3 py-2 text-[0.82rem] font-extrabold text-[#8a4b12]">
           {mensajeError}
         </p>
       )}
 
-      <AccionesPedidoSemana
-        editando
-        guardando={guardando}
-        modoCreacion={modoCreacion}
-        onCancelar={cancelarEdicion}
-        onConfirmar={guardarCambios}
-      />
+      {diasEditables > 0 ? (
+        <AccionesPedidoSemana
+          editando
+          guardando={guardando}
+          modoCreacion={modoCreacion}
+          onCancelar={cancelarEdicion}
+          onConfirmar={guardarCambios}
+        />
+      ) : (
+        <div className="mt-auto shrink-0 border-t border-[#ecebe5] bg-white px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
+          <Boton variante="secundario" anchoCompleto onClick={cancelarEdicion}>
+            Volver
+          </Boton>
+        </div>
+      )}
 
       <BottomSheetSeleccionDia
         abierto={Boolean(diaActivo)}
-        cerrarAlConfirmar={!modoCreacion}
+        cerrarAlConfirmar={true}
         dia={diaActivo}
         dias={diasEditados}
+        diasEditables={[]}
         semanaId={semana.id}
         onCerrar={() => setDiaActivo(null)}
         onConfirmar={actualizarDia}

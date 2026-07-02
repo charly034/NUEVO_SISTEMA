@@ -51,6 +51,7 @@ export const requireAuth = async (req, res, next) => {
     }
     req.empleado = {
       ...payload,
+      id: empleado.id,
       sub: empleado.id,
       empresa_id: empleado.empresa_id,
       nombre: empleado.nombre,

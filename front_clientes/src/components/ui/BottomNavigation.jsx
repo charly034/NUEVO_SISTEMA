@@ -20,8 +20,8 @@ export default function BottomNavigation() {
 
   return (
     <nav
-      aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[480px] border-t border-[#eee8df] bg-white/95 px-3 pt-1.5 pb-[calc(0.45rem+env(safe-area-inset-bottom))] shadow-[0_-10px_26px_rgba(45,90,39,0.07)] backdrop-blur md:max-w-[760px] md:px-5 lg:max-w-[860px]"
+      aria-label="Navegacion principal"
+      className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[480px] border-t border-[#f0f0eb] bg-white/96 px-6 pt-0 pb-[calc(0.45rem+env(safe-area-inset-bottom))] shadow-[0_-10px_26px_rgba(45,90,39,0.05)] backdrop-blur md:max-w-[480px]"
     >
       <div className="grid grid-cols-3 gap-1">
         {itemsNavegacion.map(({ to, label, Icono, principal }) => (
@@ -32,21 +32,24 @@ export default function BottomNavigation() {
             onClick={() => manejarClick(principal, to)}
             className={({ isActive }) =>
               unirClases(
-                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 text-[12px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2d5a27] md:min-h-14 md:text-[13px]",
+                "relative flex min-h-16 flex-col items-center justify-center gap-1 px-2 text-[12px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#586b24]",
                 isActive
-                  ? "bg-[#f0f7ee] text-[#2d5a27]"
-                  : "text-[#77736b] hover:bg-[#faf8f4] hover:text-[#2d5a27]",
+                  ? "text-[#586b24]"
+                  : "text-[#b8b6af] hover:text-[#586b24]",
                 principal && "font-black",
               )
             }
           >
             {({ isActive }) => (
               <>
+                {isActive && (
+                  <span
+                    className="absolute top-0 h-0.5 w-10 rounded-full bg-[#586b24]"
+                    aria-hidden="true"
+                  />
+                )}
                 <Icono
-                  className={unirClases(
-                    principal ? "h-5 w-5" : "h-[1.125rem] w-[1.125rem]",
-                    isActive ? "stroke-[2.6]" : "stroke-2",
-                  )}
+                  className={unirClases("h-6 w-6", isActive ? "stroke-[2.6]" : "stroke-2")}
                   aria-hidden="true"
                 />
                 <span>{label}</span>

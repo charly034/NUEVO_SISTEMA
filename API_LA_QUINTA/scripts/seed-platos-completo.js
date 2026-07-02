@@ -10,6 +10,7 @@
  */
 
 import pool, { getClient } from '../src/database/connection.js';
+import { normalizarClave } from './menu-normalizacion.js';
 
 // ── Guarniciones ───────────────────────────────────────────────────────────────
 const GUARNICIONES = [
@@ -293,8 +294,24 @@ const PLATOS_CSV = [
   { nombre: 'Zapallitos rellenos con carne',              tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes', 'Vegetariano'] },
   { nombre: 'Hamburguesa casera de pollo con vegetales asados', tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Hamburguesas'] },
   { nombre: 'Pollo al horno con vegetales',               tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo'] },
+  { nombre: 'Pollo al limón con fideos al pesto',          tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Pasta'] },
+  { nombre: 'Carbonada de pollo',                          tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Guisos'] },
+  { nombre: 'Pata muslo con arroz primavera',              tipo: 'especial', tiene_guarnicion: false, tags: ['Pollo', 'Arroz'] },
   { nombre: 'Carne al wok con vegetales',                 tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
   { nombre: 'Wok de carne con vegetales y arroz',         tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
+  { nombre: 'Bondiola de cerdo braseada con puré de batata', tipo: 'especial', tiene_guarnicion: false, tags: ['Cerdo'] },
+  { nombre: 'Carne al horno con puré',                     tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
+  { nombre: 'Carne al horno con verduras grilladas',       tipo: 'especial', tiene_guarnicion: false, tags: ['Carnes'] },
+  { nombre: 'Fetuchini con albóndigas',                    tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta', 'Carnes'] },
+  { nombre: 'Lasaña',                                      tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta'] },
+  { nombre: 'Lasaña de berenjena',                         tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta', 'Vegetariano'] },
+  { nombre: 'Ñoquis',                                      tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta'] },
+  { nombre: 'Pastel de calabaza',                          tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Tarta de atún con remolacha y zanahoria cocida', tipo: 'especial', tiene_guarnicion: false, tags: ['Pescado', 'Tartas'] },
+  { nombre: 'Tortilla de papa con ensalada',               tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Tortilla de verduras con arroz integral',     tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Zapallitos rellenos con salsa fileto',        tipo: 'especial', tiene_guarnicion: false, tags: ['Vegetariano'] },
+  { nombre: 'Canelones de Jamón y queso con salsa blanca', tipo: 'especial', tiene_guarnicion: false, tags: ['Pasta'] },
   { nombre: 'Ensalada Cesar con arroz integral',          tipo: 'especial', tiene_guarnicion: false, tags: ['Ensaladas', 'Vegetariano'] },
 ];
 
@@ -338,7 +355,7 @@ async function main() {
     const vistos = new Set();
     const platosUnicos = [];
     for (const p of PLATOS_CSV) {
-      const key = p.nombre.toLowerCase().trim();
+      const key = normalizarClave(p.nombre);
       if (!vistos.has(key)) {
         vistos.add(key);
         platosUnicos.push(p);

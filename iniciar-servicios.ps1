@@ -18,10 +18,25 @@ function Stop-ProcessTree {
 function Stop-PreviousProjectProcesses {
   $processes = Get-CimInstance Win32_Process
   $rootPattern = '*' + $root + '*'
-  $projectProcessNames = @('node.exe', 'npm.exe', 'cmd.exe', 'wt.exe', 'cloudflared.exe')
+  $currentPid = $PID
+  $processById = @{}
+  foreach ($process in $processes) {
+    $processById[[int]$process.ProcessId] = $process
+  }
+
+  $protectedIds = @{}
+  $cursor = $currentPid
+  while ($cursor -and $processById.ContainsKey([int]$cursor)) {
+    $protectedIds[[int]$cursor] = $true
+    $cursor = $processById[[int]$cursor].ParentProcessId
+  }
+
+  $projectProcessNames = @('node.exe', 'npm.exe', 'cmd.exe', 'cloudflared.exe')
   $targets = $processes | Where-Object {
+    if ($protectedIds.ContainsKey([int]$_.ProcessId) -or $_.ParentProcessId -eq $currentPid) { return $false }
     ($_.Name -in $projectProcessNames -and $_.CommandLine -and $_.CommandLine -like $rootPattern) -or
     ($_.Name -eq 'cloudflared.exe') -or
+    ($_.Name -eq 'cmd.exe' -and $_.CommandLine -match 'title\s+(API :3000|Clientes :5175|Admin :5174|Cloudflare Tunnel)') -or
     ($_.Name -eq 'cmd.exe' -and $_.CommandLine -match 'cloudflared\s+tunnel\s+run')
   }
 
@@ -75,11 +90,30 @@ Write-Host ''
 Write-Host '[2/2] Iniciando servicios...'
 Write-Host ''
 
-Start-Process 'cmd.exe' -ArgumentList '/k', 'npm run dev' -WorkingDirectory $apiDir
-Start-Process 'cmd.exe' -ArgumentList '/k', 'npm run dev -- --force' -WorkingDirectory $clientesDir
-Start-Process 'cmd.exe' -ArgumentList '/k', 'npm run dev -- --force' -WorkingDirectory $adminDir
-Start-Process 'cmd.exe' -ArgumentList '/k', 'cloudflared tunnel run'
-Write-Host '  4 servicios iniciados en ventanas visibles de consola.' -ForegroundColor Green
+$wtCmd = Get-Command wt.exe -ErrorAction SilentlyContinue
+
+if ($wtCmd) {
+  $wtArgs = @(
+    '-w', 'La Quinta Servicios',
+    'new-tab', '--title', 'API :3000', '-d', $apiDir, 'cmd', '/k', 'title API :3000 && npm run dev',
+    ';',
+    'new-tab', '--title', 'Clientes :5175', '-d', $clientesDir, 'cmd', '/k', 'title Clientes :5175 && npm run dev -- --force',
+    ';',
+    'new-tab', '--title', 'Admin :5174', '-d', $adminDir, 'cmd', '/k', 'title Admin :5174 && npm run dev -- --force',
+    ';',
+    'new-tab', '--title', 'Cloudflare Tunnel', '-d', $root, 'cmd', '/k', 'title Cloudflare Tunnel && cloudflared tunnel run'
+  )
+  & $wtCmd.Source @wtArgs
+  Write-Host '  4 servicios iniciados en una sola ventana de Windows Terminal.' -ForegroundColor Green
+  Write-Host '  Pestanas: API, Clientes, Admin y Cloudflare Tunnel.' -ForegroundColor Green
+} else {
+  Write-Host '  Windows Terminal no encontrado. Abriendo ventanas separadas...' -ForegroundColor Yellow
+  Start-Process 'cmd.exe' -ArgumentList '/k', 'npm run dev' -WorkingDirectory $apiDir
+  Start-Process 'cmd.exe' -ArgumentList '/k', 'npm run dev -- --force' -WorkingDirectory $clientesDir
+  Start-Process 'cmd.exe' -ArgumentList '/k', 'npm run dev -- --force' -WorkingDirectory $adminDir
+  Start-Process 'cmd.exe' -ArgumentList '/k', 'cloudflared tunnel run' -WorkingDirectory $root
+  Write-Host '  4 servicios iniciados en ventanas visibles de consola.' -ForegroundColor Green
+}
 
 Write-Host ''
 Write-Host '  URLs locales:' -ForegroundColor White

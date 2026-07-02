@@ -2,15 +2,15 @@ import { unirClases } from "../utils/clases.js";
 
 const variantes = {
   primario:
-    "border-transparent bg-[var(--verde)] text-white hover:bg-[var(--verde-light)] focus-visible:outline-[var(--verde)]",
+    "border-transparent bg-[#2d5a27] text-white shadow-[0_10px_20px_rgba(45,90,39,0.12)] hover:bg-[#3d7a35] focus-visible:outline-[#2d5a27]",
   secundario:
-    "border-[var(--verde)] bg-white text-[var(--verde)] hover:bg-[var(--verde-bg)] focus-visible:outline-[var(--verde)]",
+    "border-[#9fb998] bg-white text-[#2d5a27] hover:bg-[#f0f7ee] focus-visible:outline-[#2d5a27]",
   suave:
-    "border-green-200 bg-green-50 text-green-800 hover:bg-green-100 focus-visible:outline-[var(--verde)]",
+    "border-[#cde5c8] bg-[#f0f7ee] text-[#2d5a27] hover:bg-[#e7f2e4] focus-visible:outline-[#2d5a27]",
   fantasma:
-    "border-transparent bg-transparent text-slate-600 underline-offset-4 hover:text-[var(--verde)] hover:underline focus-visible:outline-[var(--verde)]",
+    "border-transparent bg-transparent text-[#716c64] underline-offset-4 hover:text-[#2d5a27] hover:underline focus-visible:outline-[#2d5a27]",
   peligro:
-    "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:outline-red-600",
+    "border-[#f4c7c7] bg-[#fff3f3] text-[#b91c1c] hover:bg-[#ffe8e8] focus-visible:outline-[#b91c1c]",
 };
 
 export default function Boton({
@@ -28,7 +28,7 @@ export default function Boton({
       type={type}
       disabled={disabled || cargando}
       className={unirClases(
-        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-center text-base font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-70",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-base font-black transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-70",
         anchoCompleto && "w-full",
         variantes[variante] || variantes.primario,
         className,

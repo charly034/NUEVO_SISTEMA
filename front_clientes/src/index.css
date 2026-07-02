@@ -1,37 +1,65 @@
-@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700;6..12,800;6..12,900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap");
 @import "tailwindcss";
 
 *, *::before, *::after { box-sizing: border-box; }
 
 :root {
-  --verde: #2d5a27;
-  --verde-light: #3d7a35;
-  --verde-bg: #f0f7ee;
-  --gris: #f5f5f0;
-  --borde: #e0e0d8;
-  --texto: #1a1a1a;
-  --subtexto: #666;
-  --error: #c0392b;
+  /* Paleta del mockup */
+  --primary:      #5B6B2A;
+  --primary-dark: #4D5A24;
+  --primary-bg:   #EDF0E4;
+  --accent:       #C8782A;
+  --background:   #FAF8F3;
+  --foreground:   #2A2C1F;
+  --card:         #FFFFFF;
+  --muted:        #F0EDE6;
+  --muted-fg:     #7A7868;
+  --border:       #E8E5DC;
+  --subtexto:     #9A9885;
+  --error:        #C83030;
+
+  /* aliases para compatibilidad con código legacy */
+  --verde:        var(--primary);
+  --verde-bg:     var(--primary-bg);
+  --gris:         var(--background);
+  --borde:        var(--border);
+  --texto:        var(--foreground);
+
+  --radius: 0.875rem;
+  --font-serif: 'Lora', Georgia, serif;
+  --font-sans:  'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 body {
-  font-family: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--gris);
-  color: var(--texto);
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
   min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
 }
 
 button { cursor: pointer; font-family: inherit; }
 input, textarea, select { font-family: inherit; }
 
-@keyframes sheetUp {
-  from {
-    opacity: 0.9;
-    transform: translateY(100%);
-  }
+.font-serif { font-family: var(--font-serif) !important; }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes sheetup {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes sheetUp {
+  from { opacity: 0.9; transform: translateY(100%); }
+  to   { opacity: 1;   transform: translateY(0);    }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }

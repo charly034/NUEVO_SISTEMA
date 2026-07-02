@@ -3,6 +3,8 @@ export const rutasCliente = {
   pedidoSemanal: "/pedido-semanal",
   misPedidos: "/mis-pedidos",
   miCuenta: "/mi-cuenta",
+  notificaciones: "/notificaciones",
+  sugerencias: "/sugerencias",
 };
 
 export const rutasAutenticacion = {

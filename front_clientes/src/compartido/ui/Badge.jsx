@@ -1,11 +1,11 @@
 import { unirClases } from "../utils/clases.js";
 
 const variantes = {
-  verde: "bg-green-100 text-green-800",
-  gris: "bg-slate-100 text-slate-600",
-  azul: "bg-blue-100 text-blue-800",
-  naranja: "bg-orange-100 text-orange-800",
-  rojo: "bg-red-100 text-red-700",
+  verde: "bg-[#dff4e2] text-[#216029]",
+  gris: "bg-[#f1f2ee] text-[#667085]",
+  azul: "bg-[#e6f0ff] text-[#2454a6]",
+  naranja: "bg-[#fff1d8] text-[#9a5a11]",
+  rojo: "bg-[#ffe7e7] text-[#b91c1c]",
 };
 
 export default function Badge({ children, variante = "gris", className }) {

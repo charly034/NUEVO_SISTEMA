@@ -45,6 +45,13 @@ export const cambiarPasswordController = asyncHandler(async (req, res) => {
   sendSuccess(res, null, 'Contraseña actualizada');
 });
 
+export const actualizarPreferenciasController = asyncHandler(async (req, res) => {
+  const { vegetariano, sin_gluten, sin_lacteos, sin_pescado, sin_frutos_secos } = req.body;
+  const prefs = { vegetariano: Boolean(vegetariano), sin_gluten: Boolean(sin_gluten), sin_lacteos: Boolean(sin_lacteos), sin_pescado: Boolean(sin_pescado), sin_frutos_secos: Boolean(sin_frutos_secos) };
+  const data = await authService.actualizarPreferencias(req.empleado.sub, prefs);
+  sendSuccess(res, data, 'Preferencias actualizadas');
+});
+
 export const registroController = asyncHandler(async (req, res) => {
   const { codigo, nombre, apellido, email, password, telefono, fecha_nacimiento } = req.body;
   if (!codigo || !nombre || !apellido || !email || !password) {

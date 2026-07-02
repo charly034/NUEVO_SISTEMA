@@ -538,36 +538,37 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
         const opciones = [...especiales, ...fijos];
         const motivoSinServicio = sinServicioPorDia.get(dia);
         const sinPedidoGuardado = Boolean(item?.sin_pedido);
-        const sinPedidoPorDefecto = !item && diasPorDefectoSinPedido.includes(dia);
+        const sinPedidoPorDefecto = !item && (
+          diasPorDefectoSinPedido.includes(dia) ||
+          Boolean(motivoSinServicio)
+        );
         const seleccion = construirSeleccionItem(item, opciones);
-        const sinMenuEspecial = !motivoSinServicio && especiales.length === 0 && fijos.length > 0;
+        const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
 
         return {
           id: dia,
           clave: dia,
           dia: DIAS_LABEL[dia] || dia,
           fecha: addDias(semanaInicio, indice),
-          estado: motivoSinServicio
-            ? 'sin_servicio'
-            : sinPedidoGuardado || sinPedidoPorDefecto
+          estado: sinPedidoGuardado || sinPedidoPorDefecto
               ? 'sin_pedido_por_defecto'
               : seleccion
                 ? 'seleccionado'
                 : sinMenuEspecial
                   ? 'sin_menu'
                   : 'sin_seleccionar',
-          bloqueado: Boolean(motivoSinServicio),
+          bloqueado: (menuSemana.limiteEmpresa?.diasCerrados || []).includes(dia),
           motivo: motivoSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
-          mensajeMenu: sinMenuEspecial
-            ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
-            : null,
+          mensajeMenu: motivoSinServicio
+            ? 'Este dia no tiene servicio normal. Queda sin vianda por defecto, pero podes elegir plato si tu empresa recibe entrega anticipada.'
+            : sinMenuEspecial
+              ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
+              : null,
           plato: seleccion
             ? construirTextoItem(item)
             : sinPedidoGuardado || sinPedidoPorDefecto
               ? 'Sin pedido por defecto'
-              : motivoSinServicio
-                ? `Sin servicio: ${motivoSinServicio}`
-                : 'Sin seleccionar',
+              : 'Sin seleccionar',
           seleccion: seleccion || null,
           especiales,
           fijos,
@@ -643,15 +644,11 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
     dias: diasPedido.map((dia, indice) => {
       const motivoSinServicio = (menu?.sin_servicio || [])
         .find((item) => item.dia === dia)?.motivo || null;
-      const especiales = motivoSinServicio
-        ? []
-        : (menu?.variables || [])
+      const especiales = (menu?.variables || [])
           .filter((plato) => plato.dia === dia)
           .map((plato) => mapearPlatoEspecial(plato, guarniciones));
-      const fijos = motivoSinServicio
-        ? []
-        : (menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
-      const sinMenuEspecial = !motivoSinServicio && especiales.length === 0 && fijos.length > 0;
+      const fijos = (menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
+      const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
 
       return {
         diaId: dia,
@@ -664,7 +661,7 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
               ? 'sin_menu_especial'
               : 'sin_menu',
         mensaje: motivoSinServicio
-          ? `No hay servicio este dia: ${motivoSinServicio}`
+          ? 'Este dia no tiene servicio normal. Queda sin vianda por defecto, pero podes elegir plato si tu empresa recibe entrega anticipada.'
           : sinMenuEspecial
             ? 'Todavia no hay menu especial para este dia. Podes elegir un plato fijo.'
             : null,
@@ -821,13 +818,8 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
   try {
     await client.query('BEGIN');
     const pedidoPrevio = await repo.findPedidoByEmpleadoSemana(empleadoId, semana_inicio, client);
-    const diasSinServicio = new Set((menuActivo?.sin_servicio || []).map((dia) => dia.dia));
 
     for (const item of items) {
-      if (diasSinServicio.has(item.dia)) {
-        throw ApiError.unprocessable(`El ${item.dia} esta marcado como dia sin servicio`);
-      }
-
       if (item.sin_pedido) continue;
 
       const plato = await repo.validateItemForMenu(menuActivo?.id || null, item, client);

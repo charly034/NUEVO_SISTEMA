@@ -16,35 +16,20 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import pool, { getClient } from '../src/database/connection.js';
+import {
+  FECHAS_INICIO_MENUS_HISTORICOS,
+  canonicalizarNombrePlato,
+  fechaFinSemanaHistorica,
+  nombreSemanaHistorica,
+  normalizarClave,
+  sumarDias,
+} from './menu-normalizacion.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // ── Fechas de inicio reales (lunes) para cada columna del CSV ─────────────────
-const FECHAS_INICIO = [
-  '2026-01-26', // sem  1: 26/01
-  '2026-02-02', // sem  2: 02/02
-  '2026-02-09', // sem  3: 09/02
-  '2026-02-16', // sem  4: 16/02  (L+M feriado – Carnaval)
-  '2026-02-23', // sem  5: 23/02
-  '2026-03-02', // sem  6: 02/03
-  '2026-03-09', // sem  7: 09/03
-  '2026-03-16', // sem  8: 16/03
-  '2026-03-23', // sem  9: 23/03  (L+M feriado – Semana Santa)
-  '2026-04-06', // sem 10: 06/04
-  '2026-04-13', // sem 11: 13/04
-  '2026-04-20', // sem 12: 20/04
-  '2026-04-27', // sem 13: 27/04  (V feriado – 1 de Mayo)
-  '2026-05-04', // sem 14: 04/05
-  '2026-05-11', // sem 15: 11/05
-  '2026-05-18', // sem 16: 18/05
-  '2026-05-25', // sem 17: 25/05  (L feriado – 25 de Mayo)
-  '2026-06-01', // sem 18: 01/06
-  '2026-06-08', // sem 19: 08/06
-  '2026-06-15', // sem 20: 15/06  (L feriado; CSV dice 16/06 por error)
-  '2026-06-22', // sem 21: 22/06
-  '2026-06-29', // sem 22: 29/06  (CSV dice 26/06 por error)
-];
+const FECHAS_INICIO = FECHAS_INICIO_MENUS_HISTORICOS;
 
 // ── Mapeo filas CSV → día + offset para fecha_servicio ───────────────────────
 // offset: días desde el lunes de la semana (lunes=0, martes=1, ..., viernes=4)
@@ -64,21 +49,11 @@ const ROW_MAP = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function domingoDe(fechaInicio) {
-  const [y, m, d] = fechaInicio.split('-').map(Number);
-  const dom = new Date(y, m - 1, d + 6);
-  return [
-    dom.getFullYear(),
-    String(dom.getMonth() + 1).padStart(2, '0'),
-    String(dom.getDate()).padStart(2, '0'),
-  ].join('-');
+  return fechaFinSemanaHistorica(fechaInicio);
 }
 
 function nombreSemana(fechaInicio) {
-  const [y, m, d] = fechaInicio.split('-').map(Number);
-  const lun = new Date(y, m - 1, d);
-  const dom = new Date(y, m - 1, d + 6);
-  const fmt = (dt) => `${dt.getDate()}/${dt.getMonth() + 1}`;
-  return `Semana del ${fmt(lun)} al ${fmt(dom)}`;
+  return nombreSemanaHistorica(fechaInicio);
 }
 
 function estadoDe(fechaInicio) {
@@ -97,13 +72,7 @@ function estadoDe(fechaInicio) {
  * Retorna string 'YYYY-MM-DD'.
  */
 function fechaServicioDe(fechaInicio, offset) {
-  const [y, m, d] = fechaInicio.split('-').map(Number);
-  const dt = new Date(y, m - 1, d + offset);
-  return [
-    dt.getFullYear(),
-    String(dt.getMonth() + 1).padStart(2, '0'),
-    String(dt.getDate()).padStart(2, '0'),
-  ].join('-');
+  return sumarDias(fechaInicio, offset);
 }
 
 /** Parsea una celda del CSV: retorna { opcion, nombre } | 'FERIADO' | null */
@@ -115,12 +84,12 @@ function parseCelda(celda, defaultOpcion) {
 
   const match = txt.match(/^([A-Ca-c]):\s*/);
   if (match) {
-    const nombre = txt.slice(match[0].length).trim();
+    const nombre = canonicalizarNombrePlato(txt.slice(match[0].length));
     if (!nombre) return null;
     return { opcion: match[1].toUpperCase(), nombre };
   }
 
-  return { opcion: defaultOpcion, nombre: txt };
+  return { opcion: defaultOpcion, nombre: canonicalizarNombrePlato(txt) };
 }
 
 function parseCSV(content) {
@@ -146,27 +115,14 @@ async function seedMenusCompleto() {
   let platosNuevos = 0;
 
   async function getOrCreatePlato(nombre) {
-    const key = nombre.toLowerCase().trim();
+    const key = normalizarClave(nombre);
     if (platoCache.has(key)) return platoCache.get(key);
 
-    // Buscar exacto
-    const res = await client.query(
-      'SELECT id, nombre FROM platos WHERE LOWER(nombre) = $1 LIMIT 1',
-      [key]
-    );
-    if (res.rows.length > 0) {
-      platoCache.set(key, res.rows[0]);
-      return res.rows[0];
-    }
-
-    // Buscar aproximado
-    const res2 = await client.query(
-      `SELECT id, nombre FROM platos WHERE LOWER(nombre) ILIKE $1 LIMIT 1`,
-      [`%${key.replace(/\s+/g, '%')}%`]
-    );
-    if (res2.rows.length > 0) {
-      platoCache.set(key, res2.rows[0]);
-      return res2.rows[0];
+    const { rows: existentes } = await client.query('SELECT id, nombre FROM platos');
+    const existente = existentes.find((row) => normalizarClave(row.nombre) === key);
+    if (existente) {
+      platoCache.set(key, existente);
+      return existente;
     }
 
     // Crear nuevo

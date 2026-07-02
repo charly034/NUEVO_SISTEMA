@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import ChipSeleccionable from "../ui/ChipSeleccionable.jsx";
+import { unirClases } from "../../compartido/utils/clases.js";
 
 const SelectorGuarnicion = forwardRef(function SelectorGuarnicion(
   {
@@ -29,24 +29,40 @@ const SelectorGuarnicion = forwardRef(function SelectorGuarnicion(
     <section
       ref={ref}
       tabIndex={-1}
-      className="rounded-3xl border border-[#d8e6d4] bg-[#f0f7ee] p-3 outline-none focus-visible:ring-2 focus-visible:ring-[#2d5a27]/25"
+      className="mt-3 rounded-[1.15rem] border border-[#deded8] bg-white px-5 py-4 outline-none focus-visible:ring-2 focus-visible:ring-[#586b24]/25"
     >
-      <h3 className="text-base font-black text-[#2d5a27]">
-        Elegí la guarnición
+      <h3 className="text-[0.95rem] font-extrabold uppercase tracking-wide text-[#7d7b75]">
+        Elegi una guarnicion
       </h3>
-      <p className="mt-0.5 text-sm font-bold text-[#5f7f55]">
-        Es necesaria para confirmar este plato.
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {guarniciones.map((opcion) => (
-          <ChipSeleccionable
-            key={obtenerId(opcion)}
-            seleccionado={estaSeleccionada(opcion)}
-            onClick={() => onSeleccionar?.(opcion)}
-          >
-            {obtenerNombre(opcion)}
-          </ChipSeleccionable>
-        ))}
+      <div className="mt-3 space-y-2">
+        {guarniciones.map((opcion) => {
+          const seleccionada = estaSeleccionada(opcion);
+          return (
+            <button
+              key={obtenerId(opcion)}
+              type="button"
+              aria-pressed={seleccionada}
+              onClick={() => onSeleccionar?.(opcion)}
+              className={unirClases(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[1.08rem] font-semibold transition",
+                seleccionada
+                  ? "bg-[#eef3e9] text-[#3f4b20]"
+                  : "text-[#2f2f2b] hover:bg-[#f5f6f0]",
+              )}
+            >
+              <span
+                className={unirClases(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
+                  seleccionada ? "border-[#586b24]" : "border-[#d6d6d0]",
+                )}
+                aria-hidden="true"
+              >
+                {seleccionada ? <span className="h-2 w-2 rounded-full bg-[#586b24]" /> : null}
+              </span>
+              {obtenerNombre(opcion)}
+            </button>
+          );
+        })}
       </div>
     </section>
   );

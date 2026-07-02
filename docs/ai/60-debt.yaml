@@ -1,5 +1,5 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-06-29"
+updated_at: "2026-07-02"
 
 technical_debt:
   - id: "debt-users-module-legacy"
@@ -146,27 +146,47 @@ technical_debt:
     recommended_cut: "Mantener XLSX mientras sea requisito operativo; si se necesita cerrar el riesgo, evaluar una libreria XLSX mantenida o generar el archivo en backend/controlado."
 
   - id: "debt-client-week-carousel-context"
-    status: resolved
+    status: fully_resolved
     area: "front_clientes"
     evidence:
       - "Antes del 2026-06-28 Pedido semanal usaba Embla como navegacion primaria de semanas."
-      - "El carrusel ocultaba parte de semanas vecinas y en desktop desperdiciaba espacio con navegacion lateral/indicadores."
-      - "El 2026-06-28 front_clientes/src/components/pedido/SemanaContainer.jsx reemplaza ese flujo por un panel de accion que oculta semanas actuales cerradas/fuera de plazo."
-      - "Las semanas futuras se muestran como cards grandes y montan SemanaPedidoCard recien al tocar Ver menu o Sugerir menu, ocupando el alto disponible."
-      - "Las semanas con menu abren primero en lectura de menu semanal, con fecha, dias y opciones especiales, antes de permitir Hacer mi pedido."
-      - "Validado en navegador 390x844, 360x740, 768x1024 y 1366x768 sin overflow horizontal de pagina."
-    risk: "Bajo; embla-carousel-react queda instalado aunque ya no lo consume SemanaContainer."
-    recommended_cut: "Eliminar dependencia embla-carousel-react solo en una limpieza separada si no quedan otros consumidores."
+      - "El 2026-06-28 SemanaContainer reemplaza el carrusel por un panel de accion con cards grandes por semana."
+      - "El 2026-06-29 se ejecuto npm uninstall embla-carousel-react; removed 3 packages, 0 vulnerabilities."
+      - "Build del 2026-06-29 sin referencias a embla en src/; npm run build OK sin warnings de chunk."
+    risk: "Sin riesgo residual."
+    recommended_cut: "Completado."
+
+  - id: "debt-formulario-legacy"
+    status: fully_resolved
+    area: "front_clientes"
+    evidence:
+      - "El 2026-06-29 se eliminaron front_clientes/src/components/formulario/ (12 archivos) y front_clientes/src/components/FormularioPedido.jsx."
+      - "Verificado con grep que ningun archivo activo en src/ los importaba."
+      - "npm run build OK post-eliminacion sin errores."
+    risk: "Sin riesgo residual."
+    recommended_cut: "Completado."
 
   - id: "debt-client-vitest-worker-timeout"
-    status: open
+    status: resolved
     area: "front_clientes"
     evidence:
       - "npm test del 2026-06-28 fallo antes de ejecutar aserciones de algunos archivos por Timeout waiting for worker to respond."
       - "npx vitest run --pool=threads ejecuto 3 archivos y 8 tests OK, pero 2 workers tambien fallaron al iniciar."
       - "npm run lint, npm run build y npm run test:e2e pasaron."
-    risk: "Medio para confianza local de regression suite; no apunta a una asercion funcional fallida del cambio UX."
-    recommended_cut: "Investigar configuracion Vitest/Node 22/OneDrive o forzar pool/aislamiento estable en una tarea separada."
+      - "El 2026-07-02 front_clientes/package.json cambia npm test a vitest run --pool=threads."
+      - "El 2026-07-02 npm test pasa: 4 archivos y 10 tests."
+    risk: "Bajo; sigue siendo sensible al entorno local OneDrive/Node, pero el comando canonico queda estable en esta maquina."
+    recommended_cut: "Mantener --pool=threads; si reaparece, revisar Vitest/Node/OneDrive antes de atribuirlo a fallas funcionales."
+
+  - id: "debt-mis-sugerencias-parallel-flow"
+    status: open
+    area: "API_LA_QUINTA"
+    evidence:
+      - "API_LA_QUINTA/src/modules/sugerencias-empleados expone /api/v1/mis-sugerencias y usa tabla sugerencias_empleados."
+      - "El flujo principal de pedido cliente y admin usa /api/v1/pedidos/sugerencias y tabla pedido_sugerencias."
+      - "front_clientes/src/pages/SugerenciasPage.jsx fue alineado el 2026-07-02 para usar /api/v1/pedidos/sugerencias."
+    risk: "Medio: mantener dos sistemas de sugerencias puede fragmentar datos si un consumidor nuevo usa /mis-sugerencias."
+    recommended_cut: "Confirmar si /mis-sugerencias se conserva como feature separada o se elimina/consolida antes de exponerlo a usuarios."
 
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."
@@ -174,6 +194,7 @@ deferred_cleanup:
   - "Separar o consolidar menu vs menus-semanales solo con decision de arquitectura."
   - "Revisar duplicidad de endpoint opciones: /pedidos/menu/semanas/:semanaId/opciones y /menu/semanas/:semanaId/opciones."
   - "Definir si API_LA_QUINTA/scripts/seed-full-reset.js debe quedar disponible, renombrarse como dev-only o requerir confirmacion adicional."
+  - "Confirmar destino de /api/v1/mis-sugerencias frente al flujo canonico /api/v1/pedidos/sugerencias."
 
 do_not_mix_with_functional_changes:
   - "Normalizacion de encoding en docs."
