@@ -30,8 +30,14 @@ npm run dev
 - Los passwords de seeds demo/dev deben venir por variables de entorno:
   `DEMO_ADMIN_PASSWORD`, `DEMO_CLIENT_PASSWORD`, `TEST_DATA_PASSWORD`,
   `SUPERADMIN_PASSWORD`, `DEFAULT_DEMO_PASSWORD` y `TEST_USER_PASSWORD`.
-- Para crear un admin inicial en desarrollo/staging, usar `npm run seed:admin`
-  con `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD` configuradas.
+- Para crear un usuario del panel administrativo en desarrollo/staging, usar
+  `npm run seed:admin` con `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD`
+  configuradas. Si no existe ningun superadmin activo, el comando crea ese
+  usuario como `superadmin`; si ya existe, lo crea como `admin`.
+- Para una base demo completa desde cero, usar `npm run seed:setup` solo en
+  desarrollo/testing. Es destructivo, exige `SEED_FULL_RESET_CONFIRM`, crea un
+  superadmin con `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` y un admin operativo
+  con `DEMO_ADMIN_EMAIL`/`DEMO_ADMIN_PASSWORD`.
 
 En terminales separadas:
 
@@ -56,6 +62,18 @@ docker compose config
 docker compose build
 docker compose up --build -d
 ```
+
+Para publicar los frontends por Cloudflare Tunnel desde Docker, completar
+`CLOUDFLARED_TUNNEL_TOKEN` en `.env` y levantar el perfil `tunnel`:
+
+```bash
+docker compose --profile tunnel up --build -d
+```
+
+En Cloudflare Zero Trust, configurar los public hostnames del tunnel asi:
+
+- `dev.laquintacomidas.com` -> `http://clientes:8080`
+- `devadmin.laquintacomidas.com` -> `http://admin:8080`
 
 Servicios locales:
 
@@ -151,6 +169,14 @@ cd API_LA_QUINTA && npm run lint && npm test
 cd front_menu && npm run lint && npm run build
 cd front_clientes && npm run lint && npm run build && npm test && npm run test:e2e
 ```
+
+Smoke post-deploy:
+
+1. `GET /api/v1/health` debe responder `200`.
+2. Entrar al panel administrativo y validar dashboard, empresas, empleados,
+   platos, guarniciones, semanas y pedidos.
+3. Entrar como empleado demo, abrir Inicio, hacer o modificar un pedido semanal,
+   recargar y validar persistencia en Historial.
 
 Los archivos `.env`, dependencias, builds y configuración local de herramientas
 están excluidos del repositorio.

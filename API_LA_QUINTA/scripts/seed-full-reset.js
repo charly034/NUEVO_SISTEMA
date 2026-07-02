@@ -3,7 +3,7 @@
  * seed-full-reset.js
  *
  * Resetea TODA la base de datos y crea un ambiente de testing completo:
- *   ✓ Superadmin
+ *   ✓ Superadmin + admin operativo
  *   ✓ Todos los platos (fijos, especiales, ambos) y guarniciones
  *   ✓ 22 semanas históricas de menús (desde CSV)
  *   ✓ 3 empresas de prueba + 1 empresa TEST
@@ -59,6 +59,12 @@ if (!SUPERADMIN_EMAIL) {
   process.exit(1);
 }
 const SUPERADMIN_PASSWORD = requireSeedSecret('SUPERADMIN_PASSWORD');
+const ADMIN_OPERATIVO_EMAIL = process.env.DEMO_ADMIN_EMAIL || 'admin-operativo@laquinta.local';
+const ADMIN_OPERATIVO_PASSWORD = requireSeedSecret('DEMO_ADMIN_PASSWORD');
+if (ADMIN_OPERATIVO_EMAIL.trim().toLowerCase() === SUPERADMIN_EMAIL.trim().toLowerCase()) {
+  console.error('❌  DEMO_ADMIN_EMAIL debe ser distinto de SUPERADMIN_EMAIL para crear dos usuarios admin.');
+  process.exit(1);
+}
 const DEFAULT_DEMO_PASSWORD = requireSeedSecret('DEFAULT_DEMO_PASSWORD');
 const TEST_USER_PASSWORD = requireSeedSecret('TEST_USER_PASSWORD');
 
@@ -72,8 +78,13 @@ function getLunes(offsetSemanas = 0) {
   return d.toISOString().split('T')[0];
 }
 
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+let randomState = 0x5eed1234;
+function random() {
+  randomState = (randomState * 1664525 + 1013904223) >>> 0;
+  return randomState / 0x100000000;
+}
+function pick(arr) { return arr[Math.floor(random() * arr.length)]; }
+function shuffle(arr) { return [...arr].sort(() => random() - 0.5); }
 
 // ─── CSV — misma lógica que seed-menus-completo.js ───────────────────────────
 const FECHAS_INICIO = FECHAS_INICIO_MENUS_HISTORICOS;
@@ -347,6 +358,14 @@ async function main() {
     console.log('🗑   Limpiando base de datos...');
     await client.query(`
       TRUNCATE
+        notificacion_ejecuciones_programadas,
+        notificacion_envios_whatsapp,
+        notificacion_destinatarios_whatsapp,
+        notificacion_configuracion,
+        notificacion_reglas,
+        notificaciones,
+        sugerencias_empleados,
+        pedido_sugerencias,
         pedido_eventos, pedido_items, pedidos,
         historial_uso_platos,
         menu_semanal_sin_servicio, menu_semanal_dias, menus_semanales,
@@ -357,16 +376,23 @@ async function main() {
     console.log('    ✓ Tablas vaciadas\n');
 
     // ── 2. Superadmin ──────────────────────────────────────────────────────────
-    console.log('👤  Creando superadmin...');
+    console.log('👤  Creando usuarios admin...');
     const adminEmail = SUPERADMIN_EMAIL;
     const adminPass  = SUPERADMIN_PASSWORD;
     const adminHash  = await bcrypt.hash(adminPass, 10);
     await client.query(
       `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol)
-       VALUES ($1, $2, $3, $4, 'superadmin')`,
+      VALUES ($1, $2, $3, $4, 'superadmin')`,
       ['Carlos', 'La Quinta', adminEmail, adminHash]
     );
-    console.log(`    ✓ ${adminEmail}\n`);
+    const operativoHash = await bcrypt.hash(ADMIN_OPERATIVO_PASSWORD, 10);
+    await client.query(
+      `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol)
+       VALUES ($1, $2, $3, $4, 'admin')`,
+      ['Operaciones', 'La Quinta', ADMIN_OPERATIVO_EMAIL.trim().toLowerCase(), operativoHash]
+    );
+    console.log(`    ✓ superadmin: ${adminEmail}`);
+    console.log(`    ✓ admin operativo: ${ADMIN_OPERATIVO_EMAIL}\n`);
 
     // ── 3. Guarniciones ────────────────────────────────────────────────────────
     console.log('🥗  Insertando guarniciones...');
@@ -589,7 +615,7 @@ async function main() {
 
         for (const empleado of empleadosCreados) {
           const esTest = empleado.email === 'test@test.com';
-          const hacePedido = esTest ? (offset <= 0) : Math.random() < PROB_PEDIDO[key];
+          const hacePedido = esTest ? (offset <= 0) : random() < PROB_PEDIDO[key];
           if (!hacePedido) continue;
 
           const pedidoRes = await client.query(
@@ -607,7 +633,7 @@ async function main() {
           );
 
           // Elegir 3-5 días al azar y una opción por día
-          const diasElegidos = shuffle(diasConOpciones).slice(0, 3 + Math.floor(Math.random() * 3));
+          const diasElegidos = shuffle(diasConOpciones).slice(0, 3 + Math.floor(random() * 3));
           for (const [dia, opciones] of diasElegidos) {
             const itemElegido = pick(opciones);
             await client.query(
@@ -649,6 +675,8 @@ async function main() {
     console.log('─'.repeat(58));
     console.log('  👑 SUPERADMIN');
     console.log(`     ${adminEmail}  /  (env SUPERADMIN_PASSWORD)`);
+    console.log('  🛠 ADMIN OPERATIVO');
+    console.log(`     ${ADMIN_OPERATIVO_EMAIL}  /  (env DEMO_ADMIN_PASSWORD)`);
     console.log('─'.repeat(58));
     console.log('  🧪 USUARIO TEST');
     console.log('     test@test.com  /  (env TEST_USER_PASSWORD)  (empresa: TEST)');

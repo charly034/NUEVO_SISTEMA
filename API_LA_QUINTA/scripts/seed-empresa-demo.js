@@ -44,10 +44,16 @@ async function main() {
   const adminEmail = process.env.DEMO_ADMIN_EMAIL || 'admin@laquinta.local';
   const adminHash = await bcrypt.hash(adminPassword, 10);
   await query(
-    `INSERT INTO empleados (empresa_id, nombre, apellido, email, password_hash, rol)
-     VALUES ($1, 'Administrador', 'La Quinta', $2, $3, 'admin')
-     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, rol = 'admin', activo = true`,
-    [empresa.id, adminEmail, adminHash]
+    `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol)
+     VALUES ('Administrador', 'La Quinta', $1, $2, 'admin')
+     ON CONFLICT (email) DO UPDATE
+       SET password_hash = EXCLUDED.password_hash,
+           rol = CASE
+             WHEN usuarios_admin.rol = 'superadmin' THEN usuarios_admin.rol
+             ELSE EXCLUDED.rol
+           END,
+           activo = true`,
+    [adminEmail.trim().toLowerCase(), adminHash]
   );
   console.log(`\nAdministrador de desarrollo:`);
   console.log(`  Email:    ${adminEmail}`);

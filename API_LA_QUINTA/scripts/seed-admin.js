@@ -12,22 +12,31 @@ async function main() {
   if (!password || password.length < 12) {
     throw new Error('DEMO_ADMIN_PASSWORD es obligatoria y debe tener al menos 12 caracteres');
   }
-  const empresaResult = await query(
-    'SELECT id FROM empresas WHERE activo = true ORDER BY id LIMIT 1'
-  );
-  const empresa = empresaResult.rows[0];
-  if (!empresa) throw new Error('No hay una empresa activa para asociar al administrador');
 
+  const emailNormalizado = email.trim().toLowerCase();
   const passwordHash = await bcrypt.hash(password, 10);
+  const superadminResult = await query(
+    "SELECT COUNT(*)::int AS total FROM usuarios_admin WHERE rol = 'superadmin' AND activo = true AND LOWER(email) <> LOWER($1)",
+    [emailNormalizado]
+  );
+  const usuarioExistenteResult = await query(
+    'SELECT rol FROM usuarios_admin WHERE LOWER(email) = LOWER($1)',
+    [emailNormalizado]
+  );
+  const usuarioExistente = usuarioExistenteResult.rows[0];
+  const rol = superadminResult.rows[0]?.total > 0 && usuarioExistente?.rol !== 'superadmin'
+    ? 'admin'
+    : 'superadmin';
+
   await query(
-    `INSERT INTO empleados (empresa_id, nombre, apellido, email, password_hash, rol)
-     VALUES ($1, 'Administrador', 'La Quinta', $2, $3, 'admin')
+    `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol)
+     VALUES ('Administrador', 'La Quinta', $1, $2, $3)
      ON CONFLICT (email) DO UPDATE
-       SET password_hash = EXCLUDED.password_hash, rol = 'admin', activo = true`,
-    [empresa.id, email, passwordHash]
+       SET password_hash = EXCLUDED.password_hash, rol = EXCLUDED.rol, activo = true`,
+    [emailNormalizado, passwordHash, rol]
   );
 
-  console.log(`Administrador creado: ${email}`);
+  console.log(`Usuario admin creado: ${email} (${rol})`);
   process.exit(0);
 }
 
