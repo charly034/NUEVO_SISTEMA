@@ -1,4 +1,6 @@
 export function tienePedidoSemana(semana) {
+  const estadoPedido = semana?.metadata?.pedido?.estado;
+  if (semana?.estado === "cancelado" || estadoPedido === "cancelado") return false;
   return Boolean(semana?.metadata?.pedidoId || semana?.estado === "confirmado");
 }
 

@@ -120,6 +120,7 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Error de API: mensaje claro sin exponer detalles internos.
 - Guardado OK: la card se sincroniza con la respuesta real.
 - Recarga de página: el pedido confirmado o modificado se reconstruye desde DB.
+- Pedido cancelado/eliminado: no debe contar como pedido activo ni mostrar `Ver pedido` en Inicio; Historial invalida también la cache de `Pedido semanal`.
 - Semana sin menú asignado: mostrar pantalla de sugerencia de menú.
 
 ## Decisiones UX cliente 2026-06-28

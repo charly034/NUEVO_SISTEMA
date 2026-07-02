@@ -31,7 +31,7 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-la_quinta}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-menudb}
       DB_SSL: "false"
-      JWT_SECRET: ${JWT_SECRET:?Definí JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?Defini JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
       DB_IDLE_TIMEOUT_MS: ${DB_IDLE_TIMEOUT_MS:-30000}
@@ -76,14 +76,10 @@ services:
     restart: unless-stopped
     profiles:
       - tunnel
-    command:
-      [
-        "tunnel",
-        "--no-autoupdate",
-        "run",
-        "--token",
-        "${CLOUDFLARED_TUNNEL_TOKEN:-}",
-      ]
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
     depends_on:
       admin:
         condition: service_healthy

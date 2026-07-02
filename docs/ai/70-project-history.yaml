@@ -195,9 +195,13 @@ timeline:
     - date: "2026-07-02"
       event: "Notificaciones agrega scheduler interno de API para reglas evento pedido_semanal_pendiente; permite programar dia/hora semanal, por ejemplo lunes 09:00, y envia solo a empleados sin pedido no-cancelado para la semana publicada objetivo."
     - date: "2026-07-02"
-      event: "Auditoria de puesta en marcha corrige seeds admin: seed-admin y seed-demo escriben usuarios_admin para login real del panel; seed:setup queda como alias de seed-full-reset y crea superadmin + admin operativo con credenciales demo por env, limpiando tambien tablas nuevas de notificaciones/sugerencias."
+      event: "Auditoria de puesta en marcha corrige seeds admin: seed-admin y seed-demo escriben usuarios_admin para login real del panel; el reset demo destructivo crea superadmin + admin operativo con credenciales demo por env, limpiando tambien tablas nuevas de notificaciones/sugerencias."
     - date: "2026-07-02"
       event: "Docker Compose agrega servicio opcional cloudflared bajo profile tunnel usando CLOUDFLARED_TUNNEL_TOKEN; los public hostnames esperados en Cloudflare Zero Trust apuntan a http://clientes:8080 y http://admin:8080."
+    - date: "2026-07-02"
+      event: "Auditoria de migraciones/seeds para produccion: setup queda limitado a migraciones, setup:demo concentra reset demo destructivo, los seeds que crean platos recalculan metadata aproximada, los seeds demo/test cargan codigo_registro y perfiles completos, y seed:demo-profiles completa datos demo existentes sin borrar ni cambiar passwords."
+    - date: "2026-07-02"
+      event: "Se consolidan comandos npm de seeds: seed carga catalogo+menus, seed:catalogo prepara guarniciones/platos/metadata, seed:menus importa historico, seed:demo queda no destructivo y seed:demo-reset concentra el reset destructivo dev-only."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."

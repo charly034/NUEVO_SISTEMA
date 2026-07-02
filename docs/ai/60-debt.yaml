@@ -128,8 +128,12 @@ technical_debt:
       - "seed-full-reset.js bloquea NODE_ENV=production y requiere SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
       - "seed-full-reset.js exige SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD, DEFAULT_DEMO_PASSWORD y TEST_USER_PASSWORD por env."
       - "seed-full-reset.js crea superadmin y admin operativo en usuarios_admin; DEMO_ADMIN_EMAIL debe ser distinto de SUPERADMIN_EMAIL."
+      - "seed-full-reset.js carga metadata aproximada de platos y empleados demo con telefono, fecha_nacimiento y preferencias_alimentarias."
+      - "backfill-demo-perfiles.js completa datos faltantes de empresas/empleados demo existentes y bloquea NODE_ENV=production."
+      - "API_LA_QUINTA package.json deja npm run setup como solo migraciones y separa npm run setup:demo/seed:demo-reset para reset demo destructivo."
+      - "Comandos npm de seeds consolidados: seed, seed:catalogo, seed:menus, seed:demo, seed:demo-reset, seed:admin y seed:demo-profiles."
       - "seed-admin.js crea usuarios del panel en usuarios_admin, no empleados, y preserva rol superadmin para usuarios existentes."
-      - "seed-test-data.js exige TEST_DATA_PASSWORD por env."
+      - "seed-test-data.js exige TEST_DATA_PASSWORD por env, usa tipos vigentes especial/ambos y completa datos de perfil de empleados."
       - "API_LA_QUINTA/.env.example y .env.example usan placeholders para passwords demo/dev."
     risk: "Riesgo residual medio: seed-full-reset sigue siendo destructivo si se confirma explicitamente en dev/test."
     recommended_cut: "No ejecutar seed-full-reset en produccion; usar solo seed-admin con credenciales provistas por env si hace falta."
@@ -220,7 +224,7 @@ deferred_cleanup:
   - "Precisar payloads de todos los endpoints admin solo si se van a tocar."
   - "Separar o consolidar menu vs menus-semanales solo con decision de arquitectura."
   - "Revisar duplicidad de endpoint opciones: /pedidos/menu/semanas/:semanaId/opciones y /menu/semanas/:semanaId/opciones."
-  - "Definir si API_LA_QUINTA/scripts/seed-full-reset.js debe quedar disponible, renombrarse como dev-only o requerir confirmacion adicional."
+  - "Definir si API_LA_QUINTA/scripts/seed-full-reset.js debe renombrarse como dev-only; hoy ya bloquea NODE_ENV=production y requiere confirmacion explicita."
   - "Confirmar destino de /api/v1/mis-sugerencias frente al flujo canonico /api/v1/pedidos/sugerencias."
 
 do_not_mix_with_functional_changes:

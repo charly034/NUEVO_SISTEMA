@@ -617,6 +617,38 @@ test('DELETE /pedidos/mi-pedido cancela pedido pendiente desde historial', async
   });
 });
 
+test('GET /pedidos/semanas no expone pedidoId activo despues de cancelar', async () => {
+  await conFixture({}, async (fixture) => {
+    await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
+
+    const cancelacion = await requestJson(
+      servidor.baseUrl,
+      'DELETE',
+      `/pedidos/mi-pedido?semana_inicio=${fixture.semanaInicio}`,
+      { token: fixture.token },
+    );
+    assert.equal(cancelacion.status, 200);
+
+    const respuesta = await requestJson(servidor.baseUrl, 'GET', '/pedidos/semanas', {
+      token: fixture.token,
+    });
+
+    assert.equal(respuesta.status, 200);
+    const semana = respuesta.body.data.semanas.find((item) => item.id === fixture.semanaInicio);
+    assert.ok(semana);
+    assert.equal(semana.estado, 'sin_pedido');
+    assert.equal(semana.metadata.pedidoId, null);
+    assert.equal(semana.metadata.pedido, null);
+  });
+});
+
 test('GET /pedidos/semanas refleja pedido confirmado luego de PATCH', async () => {
   await conFixture({}, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture, {

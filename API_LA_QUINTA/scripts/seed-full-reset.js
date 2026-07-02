@@ -21,6 +21,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import pool, { getClient } from '../src/database/connection.js';
+import { actualizarMetadataPlatos } from './backfill-platos-metadata-aproximada.js';
 import {
   FECHAS_INICIO_MENUS_HISTORICOS,
   canonicalizarNombrePlato,
@@ -344,6 +345,39 @@ const EMPRESAS = [
 const PROB_PEDIDO = { '-2': 0.70, '-1': 0.80, '0': 0.65, '+1': 0.40 };
 const NOTAS_OPCIONALES = [null, null, null, null, 'Sin cebolla', 'Sin picante', 'Poca sal', 'Sin ajo'];
 
+function telefonoDemo(empresaIndex, personaIndex) {
+  return `+549261555${String(empresaIndex + 1).padStart(2, '0')}${String(personaIndex + 1).padStart(2, '0')}`;
+}
+
+function codigoEmpresaDemo(slug, empresaIndex) {
+  const base = String(slug)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 4)
+    .padEnd(4, 'X');
+  return `${base}${String(empresaIndex + 1).padStart(2, '0')}`.slice(0, 6);
+}
+
+function fechaNacimientoDemo(empresaIndex, personaIndex) {
+  const year = 1984 + ((empresaIndex * 5 + personaIndex) % 18);
+  const month = String((personaIndex % 9) + 1).padStart(2, '0');
+  const day = String(10 + ((empresaIndex + personaIndex) % 18)).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function preferenciasDemo(empresaIndex, personaIndex) {
+  return {
+    vegetariano: (empresaIndex + personaIndex) % 7 === 0,
+    sin_gluten: personaIndex === 2,
+    sin_lacteos: personaIndex === 3,
+    sin_pescado: false,
+    sin_frutos_secos: personaIndex === 4,
+    recibir_recordatorios_whatsapp: true,
+  };
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('🌱  seed-full-reset — Iniciando...\n');
@@ -548,6 +582,10 @@ async function main() {
     }
     console.log(`    ✓ ${FECHAS_INICIO.length} semanas, ${totalDias} entradas de menú\n`);
 
+    console.log('🧾  Calculando metadata aproximada de platos...');
+    const metadataActualizada = await actualizarMetadataPlatos(client);
+    console.log(`    ✓ ${metadataActualizada} platos con descripcion, kcal y alergenos\n`);
+
     // ── 6. Empresas + empleados + pedidos ──────────────────────────────────────
     // Semanas objetivo para pedidos: -2, -1, actual, próxima
     const SEMANAS_PEDIDOS = [
@@ -574,23 +612,45 @@ async function main() {
     }
 
     const defaultHash = await bcrypt.hash(DEFAULT_DEMO_PASSWORD, 10);
-    for (const emp of EMPRESAS) {
+    for (const [empresaIndex, emp] of EMPRESAS.entries()) {
       console.log(`🏢  ${emp.nombre}`);
 
       const empRes = await client.query(
-        `INSERT INTO empresas (nombre, slug, plan, modo_pedido)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [emp.nombre, emp.slug, emp.plan, emp.modo_pedido]
+        `INSERT INTO empresas (nombre, slug, plan, modo_pedido, email, telefono, codigo_registro)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [
+          emp.nombre,
+          emp.slug,
+          emp.plan,
+          emp.modo_pedido,
+          `contacto@${emp.slug}.test`,
+          `+549261444${String(empresaIndex + 1).padStart(4, '0')}`,
+          codigoEmpresaDemo(emp.slug, empresaIndex),
+        ]
       );
       const empresaId = empRes.rows[0].id;
 
       const empleadosCreados = [];
-      for (const persona of emp.empleados) {
+      for (const [personaIndex, persona] of emp.empleados.entries()) {
         const hash = persona.password ? await bcrypt.hash(persona.password, 10) : defaultHash;
+        const telefono = persona.telefono || telefonoDemo(empresaIndex, personaIndex);
+        const fechaNacimiento = persona.fecha_nacimiento || fechaNacimientoDemo(empresaIndex, personaIndex);
+        const preferencias = persona.preferencias_alimentarias || preferenciasDemo(empresaIndex, personaIndex);
         const emlRes = await client.query(
-          `INSERT INTO empleados (empresa_id, nombre, apellido, email, password_hash, rol)
-           VALUES ($1, $2, $3, $4, $5, 'cliente') RETURNING id, nombre, apellido, email`,
-          [empresaId, persona.nombre, persona.apellido, persona.email, hash]
+          `INSERT INTO empleados
+             (empresa_id, nombre, apellido, email, password_hash, rol, telefono, fecha_nacimiento, preferencias_alimentarias)
+           VALUES ($1, $2, $3, $4, $5, 'cliente', $6, $7, $8::jsonb)
+           RETURNING id, nombre, apellido, email`,
+          [
+            empresaId,
+            persona.nombre,
+            persona.apellido,
+            persona.email,
+            hash,
+            telefono,
+            fechaNacimiento,
+            JSON.stringify(preferencias),
+          ]
         );
         empleadosCreados.push(emlRes.rows[0]);
         const tag = persona.password ? ' (password desde env)' : '';

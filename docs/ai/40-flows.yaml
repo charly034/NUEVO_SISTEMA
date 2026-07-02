@@ -57,6 +57,7 @@ flows:
       - "front_clientes guarda token/empleado en localStorage si remember=true, si no en sessionStorage"
       - "requests agregan Authorization Bearer"
       - "ante 401 se limpia sesion y se emite cliente:unauthorized"
+      - "Onboarding usa tres pantallas introductorias: elegir viandas de la semana, confirmar antes del cierre dinamico por empresa/semana y revisar/modificar el pedido mientras haya dias habilitados; no debe prometer un dia/hora fijo de cierre."
     error_behavior:
       - "credenciales invalidas -> 401 con success=false"
       - "empresa inactiva o usuario inactivo -> 401"
@@ -283,7 +284,7 @@ flows:
       - "front_clientes/src/services/api.js"
     sequence:
       - "Historial usa endpoints cliente autenticados"
-      - "Cancelar pedido en Historial llama DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD, actualiza cache mi-historial como cancelado e invalida la query."
+      - "Cancelar pedido en Historial llama DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD, actualiza cache mi-historial como cancelado, limpia el pedido activo en caches pedido-semanal e invalida ambas queries."
       - "Perfil usa authApi.actualizarPerfil y authApi.cambiarPassword"
       - "PerfilPage muestra Empresa, Plan, Telefono y Cumpleanos desde el empleado autenticado."
       - "PerfilPage usa PATCH /api/v1/auth/preferencias para preferencias alimentarias"
@@ -302,8 +303,11 @@ flows:
       - "API_LA_QUINTA/scripts/menu-normalizacion.js"
       - "API_LA_QUINTA/scripts/import-menus-csv.js"
       - "API_LA_QUINTA/scripts/seed-menus-completo.js"
+      - "API_LA_QUINTA/scripts/seed-platos-fijos.js"
       - "API_LA_QUINTA/scripts/seed-platos-completo.js"
       - "API_LA_QUINTA/scripts/seed-full-reset.js"
+      - "API_LA_QUINTA/scripts/backfill-platos-metadata-aproximada.js"
+      - "API_LA_QUINTA/scripts/backfill-demo-perfiles.js"
       - "API_LA_QUINTA/scripts/menus-historicos.csv"
       - "API_LA_QUINTA/src/database/seeds/menus-historicos.csv"
     sequence:
@@ -312,10 +316,15 @@ flows:
       - "canonicalizarNombrePlato limpia prefijos A/C, corrige typos frecuentes y agrupa alias equivalentes antes de crear o buscar platos."
       - "import-menus-csv.js carga estado por fecha: semanas pasadas cerrado, semana actual publicado y futuras borrador."
       - "import-menus-csv.js mantiene menus_semanales, menu_semanal_dias, menu_semanal_sin_servicio e historial_uso_platos alineados con el CSV."
-      - "seed-platos-completo.js incluye los platos canonicos detectados en el CSV para evitar creaciones sueltas sin metadata."
-      - "backfill-platos-metadata-aproximada.js carga descripciones, receta/preparacion breve, kcal aproximadas, alergenos y vegetariano para platos existentes; no inventa foto_url."
-      - "seed-full-reset.js tambien se expone como npm run seed:setup; es destructivo, bloquea NODE_ENV=production y exige SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
-      - "seed:setup crea dos usuarios del panel admin: superadmin con SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD y admin operativo con DEMO_ADMIN_EMAIL/DEMO_ADMIN_PASSWORD, que deben ser emails distintos."
+      - "seed-platos-fijos.js, seed-platos-completo.js, import-menus-csv.js y seed-full-reset.js recalculan metadata aproximada de platos luego de crear/actualizar catalogo."
+      - "backfill-platos-metadata-aproximada.js exporta actualizarMetadataPlatos y metadataParaPlato; carga descripciones, receta/preparacion breve, kcal aproximadas, alergenos y vegetariano para platos existentes; no inventa foto_url."
+      - "npm run seed es el comando consolidado para catalogo + menus; ejecuta seed:catalogo y luego seed:menus."
+      - "npm run seed:catalogo ejecuta seed-guarniciones-completo.js y seed-platos-completo.js; deja guarniciones, platos y metadata aproximada."
+      - "npm run seed:menus ejecuta import-menus-csv.js; recrea menus desde CSV e historial asociado."
+      - "seed-full-reset.js se expone como npm run seed:demo-reset; es destructivo, bloquea NODE_ENV=production y exige SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
+      - "seed:demo-reset crea dos usuarios del panel admin: superadmin con SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD y admin operativo con DEMO_ADMIN_EMAIL/DEMO_ADMIN_PASSWORD, que deben ser emails distintos."
+      - "npm run setup ejecuta solo migraciones y es el comando seguro de setup para produccion; npm run setup:demo ejecuta migraciones + seed:demo-reset y queda restringido a dev/testing."
+      - "backfill-demo-perfiles.js se expone como npm run seed:demo-profiles; completa empresas/empleados demo existentes con email, telefono, codigo_registro, fecha_nacimiento y preferencias sin borrar datos ni cambiar passwords; bloquea NODE_ENV=production."
       - "seed:admin crea un usuario en usuarios_admin; si no existe otro superadmin activo lo crea como superadmin, si ya existe lo crea como admin y preserva rol superadmin para emails que ya lo tengan."
     validation_2026_06_29:
       - "Auditoria local: 215 entradas del CSV -> 123 platos canonicos; faltantes en seed-platos-completo: 0."
@@ -327,6 +336,10 @@ flows:
     validation_2026_07_02:
       - "Auditoria de seeds: seed-admin.js corregido para escribir en usuarios_admin en vez de empleados."
       - "seed-full-reset.js corregido para crear superadmin + admin operativo, limpiar tablas nuevas de notificaciones/sugerencias y generar pedidos demo con pseudoaleatorio deterministico."
+      - "Auditoria produccion: seed-full-reset.js y seed-test-data.js cargan empleados con telefono, fecha_nacimiento y preferencias_alimentarias; seed-test-data.js usa tipos vigentes especial/ambos en vez de variable."
+      - "package.json cambia setup a solo migraciones y agrega setup:demo para base demo destructiva explicita."
+      - "seed:demo-profiles ejecutado en DB local: 4 empresas con email/telefono/codigo_registro y 20 empleados con telefono/fecha_nacimiento/preferencias."
+      - "Consolidacion de comandos npm: seed:catalogo, seed:menus, seed, seed:demo, seed:demo-reset, seed:admin y seed:demo-profiles reemplazan aliases dispersos."
 
 validation_2026_07_02:
   verified_in_repo:
@@ -335,7 +348,9 @@ validation_2026_07_02:
     - "Navegador integrado en /pedido-semanal viewport 480x608: el selector de plato muestra el boton Listo para el Martes visible/clickeable sobre BottomNavigation."
     - "Navegador integrado en /pedido-semanal viewport mobile: el footer confirmado muestra completo Pedido confirmado y Volver al inicio sobre BottomNavigation."
     - "API_LA_QUINTA npm run migrate OK para 1719000039000_platos-metadata-constraints."
-    - "API_LA_QUINTA npm run seed:platos-metadata OK; 146 platos actualizados con metadata aproximada, 0 fotos reales cargadas."
+    - "API_LA_QUINTA npm run seed:catalogo OK; catalogo y metadata aproximada actualizados, 0 fotos reales nuevas cargadas."
+    - "API_LA_QUINTA npm run seed:demo-profiles OK; 4 empresas y 20 empleados demo completados."
+    - "Auditoria DB local posterior: 146/146 platos con descripcion, receta, kcal y alergenos; 2 con foto_url; 4/4 empresas con email, telefono y codigo_registro; 20/20 empleados con telefono, fecha_nacimiento y preferencias."
     - "API_LA_QUINTA npm run lint OK."
     - "API_LA_QUINTA npm test OK en rerun: 39 tests."
     - "front_menu npm run lint OK."

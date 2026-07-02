@@ -8,20 +8,20 @@ const PASOS = [
   {
     bg: '#EDF0E4',
     icon: <UtensilsCrossed size={38} className="text-[#5B6B2A]" />,
-    titulo: 'Pedí tu almuerzo de la semana',
-    cuerpo: 'Cada semana elegís un plato para cada día hábil. Sin colas, sin preocupaciones.',
+    titulo: 'Elegí tus viandas de la semana',
+    cuerpo: 'Cuando el menú está publicado, ves cada día y elegís plato especial o fijo, con guarnición si corresponde.',
   },
   {
     bg: '#FEF3E8',
     icon: <CalendarDays size={38} className="text-[#C8782A]" />,
-    titulo: 'El menú se publica cada viernes',
-    cuerpo: 'Revisá el menú y confirmá tu pedido antes del domingo a las 20:00 hs.',
+    titulo: 'Confirmá antes del cierre',
+    cuerpo: 'La app te muestra el día y horario límite de cada semana según tu empresa. Si el plazo cerró, igual podés consultar el menú.',
   },
   {
     bg: '#E8F5EE',
     icon: <CheckCircle2 size={38} className="text-emerald-600" />,
-    titulo: 'Tu vianda te espera en el trabajo',
-    cuerpo: 'Almuerzo fresco y preparado, listo a tiempo. Todos los días.',
+    titulo: 'Revisá tu pedido cuando quieras',
+    cuerpo: 'Después de confirmar, podés verlo desde Inicio o Historial y modificarlo mientras queden días habilitados.',
   },
 ];
 
@@ -34,9 +34,9 @@ export default function OnboardingPage() {
   const irAlLogin = () => navigate(rutasAutenticacion.iniciarSesion);
 
   return (
-    <div className="flex flex-col h-screen bg-[#FAF8F3]">
-      <div className="flex-1 flex flex-col items-center justify-center px-8 pt-16 pb-4">
-        <div className="flex flex-col items-center text-center gap-6">
+    <div className="flex h-screen flex-col bg-[#FAF8F3]">
+      <div className="flex flex-1 flex-col items-center justify-center px-7 pb-4 pt-14">
+        <div className="flex max-w-[320px] flex-col items-center gap-6 text-center">
           <div
             className="w-28 h-28 rounded-3xl flex items-center justify-center shadow-sm"
             style={{ background: paso.bg }}
@@ -44,10 +44,10 @@ export default function OnboardingPage() {
             {paso.icon}
           </div>
           <div className="space-y-3">
-            <h1 className="text-[24px] font-bold text-[#2A2C1F] leading-tight font-serif">
+            <h1 className="font-serif text-[24px] font-bold leading-tight text-[#2A2C1F]">
               {paso.titulo}
             </h1>
-            <p className="text-[15px] text-[#7A7868] leading-relaxed max-w-[280px]">
+            <p className="max-w-[310px] text-[15px] leading-relaxed text-[#7A7868]">
               {paso.cuerpo}
             </p>
           </div>

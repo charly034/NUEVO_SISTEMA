@@ -25,19 +25,46 @@ npm run dev
 
 ## Seeds y datos demo
 
-- No ejecutar `npm run seed:reset` ni `node scripts/seed-full-reset.js` en produccion.
-- `seed-full-reset.js` es destructivo y requiere `SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE`.
+- `npm run setup` es seguro para producción y ejecuta solo migraciones.
+- `npm run seed` carga catálogo + menús históricos. Equivale a ejecutar
+  `seed:catalogo` y luego `seed:menus`.
+- `npm run seed:catalogo` carga guarniciones, platos fijos/especiales/ambos y
+  metadata aproximada de platos.
+- `npm run seed:menus` importa menús históricos desde CSV, días sin servicio e
+  historial de uso.
+- `npm run seed:admin` crea/actualiza el usuario inicial del panel admin con
+  `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD`. Si no existe ningún superadmin
+  activo, crea ese usuario como `superadmin`; si ya existe, lo crea como
+  `admin`.
+- `npm run seed:demo` crea datos demo no destructivos y completa perfiles demo
+  existentes sin borrar datos ni cambiar contraseñas.
+- No ejecutar `npm run seed:demo-reset` ni `node scripts/seed-full-reset.js` en
+  producción.
+- `seed:demo-reset` es destructivo y requiere
+  `SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE`.
 - Los passwords de seeds demo/dev deben venir por variables de entorno:
   `DEMO_ADMIN_PASSWORD`, `DEMO_CLIENT_PASSWORD`, `TEST_DATA_PASSWORD`,
   `SUPERADMIN_PASSWORD`, `DEFAULT_DEMO_PASSWORD` y `TEST_USER_PASSWORD`.
-- Para crear un usuario del panel administrativo en desarrollo/staging, usar
-  `npm run seed:admin` con `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD`
-  configuradas. Si no existe ningun superadmin activo, el comando crea ese
-  usuario como `superadmin`; si ya existe, lo crea como `admin`.
-- Para una base demo completa desde cero, usar `npm run seed:setup` solo en
+- Para una base demo completa desde cero, usar `npm run setup:demo` solo en
   desarrollo/testing. Es destructivo, exige `SEED_FULL_RESET_CONFIRM`, crea un
   superadmin con `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` y un admin operativo
   con `DEMO_ADMIN_EMAIL`/`DEMO_ADMIN_PASSWORD`.
+- `npm run seed:demo-profiles` completa datos demo faltantes de empresas y
+  empleados ya existentes sin borrar datos ni cambiar contraseñas; no corre en
+  `NODE_ENV=production`.
+
+## Migraciones
+
+Las migraciones históricas no se compactan ni se reescriben porque una base que
+ya las ejecutó depende de esos nombres. Para una instalación nueva alcanza con:
+
+```bash
+cd API_LA_QUINTA
+npm run setup
+```
+
+Solo conviene hacer un squash de migraciones si se confirma que todas las bases
+pueden destruirse y recrearse desde cero.
 
 En terminales separadas:
 

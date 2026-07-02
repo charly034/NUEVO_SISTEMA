@@ -11,6 +11,7 @@
 
 import pool, { getClient } from '../src/database/connection.js';
 import { normalizarClave } from './menu-normalizacion.js';
+import { actualizarMetadataPlatos } from './backfill-platos-metadata-aproximada.js';
 
 // ── Guarniciones ───────────────────────────────────────────────────────────────
 const GUARNICIONES = [
@@ -381,6 +382,8 @@ async function main() {
       console.log(`  [${p.tipo}] ${p.nombre}`);
     }
 
+    const metadataActualizada = await actualizarMetadataPlatos(client);
+
     await client.query('COMMIT');
 
     console.log('\n=== Seed completado ===');
@@ -389,6 +392,7 @@ async function main() {
     console.log(`  Platos especial: ${especialCount}`);
     console.log(`  Platos ambos : ${ambosCount}`);
     console.log(`  Total platos : ${fijoCount + especialCount + ambosCount}`);
+    console.log(`  Metadata aprox.: ${metadataActualizada}`);
 
   } catch (err) {
     await client.query('ROLLBACK');

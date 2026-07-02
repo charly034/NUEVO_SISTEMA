@@ -12,6 +12,7 @@
 !**/.env.example
 !.env.docker.example
 .claude/
+cloudflared/credentials.json
 
 # Logs y sistema operativo
 *.log
@@ -37,4 +38,3 @@ API_LA_QUINTA/uploads/*
 !API_LA_QUINTA/uploads/platos/
 API_LA_QUINTA/uploads/platos/*
 !API_LA_QUINTA/uploads/platos/.gitkeep
-

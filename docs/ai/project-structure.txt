@@ -47,7 +47,7 @@
 |
 |-- API_LA_QUINTA/
 |   |-- package.json
-|   |   Scripts API: dev, start, migrate, seed, test, lint.
+|   |   Scripts API: dev, start, migrate, setup, setup:demo, seed, test, lint.
 |   |-- Dockerfile
 |   |-- database.json
 |   |-- scripts/

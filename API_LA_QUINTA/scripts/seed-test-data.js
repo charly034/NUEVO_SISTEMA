@@ -43,6 +43,39 @@ const NOTAS_OPCIONALES = [
   'Poca sal por favor',
 ];
 
+function telefonoDemo(empresaIndex, personaIndex) {
+  return `+549261556${String(empresaIndex + 1).padStart(2, '0')}${String(personaIndex + 1).padStart(2, '0')}`;
+}
+
+function codigoEmpresaDemo(slug, empresaIndex) {
+  const base = String(slug)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 4)
+    .padEnd(4, 'X');
+  return `${base}${String(empresaIndex + 1).padStart(2, '0')}`.slice(0, 6);
+}
+
+function fechaNacimientoDemo(empresaIndex, personaIndex) {
+  const year = 1986 + ((empresaIndex * 5 + personaIndex) % 16);
+  const month = String((personaIndex % 9) + 1).padStart(2, '0');
+  const day = String(8 + ((empresaIndex + personaIndex) % 18)).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function preferenciasDemo(empresaIndex, personaIndex) {
+  return {
+    vegetariano: (empresaIndex + personaIndex) % 6 === 0,
+    sin_gluten: personaIndex === 2,
+    sin_lacteos: personaIndex === 3,
+    sin_pescado: false,
+    sin_frutos_secos: personaIndex === 4,
+    recibir_recordatorios_whatsapp: true,
+  };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getLunes(offsetSemanas = 0) {
@@ -72,11 +105,11 @@ async function main() {
     query(`SELECT id, nombre FROM guarniciones WHERE activo = true ORDER BY nombre`),
   ]);
 
-  const platosVariables = platosRes.rows.filter(p => p.tipo === 'variable');
-  const platosFijos     = platosRes.rows.filter(p => p.tipo === 'fijo');
+  const platosEspeciales = platosRes.rows.filter(p => p.tipo === 'especial' || p.tipo === 'ambos');
+  const platosFijos     = platosRes.rows.filter(p => p.tipo === 'fijo' || p.tipo === 'ambos');
   const guarniciones    = guarnRes.rows;
 
-  if (platosVariables.length === 0 && platosFijos.length === 0) {
+  if (platosEspeciales.length === 0 && platosFijos.length === 0) {
     throw new Error('No hay platos activos. Ejecutá seed-platos-fijos.js primero.');
   }
 
@@ -101,32 +134,58 @@ async function main() {
   try {
     await client.query('BEGIN');
 
-    for (const emp of EMPRESAS) {
+    for (const [empresaIndex, emp] of EMPRESAS.entries()) {
       // Empresa
       const empRes = await client.query(
-        `INSERT INTO empresas (nombre, slug, plan, modo_pedido)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (slug) DO UPDATE SET nombre = EXCLUDED.nombre, plan = EXCLUDED.plan
+        `INSERT INTO empresas (nombre, slug, plan, modo_pedido, email, telefono, codigo_registro)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (slug) DO UPDATE SET
+           nombre = EXCLUDED.nombre,
+           plan = EXCLUDED.plan,
+           modo_pedido = EXCLUDED.modo_pedido,
+           email = EXCLUDED.email,
+           telefono = EXCLUDED.telefono,
+           codigo_registro = COALESCE(empresas.codigo_registro, EXCLUDED.codigo_registro)
          RETURNING id, nombre`,
-        [emp.nombre, emp.slug, emp.plan, emp.modo_pedido]
+        [
+          emp.nombre,
+          emp.slug,
+          emp.plan,
+          emp.modo_pedido,
+          `contacto@${emp.abrev}.test`,
+          `+549261445${String(empresaIndex + 1).padStart(4, '0')}`,
+          codigoEmpresaDemo(emp.slug, empresaIndex),
+        ]
       );
       const empresa = empRes.rows[0];
       console.log(`\n🏢 ${empresa.nombre} (id=${empresa.id})`);
 
       // Empleados
       const empleadosCreados = [];
-      for (const persona of EMPLEADOS_POR_EMPRESA) {
-        const email = `test1@${emp.abrev}.com`;
+      for (const [personaIndex, persona] of EMPLEADOS_POR_EMPRESA.entries()) {
         // Para que el email sea único por persona usamos nombre
         const emailUnico = `${persona.nombre.toLowerCase()}@${emp.abrev}.com`;
         const emlRes = await client.query(
-          `INSERT INTO empleados (empresa_id, nombre, apellido, email, password_hash, rol)
-           VALUES ($1, $2, $3, $4, $5, 'cliente')
+          `INSERT INTO empleados
+             (empresa_id, nombre, apellido, email, password_hash, rol, telefono, fecha_nacimiento, preferencias_alimentarias)
+           VALUES ($1, $2, $3, $4, $5, 'cliente', $6, $7, $8::jsonb)
            ON CONFLICT (email) DO UPDATE
-             SET nombre = EXCLUDED.nombre, apellido = EXCLUDED.apellido,
-                 password_hash = EXCLUDED.password_hash, empresa_id = EXCLUDED.empresa_id
-           RETURNING id, nombre, apellido, email`,
-          [empresa.id, persona.nombre, persona.apellido, emailUnico, hash]
+              SET nombre = EXCLUDED.nombre, apellido = EXCLUDED.apellido,
+                  password_hash = EXCLUDED.password_hash, empresa_id = EXCLUDED.empresa_id,
+                  telefono = EXCLUDED.telefono,
+                  fecha_nacimiento = EXCLUDED.fecha_nacimiento,
+                  preferencias_alimentarias = EXCLUDED.preferencias_alimentarias
+            RETURNING id, nombre, apellido, email`,
+          [
+            empresa.id,
+            persona.nombre,
+            persona.apellido,
+            emailUnico,
+            hash,
+            telefonoDemo(empresaIndex, personaIndex),
+            fechaNacimientoDemo(empresaIndex, personaIndex),
+            JSON.stringify(preferenciasDemo(empresaIndex, personaIndex)),
+          ]
         );
         empleadosCreados.push(emlRes.rows[0]);
         console.log(`  👤 ${persona.nombre} ${persona.apellido} — ${emailUnico}`);
@@ -154,15 +213,15 @@ async function main() {
           const diasElegidos = shuffle(DIAS).slice(0, 3 + Math.floor(Math.random() * 3));
 
           for (const dia of diasElegidos) {
-            // Elige entre plato variable (si hay menú) o fijo
+            // Elige entre plato de rotación semanal (si hay menú) o fijo
             let plato, opcion = null;
-            if (menuId && platosVariables.length > 0 && Math.random() > 0.4) {
-              plato = pick(platosVariables);
+            if (menuId && platosEspeciales.length > 0 && Math.random() > 0.4) {
+              plato = pick(platosEspeciales);
               opcion = pick(['A', 'B']);
             } else if (platosFijos.length > 0) {
               plato = pick(platosFijos);
             } else {
-              plato = pick(platosVariables);
+              plato = pick(platosEspeciales);
               opcion = pick(['A', 'B']);
             }
 

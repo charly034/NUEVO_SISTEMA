@@ -1,4 +1,5 @@
 import { query } from '../src/database/connection.js';
+import { actualizarMetadataPlatos } from './backfill-platos-metadata-aproximada.js';
 
 const GUARNICIONES = [
   'Ensalada Rusa',
@@ -62,6 +63,9 @@ async function main() {
     }
   }
   console.log(`✓ ${PLATOS_FIJOS.length} platos fijos procesados`);
+
+  const metadataActualizada = await actualizarMetadataPlatos();
+  console.log(`✓ ${metadataActualizada} platos con metadata aproximada`);
 
   console.log('\nSeed completado.');
   process.exit(0);

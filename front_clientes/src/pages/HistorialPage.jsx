@@ -108,6 +108,7 @@ function FilaPedido({ cancelando, pedido, onEliminar }) {
 export default function HistorialPage({ empleado }) {
   const queryClient = useQueryClient();
   const userId = empleado?.id || empleado?.usuarioId;
+  const empresaId = empleado?.empresa?.id || empleado?.empresaId || empleado?.empresa_id;
 
   const { data: pedidos = [], isLoading, error, refetch } = useQuery({
     queryKey: ['mi-historial', userId],
@@ -130,7 +131,29 @@ export default function HistorialPage({ empleado }) {
             : pedido;
         }),
       );
-      await queryClient.invalidateQueries({ queryKey: ['mi-historial', userId] });
+      queryClient.setQueriesData({ queryKey: ['pedido-semanal'] }, (actual = []) => {
+        if (!Array.isArray(actual)) return actual;
+        return actual.map((semana) => {
+          if (semana.id !== semanaInicio) return semana;
+          return {
+            ...semana,
+            estado: semana.metadata?.tieneMenuPublicado ? 'sin_pedido' : 'sin_menu',
+            diasSeleccionados: 0,
+            metadata: {
+              ...(semana.metadata || {}),
+              pedidoId: null,
+              pedido: null,
+            },
+          };
+        });
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['mi-historial', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['pedido-semanal', userId] }),
+        empresaId
+          ? queryClient.invalidateQueries({ queryKey: ['pedido-semanal', userId, empresaId] })
+          : Promise.resolve(),
+      ]);
     },
     onError: (err) => toast.error(err?.message || 'No se pudo cancelar'),
   });

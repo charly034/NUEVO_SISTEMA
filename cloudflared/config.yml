@@ -1,0 +1,9 @@
+tunnel: 3d1bb5f6-5eeb-4f71-b494-3fdccbf08862
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: dev.laquintacomidas.com
+    service: http://clientes:8080
+  - hostname: devadmin.laquintacomidas.com
+    service: http://admin:8080
+  - service: http_status:404

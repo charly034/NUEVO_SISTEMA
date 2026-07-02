@@ -34,6 +34,7 @@ import {
   nombreSemanaHistorica,
   normalizarClave,
 } from './menu-normalizacion.js';
+import { actualizarMetadataPlatos } from './backfill-platos-metadata-aproximada.js';
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -340,12 +341,14 @@ async function main() {
       JOIN menus_semanales ms ON ms.id = msd.menu_semanal_id
       JOIN platos p           ON p.id  = msd.plato_id
     `);
+    const metadataActualizada = await actualizarMetadataPlatos(client);
 
     console.log('');
     console.log('✅  Importación completada exitosamente.');
     console.log(`   📅  ${semanasImportadas} semanas importadas`);
     console.log(`   🍽️   ${platosNuevos} platos nuevos creados`);
     console.log(`   📦  ${cachePlatos.size} platos totales en la base de datos`);
+    console.log(`   🧾  ${metadataActualizada} platos con metadata aproximada`);
     console.log(`   📖  ${historialRows} registros de historial generados`);
     console.log('');
     console.log('   Tags asignados automáticamente:');

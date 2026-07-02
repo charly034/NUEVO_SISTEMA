@@ -1,3 +1,5 @@
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { query } from '../src/database/connection.js';
 
 const ALERGENOS = {
@@ -107,8 +109,23 @@ function receta(nombre, tags = []) {
   return textos[tipo];
 }
 
-async function main() {
-  const { rows: platos } = await query(`
+function ejecutar(db, text, params) {
+  if (typeof db === 'function') return db(text, params);
+  return db.query(text, params);
+}
+
+export function metadataParaPlato(nombre, tags = []) {
+  return {
+    descripcion: descripcion(nombre, tags),
+    descripcion_larga: receta(nombre, tags),
+    calorias: estimarKcal(nombre, tags),
+    alergenos: estimarAlergenos(nombre, tags),
+    vegetariano: esVegetariano(nombre, tags),
+  };
+}
+
+export async function actualizarMetadataPlatos(db = query) {
+  const { rows: platos } = await ejecutar(db, `
     SELECT id, nombre, tags
     FROM platos
     ORDER BY id
@@ -117,15 +134,10 @@ async function main() {
   let actualizados = 0;
   for (const plato of platos) {
     const tags = Array.isArray(plato.tags) ? plato.tags : [];
-    const metadata = {
-      descripcion: descripcion(plato.nombre, tags),
-      descripcion_larga: receta(plato.nombre, tags),
-      calorias: estimarKcal(plato.nombre, tags),
-      alergenos: estimarAlergenos(plato.nombre, tags),
-      vegetariano: esVegetariano(plato.nombre, tags),
-    };
+    const metadata = metadataParaPlato(plato.nombre, tags);
 
-    await query(
+    await ejecutar(
+      db,
       `UPDATE platos
        SET descripcion = $1,
            descripcion_larga = $2,
@@ -146,11 +158,18 @@ async function main() {
     actualizados++;
   }
 
+  return actualizados;
+}
+
+async function main() {
+  const actualizados = await actualizarMetadataPlatos();
   console.log(`Metadata aproximada actualizada en ${actualizados} platos.`);
   process.exit(0);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
