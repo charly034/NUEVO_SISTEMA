@@ -440,7 +440,7 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
       </div>
 
       {/* Lista de días */}
-      <div className="flex-1 overflow-y-auto pb-32">
+      <div className="flex-1 overflow-y-auto pb-[calc(11rem+env(safe-area-inset-bottom))]">
         <div className="px-5 space-y-1.5 pt-1">
           {dias.map((day) => {
             const k = claveDia(day);
@@ -511,7 +511,7 @@ export default function WeeklyOrderView({ semana, onBack, onGuardar }) {
       </div>
 
       {/* Footer fijo */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-[#E8E5DC] px-5 py-4 space-y-2">
+      <div className="fixed inset-x-0 bottom-[calc(4.65rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[480px] bg-white/95 backdrop-blur border-t border-[#E8E5DC] px-5 py-3 space-y-2">
         {saved ? (
           <div className="flex items-center justify-center gap-2 py-3.5 bg-emerald-50 rounded-xl border border-emerald-200">
             <CheckCircle2 size={17} className="text-emerald-600" />

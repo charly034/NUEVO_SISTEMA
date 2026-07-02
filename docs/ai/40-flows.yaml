@@ -141,6 +141,7 @@ flows:
       - "El bottom sheet de seleccion aclara que elegir un plato no guarda el pedido; el guardado ocurre al tocar Confirmar pedido o Guardar cambios."
       - "El bottom sheet de seleccion usa encabezado compacto con solo el dia, permite navegar al dia anterior o siguiente cuando aplica e indica visualmente si hay mas opciones hacia abajo."
       - "El bottom sheet de seleccion debe quedar por encima de BottomNavigation; en viewport 480x608 el boton Listo para el dia debe ser visible y clickeable."
+      - "El footer de accion/confirmacion de WeeklyOrderView debe quedar fijo por encima de BottomNavigation; los estados Confirmar pedido y Pedido confirmado + Volver al inicio deben verse completos."
     error_behavior:
       - "401 carga pedido -> mensaje de iniciar sesion nuevamente"
       - "otros errores carga -> mensaje generico de intentar nuevamente"
@@ -244,6 +245,7 @@ validation_2026_07_02:
     - "front_clientes npm test usa vitest run --pool=threads para evitar timeout de workers forks en esta maquina."
     - "front_clientes e2e/smoke.spec.js valida el flujo actual Splash/Onboarding -> Login."
     - "Navegador integrado en /pedido-semanal viewport 480x608: el selector de plato muestra el boton Listo para el Martes visible/clickeable sobre BottomNavigation."
+    - "Navegador integrado en /pedido-semanal viewport mobile: el footer confirmado muestra completo Pedido confirmado y Volver al inicio sobre BottomNavigation."
 
 from_chat_summary_flows:
   - id: "post_hacer_o_modificar_pedido"

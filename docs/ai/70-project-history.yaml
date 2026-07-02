@@ -160,6 +160,8 @@ timeline:
       event: "Auditoria de merge corrige lint cliente, alinea SugerenciasPage con POST /api/v1/pedidos/sugerencias, estabiliza npm test con vitest --pool=threads, actualiza smoke e2e a Onboarding -> Login y corrige rollback de migracion 1719000034000 para no dropear columnas historicas telefono/fecha_nacimiento."
     - date: "2026-07-02"
       event: "Admin empleados agrega telefono y fecha_nacimiento al formulario/listado y API empleados los acepta/devuelve; Pedido semanal corrige z-index del selector de plato para que el boton Listo para el dia no quede tapado por BottomNavigation."
+    - date: "2026-07-02"
+      event: "Pedido semanal ajusta el footer fijo de accion/confirmacion para que Pedido confirmado y Volver al inicio se vean completos por encima de BottomNavigation en mobile."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."
