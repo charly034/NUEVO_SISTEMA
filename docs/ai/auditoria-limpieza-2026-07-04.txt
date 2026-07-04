@@ -1,0 +1,151 @@
+Auditoria de limpieza y refactor - La Quinta
+Fecha: 2026-07-04
+Rama de trabajo: codex/auditoria-limpieza-refactor
+
+Alcance ejecutado
+- Se reviso frontend admin (front_menu), frontend clientes (front_clientes) y backend (API_LA_QUINTA).
+- No se eliminaron archivos.
+- No se modifico comportamiento visible.
+- No se tocaron reglas de negocio de pedidos, pagos ni notificaciones.
+- No se ejecuto ningun cambio sobre base de datos de produccion.
+
+Validaciones ejecutadas
+- API_LA_QUINTA: npm run lint OK.
+- API_LA_QUINTA: npm test OK, 49 tests.
+- front_menu: npm run lint OK.
+- front_menu: npm run build OK. Warning informativo PLUGIN_TIMINGS por vite:css/vite:build-html.
+- front_clientes: npm run lint OK.
+- front_clientes: npm run build OK.
+- front_clientes: npm test fallo en la primera corrida por timeout al iniciar 2 workers threads de Vitest; 3 archivos y 6 tests habian pasado. Reintento con npx vitest run --pool=threads --maxWorkers=1 OK, 5 archivos y 12 tests.
+- API_LA_QUINTA: npm audit --omit=dev sin vulnerabilidades productivas.
+- front_clientes: npm audit --omit=dev sin vulnerabilidades productivas.
+- front_menu: npm audit --omit=dev reporta xlsx 0.18.5 con 1 vulnerabilidad high, sin fix directo disponible. Esta deuda ya figura aceptada en docs/ai/60-debt.yaml por requerimiento operativo de exportar XLSX.
+- npm outdated ejecutado en las tres apps; no se actualizaron paquetes.
+
+Frontend - codigo muerto candidato, NO eliminado
+Los siguientes archivos aparecen como no importados por el grafo estatico de imports relativos. Deben revisarse manualmente antes de borrar:
+
+front_menu
+- front_menu/src/components/ui/StatCard.jsx
+- front_menu/src/components/ui/Toast.jsx
+
+front_clientes
+- front_clientes/src/compartido/ui/Badge.jsx
+- front_clientes/src/components/HistorialPedidos.jsx
+- front_clientes/src/components/PerfilCliente.jsx
+- front_clientes/src/components/layout/BottomNav.jsx
+- front_clientes/src/components/pedido/FilaPedidoDiaEditable.jsx
+- front_clientes/src/components/pedido/PedidoContainer.jsx
+- front_clientes/src/components/pedido/ResumenSeleccionDia.jsx
+- front_clientes/src/components/ui/Badge.jsx
+- front_clientes/src/components/ui/BotonIcono.jsx
+- front_clientes/src/components/ui/IndicadoresCarrusel.jsx
+- front_clientes/src/pages/RecuperarPage.jsx
+- front_clientes/src/pages/RegistroPage.jsx
+
+Notas sobre falsos positivos
+- front_menu/src/main.jsx -> ./index.css y front_clientes/src/main.jsx -> ./index.css aparecen como imports relativos faltantes porque el script solo resolvio JS/JSX.
+- front_clientes/src/utils/sonidoConfirmacionPedido.js -> ../assets/sonidos/sonido-confirmacion-pedido.mp3 aparece como asset no JS; no implica archivo faltante por si solo.
+- Migraciones y seeds del backend aparecen como no importados en un grafo JS normal, pero son entrypoints de node-pg-migrate o scripts y no son candidatos de borrado por ese criterio.
+
+Frontend - duplicaciones y refactors propuestos, NO aplicados
+- Hay dos componentes Badge distintos en front_clientes:
+  - front_clientes/src/compartido/ui/Badge.jsx
+  - front_clientes/src/components/ui/Badge.jsx
+  Recomendacion: confirmar cual es el sistema canonico antes de unificar, porque cambian tonos/tamanos.
+- METODOS_PAGO esta duplicado en:
+  - front_menu/src/pages/PedidosPagos.jsx
+  - front_menu/src/components/finanzas/CuentaCorrienteFicha.jsx
+  Recomendacion: extraer una constante compartida solo en una tarea financiera con validacion funcional completa.
+- Hay patrones de modales locales repetidos en front_menu, especialmente en Empresas.jsx y CuentaCorrienteFicha.jsx, mientras otras pantallas usan components/ui/Modal.jsx.
+  Recomendacion: no unificar ahora; afecta flujos admin grandes y finanzas.
+- Hay patrones de toast duplicados en admin:
+  - front_menu/src/lib/toast.js
+  - front_menu/src/lib/confirm.js
+  - front_menu/src/components/ui/Toast.jsx aparece no usado.
+  Recomendacion: decidir si se conserva SweetAlert como sistema canonico o si se monta ToastContainer.
+
+Frontend - consistencia de loading/error
+- front_clientes usa React Query en varios flujos, con loading/error propios por pantalla.
+- front_menu usa hooks por dominio y estados locales; no hay un patron unico para skeleton/error entre vistas admin.
+- Recomendacion: definir componentes compartidos de estado de carga/error por app antes de refactorizar vistas. No aplicar automaticamente porque puede cambiar UX visual.
+
+Frontend - logs/TODO/comentarios
+- console.debug en front_clientes/src/utils/performance.js esta documentado como condicionado por entorno o VITE_DEBUG_PERFORMANCE.
+- console.error en front_menu/src/components/layout/SectionErrorBoundary.jsx es diagnostico de error boundary.
+- Se detecto TODO en front_clientes/src/components/pedido/EstadoPedido.jsx: "implementar ajuste de densidad para compacta=true".
+- Muchos console.log/error del backend estan en server, scheduler o scripts operativos; no son ruido de UI.
+
+Frontend - accesibilidad basica
+- Existen muchos botones de icono con aria-label en layout, pedido y acciones principales.
+- Se detectan botones visuales en algunas pantallas grandes sin aria-label explicito, pero con texto visible; no se marcaron como bug.
+- Riesgo a revisar manualmente: botones de icono en WeeklyOrderView y algunos botones admin densos podrian necesitar aria-label si el contenido visible no basta.
+- Los inputs principales suelen estar dentro de label o usan componentes CampoTexto/CampoPassword. No se aplicaron cambios.
+
+Frontend - rendimiento evidente
+- No se detectaron listas claramente masivas sin paginacion en la revision estatica; las pantallas de pedidos/admin filtran y agrupan en memoria.
+- No se agregaron useMemo/useCallback mecanicos: hacerlo sin perfilado puede empeorar legibilidad sin mejora real.
+- Riesgo existente: vistas financieras y pedidos admin son componentes grandes; conviene dividir solo con pruebas visuales y funcionales.
+
+Backend - endpoints o modulos candidatos a revision, NO eliminados
+- API_LA_QUINTA/src/modules/users esta montado en /api/v1/users y responde 410 Gone. Ya esta documentado como modulo legacy retirado; eliminarlo requiere confirmacion externa porque puede servir de aviso de migracion.
+- API_LA_QUINTA/src/modules/sugerencias-empleados expone /api/v1/mis-sugerencias. El flujo principal actual usa /api/v1/pedidos/sugerencias y tabla pedido_sugerencias. Ya figura como deuda abierta; consolidar requiere decision de producto/datos.
+- Endpoint duplicado de opciones de menu:
+  - /api/v1/menu/semanas/:semanaId/opciones
+  - /api/v1/pedidos/menu/semanas/:semanaId/opciones
+  Recomendacion: mantener por compatibilidad hasta confirmar consumidores externos.
+- Endpoints legacy de menu cliente:
+  - /api/v1/pedidos/menu-hoy
+  - /api/v1/pedidos/menu-semana
+  - /api/v1/pedidos/menu-activo
+  Aun tienen consumidores en front_clientes/src/services/api.js o pedidoService.js; no son codigo muerto confirmado.
+
+Backend - manejo de errores y exposicion interna
+- error.middleware.js centraliza errores; no se verifico exposicion de stack trace al cliente en esta pasada.
+- Se detectan mensajes de scripts con "seed/test data", pero estan en scripts CLI, no en endpoints de usuario.
+- En respuestas HTTP, /api/v1/users devuelve mensaje de modulo legacy retirado; esto parece intencional.
+
+Backend - queries/indices
+- No se hicieron cambios de SQL ni indices.
+- La auditoria estatica no probo N+1 en runtime.
+- Areas a perfilar si hay lentitud real: finanzas cuenta corriente, pedidos admin, estadisticas y notificaciones scheduler.
+
+Credenciales y URLs sensibles
+- No se detectaron secretos reales hardcodeados en codigo.
+- Los .env.example contienen placeholders, no valores reales.
+- API_LA_QUINTA/src/config/env.js mantiene fallback dev para DB_PASSWORD y JWT_SECRET cuando NODE_ENV no es production; en production exige JWT_SECRET.
+- compose.yaml exige JWT_SECRET y POSTGRES_PASSWORD mediante expansion con error.
+
+Dependencias candidatas no usadas, NO removidas
+- front_menu: @tanstack/react-query-devtools aparece en package.json/package-lock, pero no se encontro import en src.
+- front_clientes: motion aparece en package.json/package-lock, pero no se encontro import en src.
+- No se removieron porque package-lock ya tenia cambios previos sin commitear y porque cualquier uninstall debe validarse con build.
+
+Dependencias desactualizadas, NO actualizadas
+- API_LA_QUINTA: dotenv 17.x, express 5.x, express-rate-limit 8.x, helmet 8.x, node-pg-migrate 8.x, zod 4.x y eslint 10.x aparecen como latest disponibles. Varios son majors y requieren migracion.
+- front_menu: React 19, React Router 7, Tailwind 4 y Vite 8.1.x aparecen disponibles; React/Tailwind/Router son migraciones mayores.
+- front_clientes: updates menores para Tailwind 4.3.2, React Query 5.101.2, lucide-react 1.23.0, React Router 7.18.1 y Vite 8.1.x.
+- No se actualizo nada por consigna.
+
+Riesgos o bugs observados que requieren decision
+- front_clientes/src/routes/rutasCliente.js define rutas de auth crearCuenta (/crear-cuenta) y recuperarAcceso (/recuperar-acceso), y rutas de compatibilidad /registro y /recuperar redirigen hacia ellas.
+- front_clientes/src/App.jsx no monta rutas explicitas para /crear-cuenta ni /recuperar-acceso; en cambio LoginPage parece contener el flujo integrado. Revisar si las pages RegistroPage.jsx y RecuperarPage.jsx quedaron obsoletas o si falta montar esas rutas.
+- No se corrigio porque seria cambio visible de navegacion/autenticacion.
+
+Hechos verificados en repo
+- Lint pasa en API, admin y cliente.
+- Audit productivo solo reporta xlsx en admin.
+- Los archivos listados como candidatos no tienen imports relativos detectados desde src.
+- /api/v1/users y /api/v1/mis-sugerencias estan documentados en docs/ai como legacy/deuda o pendiente de decision.
+
+Inferencias razonables
+- StatCard.jsx, Toast.jsx, RegistroPage.jsx, RecuperarPage.jsx y varios componentes de pedido cliente parecen restos de iteraciones anteriores.
+- motion y react-query-devtools parecen dependencias instaladas pero no usadas.
+- Unificar constantes financieras y modales puede reducir duplicacion, pero debe hacerse en una tarea separada con validacion funcional completa.
+
+Dudas pendientes para el usuario
+- Aprobar o rechazar eliminacion de cada archivo candidato.
+- Confirmar si se conserva /api/v1/mis-sugerencias como feature separada.
+- Confirmar cuando se puede retirar /api/v1/users 410 Gone.
+- Confirmar si /registro y /recuperar deben existir como pantallas separadas o vivir solo dentro de LoginPage.
+- Confirmar si se acepta remover motion y @tanstack/react-query-devtools.
