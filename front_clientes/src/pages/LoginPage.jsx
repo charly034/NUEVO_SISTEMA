@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,6 +16,7 @@ import {
 import Logo from "../components/ui/Logo.jsx";
 import BtnPrimary from "../components/ui/BtnPrimary.jsx";
 import FloatField from "../components/ui/FloatField.jsx";
+import { rutasAutenticacion } from "../routes/rutasCliente.js";
 
 function AuthAlert({ children }) {
   if (!children) return null;
@@ -320,10 +321,31 @@ function RecuperarScreen({ onVolver }) {
   );
 }
 
-export default function LoginPage({ onLogin, onSesionAutenticada }) {
-  const [vista, setVista] = useState(VISTAS_AUTENTICACION.LOGIN);
+function rutaParaVista(vista) {
+  if (vista === VISTAS_AUTENTICACION.REGISTRO) {
+    return rutasAutenticacion.crearCuenta;
+  }
 
-  const volverAlLogin = () => setVista(VISTAS_AUTENTICACION.LOGIN);
+  if (vista === VISTAS_AUTENTICACION.RECUPERAR) {
+    return rutasAutenticacion.recuperarAcceso;
+  }
+
+  return rutasAutenticacion.iniciarSesion;
+}
+
+export default function LoginPage({
+  onLogin,
+  onSesionAutenticada,
+  vistaInicial = VISTAS_AUTENTICACION.LOGIN,
+}) {
+  const navigate = useNavigate();
+  const vista = vistaInicial;
+
+  const cambiarVista = (nuevaVista) => {
+    navigate(rutaParaVista(nuevaVista));
+  };
+
+  const volverAlLogin = () => cambiarVista(VISTAS_AUTENTICACION.LOGIN);
 
   if (vista === VISTAS_AUTENTICACION.RECUPERAR) {
     return <RecuperarScreen onVolver={volverAlLogin} />;
@@ -341,7 +363,7 @@ export default function LoginPage({ onLogin, onSesionAutenticada }) {
   return (
     <LoginScreen
       onLogin={onLogin}
-      onCambiarVista={setVista}
+      onCambiarVista={cambiarVista}
     />
   );
 }

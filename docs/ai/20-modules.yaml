@@ -172,8 +172,6 @@ modules:
       - "front_clientes/src/services/api.js"
       - "front_clientes/src/pages/LoginPage.jsx"
       - "front_clientes/src/components/LoginScreen.jsx"
-      - "front_clientes/src/components/RegistroScreen.jsx"
-      - "front_clientes/src/components/RecuperarPassword.jsx"
       - "front_clientes/src/components/PerfilCliente.jsx"
       - "front_clientes/src/pages/PerfilPage.jsx"
     owns: ["login", "registro", "recuperar acceso", "perfil", "preferencias alimentarias", "preferencia de recordatorios por WhatsApp", "storage token/empleado"]

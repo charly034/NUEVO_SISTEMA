@@ -24,7 +24,8 @@
 - Ingresar con credenciales invalidas y confirmar mensaje visible de error.
 - Activar y desactivar visibilidad de contrasena con mouse y teclado.
 - Verificar que el checkbox de "Mantener sesion activa" conserve la sesion correcta.
-- Confirmar que un usuario autenticado no pueda volver a `/login`, `/registro` o `/recuperar`.
+- Confirmar que un usuario autenticado no pueda volver a `/iniciar-sesion`, `/crear-cuenta` o `/recuperar-acceso`.
+- Confirmar que los aliases `/login`, `/registro` y `/recuperar` redirijan a sus rutas canonicas.
 
 ### 2. Registro
 

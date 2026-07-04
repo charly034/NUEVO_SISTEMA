@@ -5,7 +5,8 @@ Rama de trabajo: codex/auditoria-limpieza-refactor
 Alcance ejecutado
 - Se reviso frontend admin (front_menu), frontend clientes (front_clientes) y backend (API_LA_QUINTA).
 - En la auditoria inicial no se eliminaron archivos; en Fase 1, aprobada por el usuario el 2026-07-04, se eliminaron 5 archivos frontend sin imports detectados.
-- No se modifico comportamiento visible.
+- En Fase 2, solicitada por el usuario el 2026-07-04, se corrigio el cableado de rutas auth cliente ya documentado y se eliminaron 4 archivos legacy asociados.
+- No se modifico comportamiento visible salvo la correccion documentada de rutas canonicas de registro y recuperacion.
 - No se tocaron reglas de negocio de pedidos, pagos ni notificaciones.
 - No se ejecuto ningun cambio sobre base de datos de produccion.
 
@@ -23,6 +24,24 @@ Fase 1 aplicada - limpieza segura de frontend
   - front_clientes npm run lint OK.
   - front_clientes npm run build OK.
   - front_clientes npm test fallo por timeout al iniciar workers threads de Vitest antes de ejecutar tests; reintento estable con npx vitest run --pool=threads --maxWorkers=1 OK, 5 archivos y 12 tests.
+
+Fase 2 aplicada - rutas auth cliente y limpieza legacy
+- Corregido: front_clientes/src/App.jsx ahora monta las rutas canonicas de autenticacion:
+  - /iniciar-sesion
+  - /crear-cuenta
+  - /recuperar-acceso
+- Corregido: front_clientes/src/pages/LoginPage.jsx acepta vistaInicial y mantiene la navegacion interna sincronizada con esas rutas.
+- Conservado: /login, /registro y /recuperar siguen existiendo como aliases de compatibilidad mediante rutasCompatibilidad.
+- Eliminado: front_clientes/src/pages/RegistroPage.jsx.
+- Eliminado: front_clientes/src/pages/RecuperarPage.jsx.
+- Eliminado: front_clientes/src/components/RegistroScreen.jsx.
+- Eliminado: front_clientes/src/components/RecuperarPassword.jsx.
+- Criterio: esos wrappers/componentes legacy no estaban montados por App.jsx; el flujo activo de login/registro/recuperacion vive en LoginPage.jsx y useLoginPage.js.
+- Validacion post-cambio:
+  - rg de referencias activas a RegistroPage/RecuperarPage/RegistroScreen/RecuperarPassword en front_clientes/src: sin resultados.
+  - front_clientes npm run lint OK.
+  - front_clientes npm run build OK.
+  - front_clientes npm test OK, 5 archivos y 12 tests.
 
 Validaciones ejecutadas
 - API_LA_QUINTA: npm run lint OK.
@@ -51,8 +70,6 @@ front_clientes
 - front_clientes/src/components/pedido/FilaPedidoDiaEditable.jsx
 - front_clientes/src/components/pedido/PedidoContainer.jsx
 - front_clientes/src/components/ui/Badge.jsx
-- front_clientes/src/pages/RecuperarPage.jsx
-- front_clientes/src/pages/RegistroPage.jsx
 
 Notas sobre falsos positivos
 - front_menu/src/main.jsx -> ./index.css y front_clientes/src/main.jsx -> ./index.css aparecen como imports relativos faltantes porque el script solo resolvio JS/JSX.
@@ -138,9 +155,7 @@ Dependencias desactualizadas, NO actualizadas
 - No se actualizo nada por consigna.
 
 Riesgos o bugs observados que requieren decision
-- front_clientes/src/routes/rutasCliente.js define rutas de auth crearCuenta (/crear-cuenta) y recuperarAcceso (/recuperar-acceso), y rutas de compatibilidad /registro y /recuperar redirigen hacia ellas.
-- front_clientes/src/App.jsx no monta rutas explicitas para /crear-cuenta ni /recuperar-acceso; en cambio LoginPage parece contener el flujo integrado. Revisar si las pages RegistroPage.jsx y RecuperarPage.jsx quedaron obsoletas o si falta montar esas rutas.
-- No se corrigio porque seria cambio visible de navegacion/autenticacion.
+- Resuelto en Fase 2: /crear-cuenta y /recuperar-acceso quedaron montadas en App.jsx mediante LoginPage.jsx, y /registro y /recuperar se mantienen como redirects de compatibilidad.
 
 Hechos verificados en repo
 - Lint pasa en API, admin y cliente.
@@ -149,7 +164,7 @@ Hechos verificados en repo
 - /api/v1/users y /api/v1/mis-sugerencias estan documentados en docs/ai como legacy/deuda o pendiente de decision.
 
 Inferencias razonables
-- RegistroPage.jsx, RecuperarPage.jsx y varios componentes de pedido cliente parecen restos de iteraciones anteriores.
+- Varios componentes de pedido cliente parecen restos de iteraciones anteriores.
 - motion y react-query-devtools parecen dependencias instaladas pero no usadas.
 - Unificar constantes financieras y modales puede reducir duplicacion, pero debe hacerse en una tarea separada con validacion funcional completa.
 
@@ -157,5 +172,5 @@ Dudas pendientes para el usuario
 - Aprobar o rechazar eliminacion de cada archivo candidato.
 - Confirmar si se conserva /api/v1/mis-sugerencias como feature separada.
 - Confirmar cuando se puede retirar /api/v1/users 410 Gone.
-- Confirmar si /registro y /recuperar deben existir como pantallas separadas o vivir solo dentro de LoginPage.
+- Confirmar el destino de los candidatos restantes de front_clientes antes de eliminarlos.
 - Confirmar si se acepta remover motion y @tanstack/react-query-devtools.

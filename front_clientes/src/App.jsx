@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "./hooks/useAuth.js";
+import { VISTAS_AUTENTICACION } from "./hooks/useLoginPage.js";
 import PrivateRoute from "./components/layout/PrivateRoute.jsx";
 import AppMobileShell from "./components/layout/AppMobileShell.jsx";
 import BottomNavigation from "./components/ui/BottomNavigation.jsx";
@@ -82,6 +83,28 @@ function RouteGuardSinNav({ empleado, checking, children }) {
   );
 }
 
+function AuthRoute({
+  checking,
+  empleado,
+  onLogin,
+  onSesionAutenticada,
+  vistaInicial,
+}) {
+  if (empleado && !checking) {
+    return <Navigate to={rutasCliente.inicio} replace />;
+  }
+
+  return (
+    <Suspense fallback={<FallbackRutaMobile />}>
+      <LoginPage
+        onLogin={onLogin}
+        onSesionAutenticada={onSesionAutenticada}
+        vistaInicial={vistaInicial}
+      />
+    </Suspense>
+  );
+}
+
 function AppRoutes() {
   const { empleado, login, logout, setSession, setAuthenticatedSession, checking } = useAuth();
 
@@ -109,16 +132,37 @@ function AppRoutes() {
       <Route
         path={rutasAutenticacion.iniciarSesion}
         element={
-          empleado && !checking ? (
-            <Navigate to={rutasCliente.inicio} replace />
-          ) : (
-            <Suspense fallback={<FallbackRutaMobile />}>
-              <LoginPage
-                onLogin={login}
-                onSesionAutenticada={setAuthenticatedSession}
-              />
-            </Suspense>
-          )
+          <AuthRoute
+            checking={checking}
+            empleado={empleado}
+            onLogin={login}
+            onSesionAutenticada={setAuthenticatedSession}
+            vistaInicial={VISTAS_AUTENTICACION.LOGIN}
+          />
+        }
+      />
+      <Route
+        path={rutasAutenticacion.crearCuenta}
+        element={
+          <AuthRoute
+            checking={checking}
+            empleado={empleado}
+            onLogin={login}
+            onSesionAutenticada={setAuthenticatedSession}
+            vistaInicial={VISTAS_AUTENTICACION.REGISTRO}
+          />
+        }
+      />
+      <Route
+        path={rutasAutenticacion.recuperarAcceso}
+        element={
+          <AuthRoute
+            checking={checking}
+            empleado={empleado}
+            onLogin={login}
+            onSesionAutenticada={setAuthenticatedSession}
+            vistaInicial={VISTAS_AUTENTICACION.RECUPERAR}
+          />
         }
       />
 
