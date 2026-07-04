@@ -8,6 +8,7 @@ Alcance ejecutado
 - En Fase 2, solicitada por el usuario el 2026-07-04, se corrigio el cableado de rutas auth cliente ya documentado y se eliminaron 4 archivos legacy asociados.
 - No se modifico comportamiento visible salvo la correccion documentada de rutas canonicas de registro y recuperacion.
 - En Fase 3, solicitada por el usuario el 2026-07-04, se eliminaron 6 archivos frontend cliente sin referencias activas.
+- En Fase 4, solicitada por el usuario el 2026-07-04, se removieron 2 dependencias frontend instaladas pero sin imports activos.
 - No se tocaron reglas de negocio de pedidos, pagos ni notificaciones.
 - No se ejecuto ningun cambio sobre base de datos de produccion.
 
@@ -58,6 +59,21 @@ Fase 3 aplicada - limpieza segura de codigo muerto cliente
   - front_clientes npm run lint OK.
   - front_clientes npm run build OK.
   - front_clientes npm test OK, 5 archivos y 12 tests.
+
+Fase 4 aplicada - dependencias frontend sin uso
+- Removido de front_clientes/package.json y package-lock.json: motion.
+- Removido de front_menu/package.json y package-lock.json: @tanstack/react-query-devtools.
+- Criterio: no habia imports activos en front_clientes/src ni front_menu/src; solo aparecian en package.json/package-lock.json.
+- No actualizado: xlsx se mantiene en front_menu por decision operativa documentada para exportar pedidos admin.
+- Validacion post-limpieza:
+  - rg de motion y @tanstack/react-query-devtools en src: sin resultados.
+  - front_clientes npm run lint OK.
+  - front_clientes npm run build OK.
+  - front_clientes npm test OK, 5 archivos y 12 tests.
+  - front_clientes npm audit --omit=dev OK, 0 vulnerabilidades.
+  - front_menu npm run lint OK.
+  - front_menu npm run build OK. Warning informativo PLUGIN_TIMINGS por vite:build-html/vite:css.
+  - front_menu npm audit --omit=dev sigue reportando xlsx high sin fix directo; deuda aceptada en docs/ai/60-debt.yaml.
 
 Validaciones ejecutadas
 - API_LA_QUINTA: npm run lint OK.
@@ -150,10 +166,10 @@ Credenciales y URLs sensibles
 - API_LA_QUINTA/src/config/env.js mantiene fallback dev para DB_PASSWORD y JWT_SECRET cuando NODE_ENV no es production; en production exige JWT_SECRET.
 - compose.yaml exige JWT_SECRET y POSTGRES_PASSWORD mediante expansion con error.
 
-Dependencias candidatas no usadas, NO removidas
-- front_menu: @tanstack/react-query-devtools aparece en package.json/package-lock, pero no se encontro import en src.
-- front_clientes: motion aparece en package.json/package-lock, pero no se encontro import en src.
-- No se removieron porque package-lock ya tenia cambios previos sin commitear y porque cualquier uninstall debe validarse con build.
+Dependencias candidatas no usadas
+- Resuelto en Fase 4: front_menu ya no incluye @tanstack/react-query-devtools.
+- Resuelto en Fase 4: front_clientes ya no incluye motion.
+- No se removieron dependencias adicionales en esta fase.
 
 Dependencias desactualizadas, NO actualizadas
 - API_LA_QUINTA: dotenv 17.x, express 5.x, express-rate-limit 8.x, helmet 8.x, node-pg-migrate 8.x, zod 4.x y eslint 10.x aparecen como latest disponibles. Varios son majors y requieren migracion.
@@ -173,7 +189,7 @@ Hechos verificados en repo
 Inferencias razonables
 - Varios componentes de pedido cliente parecen restos de iteraciones anteriores.
 - El candidato restante PerfilCliente.jsx no se borro por tener cambios ajenos activos.
-- motion y react-query-devtools parecen dependencias instaladas pero no usadas.
+- motion y react-query-devtools fueron removidas en Fase 4.
 - Unificar constantes financieras y modales puede reducir duplicacion, pero debe hacerse en una tarea separada con validacion funcional completa.
 
 Dudas pendientes para el usuario
@@ -181,4 +197,4 @@ Dudas pendientes para el usuario
 - Confirmar si se conserva /api/v1/mis-sugerencias como feature separada.
 - Confirmar cuando se puede retirar /api/v1/users 410 Gone.
 - Confirmar el destino de los candidatos restantes de front_clientes antes de eliminarlos.
-- Confirmar si se acepta remover motion y @tanstack/react-query-devtools.
+- No quedan dependencias candidatas no usadas confirmadas por esta auditoria.
