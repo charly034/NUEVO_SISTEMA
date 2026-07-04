@@ -4,10 +4,25 @@ Rama de trabajo: codex/auditoria-limpieza-refactor
 
 Alcance ejecutado
 - Se reviso frontend admin (front_menu), frontend clientes (front_clientes) y backend (API_LA_QUINTA).
-- No se eliminaron archivos.
+- En la auditoria inicial no se eliminaron archivos; en Fase 1, aprobada por el usuario el 2026-07-04, se eliminaron 5 archivos frontend sin imports detectados.
 - No se modifico comportamiento visible.
 - No se tocaron reglas de negocio de pedidos, pagos ni notificaciones.
 - No se ejecuto ningun cambio sobre base de datos de produccion.
+
+Fase 1 aplicada - limpieza segura de frontend
+- Eliminado: front_menu/src/components/ui/StatCard.jsx.
+- Eliminado: front_menu/src/components/ui/Toast.jsx.
+- Eliminado: front_clientes/src/components/ui/BotonIcono.jsx.
+- Eliminado: front_clientes/src/components/ui/IndicadoresCarrusel.jsx.
+- Eliminado: front_clientes/src/components/pedido/ResumenSeleccionDia.jsx.
+- Criterio: archivos aprobados por el usuario para Fase 1 y sin imports detectados desde front_menu/src o front_clientes/src antes de borrar.
+- Validacion post-limpieza:
+  - rg de nombres/imports eliminados en front_menu/src y front_clientes/src: sin referencias.
+  - front_menu npm run lint OK.
+  - front_menu npm run build OK. Warning informativo PLUGIN_TIMINGS por vite:css.
+  - front_clientes npm run lint OK.
+  - front_clientes npm run build OK.
+  - front_clientes npm test fallo por timeout al iniciar workers threads de Vitest antes de ejecutar tests; reintento estable con npx vitest run --pool=threads --maxWorkers=1 OK, 5 archivos y 12 tests.
 
 Validaciones ejecutadas
 - API_LA_QUINTA: npm run lint OK.
@@ -22,12 +37,11 @@ Validaciones ejecutadas
 - front_menu: npm audit --omit=dev reporta xlsx 0.18.5 con 1 vulnerabilidad high, sin fix directo disponible. Esta deuda ya figura aceptada en docs/ai/60-debt.yaml por requerimiento operativo de exportar XLSX.
 - npm outdated ejecutado en las tres apps; no se actualizaron paquetes.
 
-Frontend - codigo muerto candidato, NO eliminado
+Frontend - codigo muerto candidato restante, NO eliminado
 Los siguientes archivos aparecen como no importados por el grafo estatico de imports relativos. Deben revisarse manualmente antes de borrar:
 
 front_menu
-- front_menu/src/components/ui/StatCard.jsx
-- front_menu/src/components/ui/Toast.jsx
+- Sin candidatos restantes de la primera tanda aprobada.
 
 front_clientes
 - front_clientes/src/compartido/ui/Badge.jsx
@@ -36,10 +50,7 @@ front_clientes
 - front_clientes/src/components/layout/BottomNav.jsx
 - front_clientes/src/components/pedido/FilaPedidoDiaEditable.jsx
 - front_clientes/src/components/pedido/PedidoContainer.jsx
-- front_clientes/src/components/pedido/ResumenSeleccionDia.jsx
 - front_clientes/src/components/ui/Badge.jsx
-- front_clientes/src/components/ui/BotonIcono.jsx
-- front_clientes/src/components/ui/IndicadoresCarrusel.jsx
 - front_clientes/src/pages/RecuperarPage.jsx
 - front_clientes/src/pages/RegistroPage.jsx
 
@@ -62,8 +73,7 @@ Frontend - duplicaciones y refactors propuestos, NO aplicados
 - Hay patrones de toast duplicados en admin:
   - front_menu/src/lib/toast.js
   - front_menu/src/lib/confirm.js
-  - front_menu/src/components/ui/Toast.jsx aparece no usado.
-  Recomendacion: decidir si se conserva SweetAlert como sistema canonico o si se monta ToastContainer.
+  Recomendacion: decidir si se conserva SweetAlert como sistema canonico; el ToastContainer no usado fue eliminado en Fase 1.
 
 Frontend - consistencia de loading/error
 - front_clientes usa React Query en varios flujos, con loading/error propios por pantalla.
@@ -135,11 +145,11 @@ Riesgos o bugs observados que requieren decision
 Hechos verificados en repo
 - Lint pasa en API, admin y cliente.
 - Audit productivo solo reporta xlsx en admin.
-- Los archivos listados como candidatos no tienen imports relativos detectados desde src.
+- Los 5 archivos eliminados en Fase 1 no tenian imports relativos detectados desde src antes de borrar.
 - /api/v1/users y /api/v1/mis-sugerencias estan documentados en docs/ai como legacy/deuda o pendiente de decision.
 
 Inferencias razonables
-- StatCard.jsx, Toast.jsx, RegistroPage.jsx, RecuperarPage.jsx y varios componentes de pedido cliente parecen restos de iteraciones anteriores.
+- RegistroPage.jsx, RecuperarPage.jsx y varios componentes de pedido cliente parecen restos de iteraciones anteriores.
 - motion y react-query-devtools parecen dependencias instaladas pero no usadas.
 - Unificar constantes financieras y modales puede reducir duplicacion, pero debe hacerse en una tarea separada con validacion funcional completa.
 
