@@ -7,6 +7,7 @@ Alcance ejecutado
 - En la auditoria inicial no se eliminaron archivos; en Fase 1, aprobada por el usuario el 2026-07-04, se eliminaron 5 archivos frontend sin imports detectados.
 - En Fase 2, solicitada por el usuario el 2026-07-04, se corrigio el cableado de rutas auth cliente ya documentado y se eliminaron 4 archivos legacy asociados.
 - No se modifico comportamiento visible salvo la correccion documentada de rutas canonicas de registro y recuperacion.
+- En Fase 3, solicitada por el usuario el 2026-07-04, se eliminaron 6 archivos frontend cliente sin referencias activas.
 - No se tocaron reglas de negocio de pedidos, pagos ni notificaciones.
 - No se ejecuto ningun cambio sobre base de datos de produccion.
 
@@ -43,6 +44,21 @@ Fase 2 aplicada - rutas auth cliente y limpieza legacy
   - front_clientes npm run build OK.
   - front_clientes npm test OK, 5 archivos y 12 tests.
 
+Fase 3 aplicada - limpieza segura de codigo muerto cliente
+- Eliminado: front_clientes/src/compartido/ui/Badge.jsx.
+- Eliminado: front_clientes/src/components/HistorialPedidos.jsx.
+- Eliminado: front_clientes/src/components/layout/BottomNav.jsx.
+- Eliminado: front_clientes/src/components/pedido/FilaPedidoDiaEditable.jsx.
+- Eliminado: front_clientes/src/components/pedido/PedidoContainer.jsx.
+- Eliminado: front_clientes/src/components/ui/Badge.jsx.
+- No eliminado: front_clientes/src/components/PerfilCliente.jsx, porque tenia cambios ajenos activos en el working tree.
+- Criterio: los 6 archivos borrados no tenian imports activos en front_clientes/src; las referencias restantes eran documentacion o la propia auditoria.
+- Validacion post-limpieza:
+  - rg de referencias activas a Badge/HistorialPedidos/BottomNav/FilaPedidoDiaEditable/PedidoContainer en front_clientes/src: sin resultados.
+  - front_clientes npm run lint OK.
+  - front_clientes npm run build OK.
+  - front_clientes npm test OK, 5 archivos y 12 tests.
+
 Validaciones ejecutadas
 - API_LA_QUINTA: npm run lint OK.
 - API_LA_QUINTA: npm test OK, 49 tests.
@@ -63,13 +79,7 @@ front_menu
 - Sin candidatos restantes de la primera tanda aprobada.
 
 front_clientes
-- front_clientes/src/compartido/ui/Badge.jsx
-- front_clientes/src/components/HistorialPedidos.jsx
 - front_clientes/src/components/PerfilCliente.jsx
-- front_clientes/src/components/layout/BottomNav.jsx
-- front_clientes/src/components/pedido/FilaPedidoDiaEditable.jsx
-- front_clientes/src/components/pedido/PedidoContainer.jsx
-- front_clientes/src/components/ui/Badge.jsx
 
 Notas sobre falsos positivos
 - front_menu/src/main.jsx -> ./index.css y front_clientes/src/main.jsx -> ./index.css aparecen como imports relativos faltantes porque el script solo resolvio JS/JSX.
@@ -77,10 +87,7 @@ Notas sobre falsos positivos
 - Migraciones y seeds del backend aparecen como no importados en un grafo JS normal, pero son entrypoints de node-pg-migrate o scripts y no son candidatos de borrado por ese criterio.
 
 Frontend - duplicaciones y refactors propuestos, NO aplicados
-- Hay dos componentes Badge distintos en front_clientes:
-  - front_clientes/src/compartido/ui/Badge.jsx
-  - front_clientes/src/components/ui/Badge.jsx
-  Recomendacion: confirmar cual es el sistema canonico antes de unificar, porque cambian tonos/tamanos.
+- Resuelto en Fase 3: los dos componentes Badge sin imports activos en front_clientes fueron eliminados.
 - METODOS_PAGO esta duplicado en:
   - front_menu/src/pages/PedidosPagos.jsx
   - front_menu/src/components/finanzas/CuentaCorrienteFicha.jsx
@@ -165,6 +172,7 @@ Hechos verificados en repo
 
 Inferencias razonables
 - Varios componentes de pedido cliente parecen restos de iteraciones anteriores.
+- El candidato restante PerfilCliente.jsx no se borro por tener cambios ajenos activos.
 - motion y react-query-devtools parecen dependencias instaladas pero no usadas.
 - Unificar constantes financieras y modales puede reducir duplicacion, pero debe hacerse en una tarea separada con validacion funcional completa.
 

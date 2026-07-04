@@ -114,7 +114,7 @@ La app cliente usa React 19, React Router 7, Tailwind 4, Vitest y Playwright.
 Pantallas/componentes relevantes:
 
 - Login, registro, recuperar password, perfil e historial.
-- `PedidoContainer`: contenedor del pedido semanal.
+- `PedidoPage` y `usePedidoSemanal`: pantalla y orquestador del pedido semanal.
 - `SemanaContainer` y tarjetas de semana.
 - Componentes de seleccion de platos, guarniciones, resumen y confirmacion.
 - Hooks para auth, semanas, opciones de menu y seleccion diaria.
@@ -123,9 +123,7 @@ Cambios actuales sin commit detectados el 2026-06-27:
 
 - `front_clientes/src/components/layout/PrivateRoute.jsx`
   - Se reemplazo el texto plano de verificacion por una pantalla de carga mobile usando `AppMobileShell` y `BottomNavigation`.
-- `front_clientes/src/components/pedido/PedidoContainer.jsx`
-  - Se agrego `SkeletonPedidoSemanal`.
-  - Mientras `cargando` esta activo, no se monta `SemanaContainer`.
+- El contenedor legacy `front_clientes/src/components/pedido/PedidoContainer.jsx` fue eliminado en la auditoria de limpieza del 2026-07-04; el flujo activo vive en `front_clientes/src/pages/PedidoPage.jsx` y `front_clientes/src/hooks/usePedidoSemanal.js`.
 - `front_clientes/src/components/pedido/SemanaPedidoCard.jsx`
   - `ConfirmacionPedido` paso a cargarse con `lazy` y `Suspense`.
 - `front_clientes/src/services/menuService.js`
@@ -196,7 +194,6 @@ Archivos modificados sin commit:
 
 ```text
 front_clientes/src/components/layout/PrivateRoute.jsx
-front_clientes/src/components/pedido/PedidoContainer.jsx
 front_clientes/src/components/pedido/SemanaPedidoCard.jsx
 front_clientes/src/services/menuService.js
 ```
