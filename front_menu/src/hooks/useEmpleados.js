@@ -17,6 +17,14 @@ export const useCreateEmpleado = () => {
   });
 };
 
+export const useImportarEmpleados = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/empleados/importar', data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+};
+
 export const useUpdateEmpleado = () => {
   const qc = useQueryClient();
   return useMutation({

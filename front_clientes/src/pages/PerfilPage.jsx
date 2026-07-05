@@ -183,7 +183,7 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
           />
           <FilaConfig
             label="Plan"
-            sublabel={empleado?.empresa?.plan || empleado?.plan || 'basico'}
+            sublabel={empleado?.empresa?.plan_detalle?.nombre || empleado?.empresa?.plan_nombre || empleado?.empresa?.plan || empleado?.plan || 'basico'}
             right={<span />}
           />
           <FilaConfig

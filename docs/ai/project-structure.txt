@@ -76,6 +76,7 @@
 |       |   response, asyncHandler, ApiError, fecha.
 |       `-- modules/
 |           |-- admin-auth/
+|           |-- admin-auditoria/
 |           |-- auth/
 |           |-- empleados/
 |           |-- empresas/
@@ -85,6 +86,7 @@
 |           |-- menu/
 |           |-- menus-semanales/
 |           |-- pedidos/
+|           |-- planes/
 |           |-- platos/
 |           |-- sugerencias/
 |           |-- notificaciones/
@@ -109,13 +111,14 @@
 |       |-- components/
 |       |   Layout, UI, forms y login admin.
 |       |-- hooks/
-|       |   Hooks por dominio admin.
+|       |   Hooks por dominio admin, incluyendo useFinanzas para /api/v1/finanzas.
 |       |-- lib/
 |       |   apiClient, confirm, queryClient, toast.
 |       |-- pages/
 |       |   Dashboard, Platos, Semanas, SemanaDetalle, Historial, Estadisticas,
-|       |   Sugeridor, PedidosAdmin, PedidosHoy, NotificacionesAdmin, Empresas,
-|       |   Guarniciones, Administradores.
+|       |   Sugeridor, PedidosAdmin, PedidosHoy, Clientes, PedidosPagos,
+|       |   NotificacionesAdmin, Empresas, Guarniciones, Auditoria, Administradores.
+|       |   Clientes centraliza Empresas, PedidosPagos y NotificacionesAdmin; Empresas tambien administra planes de vianda.
 |       `-- services/
 |
 `-- front_clientes/

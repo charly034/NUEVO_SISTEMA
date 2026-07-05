@@ -224,24 +224,24 @@ function crearSemanaPlaceholder({ semanaInicio, diasLaborales }) {
   };
 }
 
-function crearSugerenciasSemana({ diasLaborales }) {
+function crearSugerenciasSemana({ diasLaborales, opcionesSugerencia = [] }) {
   const dias = getDiasSemana(diasLaborales);
-  const sugerenciasBase = [
-    "Milanesa con puré de papas",
-    "Tarta de verduras con ensalada",
-    "Wok de pollo con arroz",
-    "Ravioles con salsa fileto",
-    "Hamburguesa casera con vegetales",
-    "Pastel de papa",
-    "Pollo al horno con calabaza",
-  ];
+  const opciones = opcionesSugerencia
+    .map((opcion) => ({
+      id: opcion.plato_id || opcion.id,
+      plato: opcion.plato_nombre || opcion.nombre || opcion.plato,
+    }))
+    .filter((opcion) => opcion.plato);
 
-  return dias.slice(0, 3).map((dia, indice) => ({
-    dia: DIAS_LABEL[dia] || dia,
-    plato: sugerenciasBase[indice % sugerenciasBase.length],
-  }));
+  return opciones.slice(0, Math.max(dias.length, 1)).map((opcion, indice) => {
+    const dia = dias[indice % Math.max(dias.length, 1)] || "lunes";
+    return {
+      id: opcion.id,
+      dia: DIAS_LABEL[dia] || dia,
+      plato: opcion.plato,
+    };
+  });
 }
-
 function construirMapas({ menusDisponibles, historial }) {
   const menusPorSemana = new Map(
     menusDisponibles
@@ -392,8 +392,10 @@ export function adaptarSemanasPedido({
       sugerencias: esSemanaSugerencias
         ? crearSugerenciasSemana({
             diasLaborales: menuSemana.dias_laborales || diasLaborales,
+            opcionesSugerencia: menuSemana.opcionesSugerencia || menuSemana.opciones_sugerencia || [],
           })
         : [],
+      opcionesSugerencia: menuSemana.opcionesSugerencia || menuSemana.opciones_sugerencia || [],
       metadata: {
         semanaInicio,
         menuSemana,

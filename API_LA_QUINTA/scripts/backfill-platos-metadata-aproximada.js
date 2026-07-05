@@ -77,36 +77,43 @@ function categoria(nombre, tags = []) {
   return 'casero';
 }
 
-function descripcion(nombre, tags = []) {
-  const tipo = categoria(nombre, tags);
-  const textos = {
-    pollo: `Plato casero a base de pollo, pensado como vianda completa y de sabor suave.`,
-    carne: `Preparacion casera con carne, de perfil contundente y acompanamiento integrado.`,
-    cerdo: `Plato principal con cerdo, coccion sabrosa y porcion de vianda completa.`,
-    pescado: `Opcion con pescado, liviana y apta para alternar proteinas durante la semana.`,
-    pasta: `Pasta o preparacion al horno con salsa, pensada como plato principal.`,
-    tarta: `Preparacion de tarta o masa horneada con relleno salado y guarnicion integrada.`,
-    guiso: `Comida de olla, abundante y rendidora, con salsa o fondo de coccion.`,
-    vegetariano: `Opcion vegetariana con verduras, legumbres o queso segun la preparacion.`,
-    casero: `Plato casero de vianda, preparado para servicio semanal.`,
-  };
-  return textos[tipo];
+const DESCRIPCIONES_PLACEHOLDER = [
+  'Plato casero a base de pollo, pensado como vianda completa y de sabor suave.',
+  'Preparacion casera con carne, de perfil contundente y acompanamiento integrado.',
+  'Plato principal con cerdo, coccion sabrosa y porcion de vianda completa.',
+  'Opcion con pescado, liviana y apta para alternar proteinas durante la semana.',
+  'Pasta o preparacion al horno con salsa, pensada como plato principal.',
+  'Preparacion de tarta o masa horneada con relleno salado y guarnicion integrada.',
+  'Comida de olla, abundante y rendidora, con salsa o fondo de coccion.',
+  'Opcion vegetariana con verduras, legumbres o queso segun la preparacion.',
+  'Plato casero de vianda, preparado para servicio semanal.',
+];
+
+const DESCRIPCIONES_LARGAS_PLACEHOLDER = [
+  'Preparacion aproximada: condimentar el pollo, cocinar al horno o en salsa hasta que quede tierno y completar con la guarnicion indicada en el nombre del plato.',
+  'Preparacion aproximada: dorar la carne, sumar vegetales o salsa base y cocinar hasta lograr una textura tierna; servir con el acompanamiento indicado.',
+  'Preparacion aproximada: marinar o condimentar el cerdo, cocinar al horno o braseado y acompanar con pure, papas o verduras segun corresponda.',
+  'Preparacion aproximada: cocinar el pescado al horno o plancha con condimentos suaves y acompanar con pure, arroz o ensalada segun el plato.',
+  'Preparacion aproximada: hervir o armar la pasta, rellenar si aplica, cubrir con salsa y terminar al horno cuando corresponda.',
+  'Preparacion aproximada: preparar el relleno salado, colocarlo sobre masa de tarta y hornear hasta dorar; acompanar con ensalada o pure si el plato lo indica.',
+  'Preparacion aproximada: saltear una base de vegetales, incorporar proteina o legumbres, cubrir con caldo o salsa y cocinar lentamente hasta integrar sabores.',
+  'Preparacion aproximada: cocinar las verduras o legumbres, condimentar y combinar con queso, arroz, masa o guarnicion segun el plato.',
+  'Preparacion aproximada: elaborar con tecnica casera tradicional y ajustar guarnicion, salsa y porcion al formato de vianda.',
+];
+
+function normalizarPlaceholder(texto) {
+  return String(texto || '').trim().replace(/\s+/g, ' ');
 }
 
-function receta(nombre, tags = []) {
-  const tipo = categoria(nombre, tags);
-  const textos = {
-    pollo: `Preparacion aproximada: condimentar el pollo, cocinar al horno o en salsa hasta que quede tierno y completar con la guarnicion indicada en el nombre del plato.`,
-    carne: `Preparacion aproximada: dorar la carne, sumar vegetales o salsa base y cocinar hasta lograr una textura tierna; servir con el acompanamiento indicado.`,
-    cerdo: `Preparacion aproximada: marinar o condimentar el cerdo, cocinar al horno o braseado y acompanar con pure, papas o verduras segun corresponda.`,
-    pescado: `Preparacion aproximada: cocinar el pescado al horno o plancha con condimentos suaves y acompanar con pure, arroz o ensalada segun el plato.`,
-    pasta: `Preparacion aproximada: hervir o armar la pasta, rellenar si aplica, cubrir con salsa y terminar al horno cuando corresponda.`,
-    tarta: `Preparacion aproximada: preparar el relleno salado, colocarlo sobre masa de tarta y hornear hasta dorar; acompanar con ensalada o pure si el plato lo indica.`,
-    guiso: `Preparacion aproximada: saltear una base de vegetales, incorporar proteina o legumbres, cubrir con caldo o salsa y cocinar lentamente hasta integrar sabores.`,
-    vegetariano: `Preparacion aproximada: cocinar las verduras o legumbres, condimentar y combinar con queso, arroz, masa o guarnicion segun el plato.`,
-    casero: `Preparacion aproximada: elaborar con tecnica casera tradicional y ajustar guarnicion, salsa y porcion al formato de vianda.`,
-  };
-  return textos[tipo];
+const DESCRIPCIONES_PLACEHOLDER_SET = new Set(DESCRIPCIONES_PLACEHOLDER.map(normalizarPlaceholder));
+const DESCRIPCIONES_LARGAS_PLACEHOLDER_SET = new Set(DESCRIPCIONES_LARGAS_PLACEHOLDER.map(normalizarPlaceholder));
+
+export function esDescripcionPlaceholder(texto) {
+  return DESCRIPCIONES_PLACEHOLDER_SET.has(normalizarPlaceholder(texto));
+}
+
+export function esDescripcionLargaPlaceholder(texto) {
+  return DESCRIPCIONES_LARGAS_PLACEHOLDER_SET.has(normalizarPlaceholder(texto));
 }
 
 function ejecutar(db, text, params) {
@@ -116,8 +123,8 @@ function ejecutar(db, text, params) {
 
 export function metadataParaPlato(nombre, tags = []) {
   return {
-    descripcion: descripcion(nombre, tags),
-    descripcion_larga: receta(nombre, tags),
+    descripcion: null,
+    descripcion_larga: null,
     calorias: estimarKcal(nombre, tags),
     alergenos: estimarAlergenos(nombre, tags),
     vegetariano: esVegetariano(nombre, tags),
@@ -126,7 +133,7 @@ export function metadataParaPlato(nombre, tags = []) {
 
 export async function actualizarMetadataPlatos(db = query) {
   const { rows: platos } = await ejecutar(db, `
-    SELECT id, nombre, tags
+    SELECT id, nombre, tags, descripcion, descripcion_larga
     FROM platos
     ORDER BY id
   `);
@@ -135,6 +142,8 @@ export async function actualizarMetadataPlatos(db = query) {
   for (const plato of platos) {
     const tags = Array.isArray(plato.tags) ? plato.tags : [];
     const metadata = metadataParaPlato(plato.nombre, tags);
+    const descripcion = esDescripcionPlaceholder(plato.descripcion) ? null : plato.descripcion;
+    const descripcionLarga = esDescripcionLargaPlaceholder(plato.descripcion_larga) ? null : plato.descripcion_larga;
 
     await ejecutar(
       db,
@@ -147,8 +156,8 @@ export async function actualizarMetadataPlatos(db = query) {
            updated_at = NOW()
        WHERE id = $6`,
       [
-        metadata.descripcion,
-        metadata.descripcion_larga,
+        descripcion,
+        descripcionLarga,
         metadata.calorias,
         metadata.alergenos,
         metadata.vegetariano,

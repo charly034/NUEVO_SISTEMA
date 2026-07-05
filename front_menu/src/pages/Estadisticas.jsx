@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useResumen, usePlatosmasUsados, useDistribucionTags, useUsoPorDia, useTendencia, useTopPorDia } from '../hooks/useEstadisticas.js';
+import { useEmpresas } from '../hooks/useEmpresas.js';
 import Spinner from '../components/ui/Spinner.jsx';
 
 const MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -24,6 +26,37 @@ function Barra({ value, max, color = 'bg-brand-500' }) {
       <div className={`${color} h-2 rounded-full`} style={{ width: `${pct}%`, transition: 'width 0.6s ease' }} />
     </div>
   );
+}
+
+function LoadingBlock({ label = 'Cargando datos...' }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500">
+      <Spinner />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function EmptyState({ title, detail }) {
+  return (
+    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+      <p className="text-sm font-semibold text-gray-700">{title}</p>
+      {detail && <p className="mt-1 text-xs text-gray-400">{detail}</p>}
+    </div>
+  );
+}
+
+function UpdatingBadge({ show }) {
+  if (!show) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600">
+      <Spinner size="sm" /> Actualizando...
+    </span>
+  );
+}
+
+function esFechaIso(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value || '');
 }
 
 // ── Resumen cards ────────────────────────────────────────────────
@@ -56,13 +89,18 @@ function SeccionResumen() {
 
 // ── Top platos ───────────────────────────────────────────────────
 function SeccionTopPlatos({ filtros }) {
-  const { data = [], isLoading } = usePlatosmasUsados({ limit: 15, ...filtros });
+  const { data = [], isLoading, isFetching } = usePlatosmasUsados({ limit: 15, ...filtros });
   const max = data[0]?.usos ?? 1;
 
   return (
     <div className="card p-5">
-      <h2 className="font-semibold text-gray-900 mb-4">Platos más repetidos</h2>
-      {isLoading ? <div className="flex justify-center py-8"><Spinner /></div> : (
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="font-semibold text-gray-900">Platos más repetidos</h2>
+        <UpdatingBadge show={isFetching && !isLoading} />
+      </div>
+      {isLoading ? <LoadingBlock label="Cargando platos mas repetidos..." /> : data.length === 0 ? (
+        <EmptyState title="Sin platos repetidos para este filtro" detail="Proba ampliar el periodo o quitar filtros de empresa." />
+      ) : (
         <div className="space-y-3">
           {data.map((p, i) => (
             <div key={p.id} className="flex items-center gap-3">
@@ -87,14 +125,19 @@ function SeccionTopPlatos({ filtros }) {
 
 // ── Distribución por categoría ───────────────────────────────────
 function SeccionTags({ filtros }) {
-  const { data = [], isLoading } = useDistribucionTags(filtros);
+  const { data = [], isLoading, isFetching } = useDistribucionTags(filtros);
   const max = data[0]?.usos ?? 1;
   const total = data.reduce((s, d) => s + d.usos, 0);
 
   return (
     <div className="card p-5">
-      <h2 className="font-semibold text-gray-900 mb-4">Distribución por categoría</h2>
-      {isLoading ? <div className="flex justify-center py-8"><Spinner /></div> : (
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="font-semibold text-gray-900">Distribución por categoría</h2>
+        <UpdatingBadge show={isFetching && !isLoading} />
+      </div>
+      {isLoading ? <LoadingBlock label="Cargando distribucion por categoria..." /> : data.length === 0 ? (
+        <EmptyState title="Sin categorias para este filtro" detail="No hay usos registrados con el periodo y empresa seleccionados." />
+      ) : (
         <div className="space-y-2.5">
           {data.map(({ tag, usos }) => (
             <div key={tag} className="flex items-center gap-3">
@@ -114,9 +157,9 @@ function SeccionTags({ filtros }) {
 }
 
 // ── Uso por día + top platos por día ─────────────────────────────
-function SeccionPorDia() {
-  const { data: resumenDia = [], isLoading: loadingRes } = useUsoPorDia();
-  const { data: topPorDia = {}, isLoading: loadingTop }  = useTopPorDia();
+function SeccionPorDia({ filtros }) {
+  const { data: resumenDia = [], isLoading: loadingRes, isFetching: fetchingRes } = useUsoPorDia(filtros);
+  const { data: topPorDia = {}, isLoading: loadingTop, isFetching: fetchingTop }  = useTopPorDia();
   const [diaActivo, setDiaActivo] = useState(null);
 
   const max = Math.max(...resumenDia.map(d => d.usos), 1);
@@ -124,11 +167,16 @@ function SeccionPorDia() {
 
   return (
     <div className="card p-5">
-      <h2 className="font-semibold text-gray-900 mb-1">Usos por día de la semana</h2>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h2 className="font-semibold text-gray-900">Usos por día de la semana</h2>
+        <UpdatingBadge show={(fetchingRes || fetchingTop) && !loadingRes && !loadingTop} />
+      </div>
       <p className="text-xs text-gray-400 mb-4">Hacé click en un día para ver los platos más servidos ese día</p>
 
       {/* Gráfico de barras */}
-      {loadingRes ? <div className="flex justify-center py-6"><Spinner /></div> : (
+      {loadingRes ? <LoadingBlock label="Cargando usos por dia..." /> : resumenDia.length === 0 ? (
+        <EmptyState title="Sin usos por dia para este filtro" detail="No hay datos suficientes para graficar el periodo seleccionado." />
+      ) : (
         <div className="flex items-end gap-2 h-28 mb-3">
           {resumenDia.map(({ dia, usos }) => {
             const pct = Math.round((usos / max) * 100);
@@ -136,8 +184,11 @@ function SeccionPorDia() {
             return (
               <button
                 key={dia}
+                type="button"
                 onClick={() => setDiaActivo(activo ? null : dia)}
-                className="flex-1 flex flex-col items-center gap-1 group"
+                aria-label={`${activo ? 'Ocultar' : 'Ver'} top de platos de ${DIAS_FULL[dia]}: ${usos} usos`}
+                title={`${DIAS_FULL[dia]}: ${usos} usos`}
+                className="flex-1 flex flex-col items-center gap-1 group rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
               >
                 <span className={`text-xs font-bold transition-colors ${activo ? 'text-brand-700' : 'text-gray-700'}`}>{usos}</span>
                 <div
@@ -159,10 +210,10 @@ function SeccionPorDia() {
           <p className="text-sm font-semibold text-gray-800 mb-3">
             Top platos los <span className="text-brand-700">{DIAS_FULL[diaActivo]}</span>
           </p>
-          {loadingTop ? <div className="flex justify-center py-4"><Spinner /></div> : (
+          {loadingTop ? <LoadingBlock label="Cargando top del dia..." /> : (
             <div className="space-y-2">
               {topDia.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-3">Sin datos</p>
+                <EmptyState title={`Sin platos para ${DIAS_FULL[diaActivo]}`} detail="El filtro actual no tiene usos para este dia." />
               ) : topDia.map((p, i) => (
                 <div key={p.id} className="flex items-center gap-3">
                   <span className="text-xs font-bold text-gray-300 w-4 text-right flex-shrink-0">{i + 1}</span>
@@ -187,14 +238,19 @@ function SeccionPorDia() {
 }
 
 // ── Tendencia mensual ────────────────────────────────────────────
-function SeccionTendencia() {
-  const { data = [], isLoading } = useTendencia();
+function SeccionTendencia({ filtros }) {
+  const { data = [], isLoading, isFetching } = useTendencia(filtros);
   const max = Math.max(...data.map(d => d.usos), 1);
 
   return (
     <div className="card p-5">
-      <h2 className="font-semibold text-gray-900 mb-4">Tendencia mensual</h2>
-      {isLoading ? <div className="flex justify-center py-6"><Spinner /></div> : (
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="font-semibold text-gray-900">Tendencia mensual</h2>
+        <UpdatingBadge show={isFetching && !isLoading} />
+      </div>
+      {isLoading ? <LoadingBlock label="Cargando tendencia mensual..." /> : data.length === 0 ? (
+        <EmptyState title="Sin tendencia mensual para este filtro" detail="No hay meses con usos registrados en la seleccion actual." />
+      ) : (
         <div className="space-y-2">
           {data.map(({ mes, usos, platos_distintos }) => {
             const [, m] = mes.split('-');
@@ -217,7 +273,30 @@ function SeccionTendencia() {
 
 // ── Página ───────────────────────────────────────────────────────
 export default function Estadisticas() {
-  const [filtros] = useState({});
+  const [searchParams] = useSearchParams();
+  const desdeUrl = searchParams.get('desde');
+  const hastaUrl = searchParams.get('hasta');
+  const tienePeriodoUrl = esFechaIso(desdeUrl) || esFechaIso(hastaUrl);
+  const { data: empresas = [] } = useEmpresas();
+  const [periodo, setPeriodo] = useState(tienePeriodoUrl ? 'custom' : '90');
+  const [empresaId, setEmpresaId] = useState('');
+  const [custom, setCustom] = useState({
+    desde: esFechaIso(desdeUrl) ? desdeUrl : '',
+    hasta: esFechaIso(hastaUrl) ? hastaUrl : '',
+  });
+
+  const hoy = new Date();
+  const filtros = {};
+  if (empresaId) filtros.empresa_id = empresaId;
+  if (periodo === 'custom') {
+    if (custom.desde) filtros.desde = custom.desde;
+    if (custom.hasta) filtros.hasta = custom.hasta;
+  } else if (periodo !== 'todo') {
+    const desde = new Date(hoy);
+    desde.setDate(hoy.getDate() - Number(periodo));
+    filtros.desde = desde.toISOString().split('T')[0];
+    filtros.hasta = hoy.toISOString().split('T')[0];
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
@@ -226,16 +305,46 @@ export default function Estadisticas() {
         <p className="text-sm text-gray-400 mt-0.5">Analizá el uso y rotación del menú</p>
       </div>
 
+      <div className="card p-4">
+        <div className="grid gap-3 md:grid-cols-4">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Período</span>
+            <select value={periodo} onChange={(event) => setPeriodo(event.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <option value="30">Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+              <option value="180">Últimos 180 días</option>
+              <option value="todo">Todo</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Empresa</span>
+            <select value={empresaId} onChange={(event) => setEmpresaId(event.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <option value="">Todas</option>
+              {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Desde</span>
+            <input type="date" disabled={periodo !== 'custom'} value={custom.desde} onChange={(event) => setCustom((prev) => ({ ...prev, desde: event.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Hasta</span>
+            <input type="date" disabled={periodo !== 'custom'} value={custom.hasta} onChange={(event) => setCustom((prev) => ({ ...prev, hasta: event.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50" />
+          </label>
+        </div>
+      </div>
+
       <SeccionResumen />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <SeccionPorDia />
+        <SeccionPorDia filtros={filtros} />
         <SeccionTags filtros={filtros} />
       </div>
 
       <SeccionTopPlatos filtros={filtros} />
 
-      <SeccionTendencia />
+      <SeccionTendencia filtros={filtros} />
     </div>
   );
 }

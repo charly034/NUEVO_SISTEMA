@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { z } from 'zod';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import { useEmpleados } from '../hooks/useEmpleados.js';
 import {
@@ -12,8 +14,10 @@ import {
   useGuardarWhatsappConfig,
   useNotificacionesAdmin,
   useProbarWebhookWhatsapp,
+  useRevealWebhookUrl,
   useReglasNotificaciones,
   useWhatsappConfig,
+  useWhatsappTestLogs,
 } from '../hooks/useNotificaciones.js';
 import { toast } from '../lib/toast.js';
 import Spinner from '../components/ui/Spinner.jsx';
@@ -101,6 +105,26 @@ const WHATSAPP_DEST_BASE = {
   activo: true,
 };
 
+const webhookUrlSchema = z.string()
+  .trim()
+  .min(1, 'La URL es requerida')
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'Debe ser una URL valida y comenzar con https://');
+
+const whatsappTestSchema = z.object({
+  telefono: z.string().trim().min(1, 'El telefono es requerido')
+    .refine((value) => value.startsWith('+'), 'Usa formato E.164, por ejemplo +549...')
+    .refine((value) => parsePhoneNumberFromString(value)?.isValid(), 'El telefono no parece valido'),
+  nombre: z.string().trim().min(1, 'El nombre es requerido').max(160, 'Maximo 160 caracteres'),
+  cuerpo: z.string().trim().min(1, 'El mensaje es requerido').max(900, 'Maximo 900 caracteres'),
+});
+
 function formatoFecha(fecha) {
   if (!fecha) return '';
   return new Date(fecha).toLocaleString('es-AR', {
@@ -168,6 +192,22 @@ function resumenRespuestaWebhook(respuesta) {
   const texto = recortarTexto(respuesta, 220);
   if (!texto) return '';
   return texto;
+}
+
+function mensajeErrorHttp(error, fallback) {
+  const status = error?.status;
+  const errorCode = error?.data?.errorCode || error?.data?.data?.errorCode;
+  if (errorCode === 'INVALID_WEBHOOK_URL') return 'Configura una URL HTTPS valida antes de probar WhatsApp.';
+  if (errorCode === 'N8N_TIMEOUT') return 'n8n no respondio a tiempo. Revisa si el workflow esta activo.';
+  if (status === 400) return error?.message || 'Revisa los datos ingresados.';
+  if (status === 401 || status === 403) return 'Tu sesion no tiene permisos para esta accion.';
+  if (status === 404) return 'No se encontro el recurso solicitado.';
+  if (status === 500 || status === 502 || status === 504) return error?.message || 'Hubo un problema del servidor o de n8n.';
+  return error?.message || fallback;
+}
+
+function zodFieldError(error, field) {
+  return error?.issues?.find((issue) => issue.path[0] === field)?.message || '';
 }
 
 function limpiarFiltros(filtros, canal) {
@@ -251,37 +291,55 @@ function Select({ label, value, onChange, children, required = false }) {
   );
 }
 
-function Input({ label, value, onChange, required = false, placeholder = '', type = 'text', maxLength }) {
+function Input({
+  label,
+  value,
+  onChange,
+  required = false,
+  placeholder = '',
+  type = 'text',
+  maxLength,
+  onBlur,
+  error = '',
+  inputRef,
+  className = '',
+}) {
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-semibold text-gray-700">{label}</span>
       <input
+        ref={inputRef}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         required={required}
         placeholder={placeholder}
         maxLength={maxLength}
-        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+        className={`w-full rounded-lg border px-3 py-2 text-sm focus:border-green-600 focus:outline-none ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'} ${className}`}
       />
+      {error && <span className="mt-1 block text-xs font-semibold text-red-600">{error}</span>}
     </label>
   );
 }
 
-function Textarea({ label, value, onChange, required = false, maxLength = 900, placeholder = '' }) {
+function Textarea({ label, value, onChange, required = false, maxLength = 900, placeholder = '', onBlur, error = '' }) {
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-semibold text-gray-700">{label}</span>
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         maxLength={maxLength}
         required={required}
         rows={4}
         placeholder={placeholder}
-        className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+        className={`w-full resize-none rounded-lg border px-3 py-2 text-sm focus:border-green-600 focus:outline-none ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
       />
-      <span className="mt-1 block text-right text-xs text-gray-400">{value.length}/{maxLength}</span>
+      <span className={`mt-1 block text-xs ${error ? 'font-semibold text-red-600' : 'text-right text-gray-600'}`}>
+        {error || `${value.length}/${maxLength}`}
+      </span>
     </label>
   );
 }
@@ -352,7 +410,7 @@ function FiltrosRegla({ canal, filtros, setFiltros, empresas, empleados, destina
           <span className="mb-2 block text-sm font-semibold text-gray-700">Contactos externos</span>
           <div className="max-h-36 overflow-auto rounded-lg border border-gray-200 bg-white p-2">
             {destinatariosWhatsapp.length === 0 ? (
-              <p className="px-2 py-4 text-center text-sm text-gray-400">No hay destinatarios externos cargados.</p>
+              <p className="px-2 py-4 text-center text-sm text-gray-600">No hay destinatarios externos cargados.</p>
             ) : destinatariosWhatsapp.map((destinatario) => (
               <label key={destinatario.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-gray-700 hover:bg-gray-50">
                 <input
@@ -441,7 +499,7 @@ function ReglaForm({ canal, regla, setRegla, empresas, empleados, destinatariosW
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-bold text-gray-900">{regla.id ? 'Editar regla' : 'Nueva regla'}</h2>
-          <p className="text-sm text-gray-500">Usa variables como {'{{semana_rango}}'}, {'{{nombre}}'} o {'{{estado}}'}.</p>
+          <p className="text-sm text-gray-600">Usa variables como {'{{semana_rango}}'}, {'{{nombre}}'} o {'{{estado}}'}.</p>
         </div>
         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
           <input type="checkbox" checked={regla.activo} onChange={(event) => setField('activo', event.target.checked)} />
@@ -503,7 +561,7 @@ function ReglaForm({ canal, regla, setRegla, empresas, empleados, destinatariosW
 
 function ReglasList({ reglas, onEdit, onDelete }) {
   if (reglas.length === 0) {
-    return <div className="rounded-xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-400">No hay reglas configuradas.</div>;
+    return <div className="rounded-xl border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-600">No hay reglas configuradas.</div>;
   }
 
   return (
@@ -514,10 +572,10 @@ function ReglasList({ reglas, onEdit, onDelete }) {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">{getEventoLabel(regla.evento)}</span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${regla.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${regla.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
                   {regla.activo ? 'Activa' : 'Pausada'}
                 </span>
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
                   {regla.filtros?.alcance || 'todos'}
                 </span>
               </div>
@@ -528,7 +586,7 @@ function ReglasList({ reglas, onEdit, onDelete }) {
                   {DIAS_SEMANA.find((dia) => dia.value === Number(regla.programacion.dia_semana))?.label || 'Dia'} a las {regla.programacion.hora}
                 </p>
               )}
-              <p className="mt-1 text-xs text-gray-400">{regla.cuerpo}</p>
+              <p className="mt-1 text-xs text-gray-600">{regla.cuerpo}</p>
             </div>
             <div className="flex shrink-0 gap-2">
               <button type="button" onClick={() => onEdit(regla)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
@@ -586,7 +644,7 @@ function ManualInterna({ empresas, empleados }) {
     <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <div>
         <h2 className="font-bold text-gray-900">Envio manual interno</h2>
-        <p className="text-sm text-gray-500">Crea avisos dentro de la app de clientes.</p>
+        <p className="text-sm text-gray-600">Crea avisos dentro de la app de clientes.</p>
       </div>
       <Select label="Alcance" value={form.alcance} onChange={(value) => setField('alcance', value)}>
         {ALCANCES_MANUAL.map((alcance) => <option key={alcance.value} value={alcance.value}>{alcance.label}</option>)}
@@ -626,12 +684,12 @@ function HistorialInterno({ notificaciones, isLoading }) {
     <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="border-b border-gray-100 px-5 py-4">
         <h2 className="font-bold text-gray-900">Ultimas internas</h2>
-        <p className="text-sm text-gray-500">Incluye envios manuales y eventos automaticos.</p>
+        <p className="text-sm text-gray-600">Incluye envios manuales y eventos automaticos.</p>
       </div>
       {isLoading ? (
         <div className="grid min-h-[200px] place-items-center"><Spinner /></div>
       ) : notificaciones.length === 0 ? (
-        <div className="grid min-h-[200px] place-items-center px-5 text-center text-sm text-gray-400">Todavia no hay notificaciones creadas.</div>
+        <div className="grid min-h-[200px] place-items-center px-5 text-center text-sm text-gray-600">Todavia no hay notificaciones creadas.</div>
       ) : (
         <div className="max-h-[520px] divide-y divide-gray-100 overflow-auto">
           {notificaciones.map((notificacion) => (
@@ -640,17 +698,17 @@ function HistorialInterno({ notificaciones, isLoading }) {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">{notificacion.tipo}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${notificacion.leida ? 'bg-gray-100 text-gray-500' : 'bg-amber-50 text-amber-700'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${notificacion.leida ? 'bg-gray-100 text-gray-700' : 'bg-amber-50 text-amber-700'}`}>
                       {notificacion.leida ? 'Leida' : 'No leida'}
                     </span>
                   </div>
                   <h3 className="mt-2 font-semibold text-gray-900">{notificacion.titulo}</h3>
                   <p className="mt-1 text-sm text-gray-600">{notificacion.cuerpo}</p>
-                  <p className="mt-2 text-xs text-gray-400">
+                  <p className="mt-2 text-xs text-gray-600">
                     {notificacion.empleado_apellido}, {notificacion.empleado_nombre} - {notificacion.empresa_nombre}
                   </p>
                 </div>
-                <time className="shrink-0 text-xs text-gray-400">{formatoFecha(notificacion.created_at)}</time>
+                <time className="shrink-0 text-xs text-gray-600">{formatoFecha(notificacion.created_at)}</time>
               </div>
             </article>
           ))}
@@ -660,24 +718,176 @@ function HistorialInterno({ notificaciones, isLoading }) {
   );
 }
 
+function Tabs({ value, onChange, items }) {
+  return (
+    <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+      {items.map((item) => {
+        const active = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`relative rounded-md px-4 py-2 text-sm font-semibold transition-colors ${active ? 'text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+          >
+            {item.label}
+            {active && <span className="absolute inset-x-3 -bottom-1 h-0.5 rounded-full bg-green-700" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TestHistoryList({ logs, isLoading, onRetry }) {
+  const [expandedId, setExpandedId] = useState(null);
+
+  return (
+    <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-5 py-4">
+        <h2 className="font-bold text-gray-900">Historial de pruebas</h2>
+        <p className="text-sm text-gray-600">Ultimos intentos manuales enviados desde Probar WhatsApp.</p>
+      </div>
+      {isLoading ? (
+        <div className="grid min-h-[160px] place-items-center"><Spinner /></div>
+      ) : logs.length === 0 ? (
+        <div className="p-6 text-center text-sm text-gray-600">Todavia no hay pruebas registradas.</div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {logs.map((log) => {
+            const expanded = expandedId === log.id;
+            return (
+              <article key={log.id} className="p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${log.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                        {log.success ? 'OK' : 'Error'}
+                      </span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                        {log.status_code ? `HTTP ${log.status_code}` : log.error_code || 'Sin codigo'}
+                      </span>
+                    </div>
+                    <h3 className="mt-2 font-semibold text-gray-900">{log.nombre}</h3>
+                    <p className="text-sm text-gray-700">{log.destinatario}</p>
+                    <time className="mt-1 block text-xs text-gray-600">{formatoFecha(log.created_at)}</time>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expanded ? null : log.id)}
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      {expanded ? 'Ocultar detalle' : 'Ver detalle'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRetry(log)}
+                      className="rounded-lg border border-green-700 px-3 py-1.5 text-sm font-semibold text-green-700 hover:bg-green-50"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                </div>
+                {expanded && (
+                  <pre className="mt-3 max-h-64 overflow-auto rounded-lg bg-gray-950 p-3 text-xs text-gray-100">
+                    {JSON.stringify(log.response_body || {}, null, 2)}
+                  </pre>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WhatsappConfig({ config }) {
-  const [form, setForm] = useState({ activo: Boolean(config?.activo), webhook_url: config?.webhook_url || '' });
+  const [form, setForm] = useState({ activo: Boolean(config?.activo), webhook_url: '' });
+  const [mostrarWebhook, setMostrarWebhook] = useState(false);
+  const [errors, setErrors] = useState({ webhook_url: '', telefono: '', nombre: '', cuerpo: '' });
+  const [highlightWebhook, setHighlightWebhook] = useState(false);
   const [test, setTest] = useState({ telefono: '', nombre: 'Prueba La Quinta', cuerpo: 'Mensaje de prueba desde La Quinta.' });
+  const webhookRef = useRef(null);
   const guardar = useGuardarWhatsappConfig();
   const probar = useProbarWebhookWhatsapp();
+  const reveal = useRevealWebhookUrl();
+  const { data: testLogs = [], isLoading: loadingTestLogs } = useWhatsappTestLogs({ limit: 10 });
+  const configured = Boolean(config?.configured);
+  const inputWebhookValue = mostrarWebhook || form.webhook_url
+    ? form.webhook_url
+    : configured
+      ? config.masked_webhook_url || '********'
+      : '';
+
+  useEffect(() => {
+    if (!mostrarWebhook || !form.webhook_url) return undefined;
+    const timeout = window.setTimeout(() => {
+      setMostrarWebhook(false);
+      setForm((prev) => ({ ...prev, webhook_url: '' }));
+      setErrors((prev) => ({ ...prev, webhook_url: '' }));
+    }, 30000);
+    return () => window.clearTimeout(timeout);
+  }, [mostrarWebhook, form.webhook_url]);
+
+  useEffect(() => {
+    if (!highlightWebhook) return undefined;
+    const timeout = window.setTimeout(() => setHighlightWebhook(false), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [highlightWebhook]);
+
+  const validarWebhookBlur = () => {
+    if (configured && !form.webhook_url) {
+      setErrors((prev) => ({ ...prev, webhook_url: '' }));
+      return true;
+    }
+    const parsed = webhookUrlSchema.safeParse(form.webhook_url);
+    setErrors((prev) => ({ ...prev, webhook_url: parsed.success ? '' : parsed.error.issues[0]?.message || 'URL invalida' }));
+    return parsed.success;
+  };
+
+  const validarTest = () => {
+    const parsed = whatsappTestSchema.safeParse(test);
+    setErrors((prev) => ({
+      ...prev,
+      telefono: parsed.success ? '' : zodFieldError(parsed.error, 'telefono'),
+      nombre: parsed.success ? '' : zodFieldError(parsed.error, 'nombre'),
+      cuerpo: parsed.success ? '' : zodFieldError(parsed.error, 'cuerpo'),
+    }));
+    return parsed.success;
+  };
+
+  const revelarWebhook = async () => {
+    try {
+      const data = await reveal.mutateAsync();
+      setForm((prev) => ({ ...prev, webhook_url: data.webhook_url }));
+      setMostrarWebhook(true);
+      setErrors((prev) => ({ ...prev, webhook_url: '' }));
+    } catch (error) {
+      toast.error(mensajeErrorHttp(error, 'No se pudo revelar el webhook'));
+    }
+  };
 
   const guardarConfig = async (event) => {
     event.preventDefault();
+    if (!validarWebhookBlur()) return;
     try {
-      await guardar.mutateAsync(form);
+      await guardar.mutateAsync({
+        activo: form.activo,
+        webhook_url: form.webhook_url,
+      });
       toast.success('Webhook guardado');
+      setMostrarWebhook(false);
+      setForm((prev) => ({ ...prev, webhook_url: '' }));
     } catch (error) {
-      toast.error(error?.message || 'No se pudo guardar el webhook');
+      toast.error(mensajeErrorHttp(error, 'No se pudo guardar el webhook'));
     }
   };
 
   const probarWebhook = async (event) => {
     event.preventDefault();
+    if (!validarTest()) return;
     try {
       const resultado = await probar.mutateAsync({ telefono: test.telefono, nombre: test.nombre, cuerpo: test.cuerpo });
       if (resultado.enviado) {
@@ -687,48 +897,129 @@ function WhatsappConfig({ config }) {
       }
     } catch (error) {
       const detalle = error?.data?.data;
-      toast.error(resumenErrorWebhook(detalle) || error?.message || 'No se pudo probar el webhook');
+      if (error?.data?.errorCode === 'INVALID_WEBHOOK_URL') {
+        webhookRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightWebhook(true);
+      }
+      toast.error(resumenErrorWebhook(detalle) || mensajeErrorHttp(error, 'No se pudo probar el webhook'));
     }
   };
 
-  return (
-    <section className="grid gap-4 lg:grid-cols-2">
-      <form onSubmit={guardarConfig} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div>
-          <h2 className="font-bold text-gray-900">Webhook n8n</h2>
-          <p className="text-sm text-gray-500">La API envia a esta URL un JSON con evento, regla, destinatario y mensaje.</p>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-          <input type="checkbox" checked={form.activo} onChange={(event) => setForm((prev) => ({ ...prev, activo: event.target.checked }))} />
-          WhatsApp activo
-        </label>
-        <Input label="URL del webhook" value={form.webhook_url} onChange={(value) => setForm((prev) => ({ ...prev, webhook_url: value }))} placeholder="https://n8n.../webhook/..." />
-        <button
-          type="submit"
-          disabled={guardar.isPending}
-          className="w-full rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {guardar.isPending ? 'Guardando...' : 'Guardar webhook'}
-        </button>
-      </form>
+  const retryTest = (log) => {
+    setTest({
+      telefono: log.telefono || log.destinatario || '',
+      nombre: log.nombre || 'Prueba La Quinta',
+      cuerpo: log.mensaje || '',
+    });
+    setErrors((prev) => ({ ...prev, telefono: '', nombre: '', cuerpo: '' }));
+  };
 
-      <form onSubmit={probarWebhook} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div>
-          <h2 className="font-bold text-gray-900">Probar WhatsApp</h2>
-          <p className="text-sm text-gray-500">Registra el resultado en los ultimos envios.</p>
-        </div>
-        <Input label="Telefono" value={test.telefono} onChange={(value) => setTest((prev) => ({ ...prev, telefono: value }))} required placeholder="+549..." />
-        <Input label="Nombre" value={test.nombre} onChange={(value) => setTest((prev) => ({ ...prev, nombre: value }))} required />
-        <Textarea label="Mensaje" value={test.cuerpo} onChange={(value) => setTest((prev) => ({ ...prev, cuerpo: value }))} required />
-        <button
-          type="submit"
-          disabled={probar.isPending}
-          className="w-full rounded-lg border border-green-700 px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {probar.isPending ? 'Probando...' : 'Enviar prueba'}
-        </button>
-      </form>
-    </section>
+  return (
+    <div className="space-y-4">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <form onSubmit={guardarConfig} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="font-bold text-gray-900">Webhook n8n</h2>
+              <p className="text-sm text-gray-600">La API envia a esta URL un JSON con evento, regla, destinatario y mensaje.</p>
+            </div>
+            <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${configured ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+              {configured ? 'Webhook configurado OK' : 'Sin configurar'}
+            </span>
+          </div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <input type="checkbox" checked={form.activo} onChange={(event) => setForm((prev) => ({ ...prev, activo: event.target.checked }))} />
+            WhatsApp activo
+          </label>
+          <div className="space-y-3 border-b border-gray-100 pb-4">
+            <Input
+              label="URL del webhook"
+              type={mostrarWebhook ? 'url' : 'password'}
+              value={inputWebhookValue}
+              onChange={(value) => {
+                setForm((prev) => ({ ...prev, webhook_url: value }));
+                setErrors((prev) => ({ ...prev, webhook_url: '' }));
+              }}
+              onBlur={validarWebhookBlur}
+              error={errors.webhook_url}
+              inputRef={webhookRef}
+              className={highlightWebhook ? 'webhook-highlight' : ''}
+              placeholder="https://n8n.../webhook/..."
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={revelarWebhook}
+                disabled={!configured || reveal.isPending}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reveal.isPending ? 'Revelando...' : mostrarWebhook ? 'Revelado por 30s' : 'Revelar URL'}
+              </button>
+              {mostrarWebhook && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarWebhook(false);
+                    setForm((prev) => ({ ...prev, webhook_url: '' }));
+                  }}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Ocultar ahora
+                </button>
+              )}
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={guardar.isPending}
+            className="w-full rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {guardar.isPending ? 'Guardando...' : 'Guardar webhook'}
+          </button>
+        </form>
+
+        <form onSubmit={probarWebhook} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div>
+            <h2 className="font-bold text-gray-900">Probar WhatsApp</h2>
+            <p className="text-sm text-gray-600">Registra el resultado en el historial de pruebas y ultimos envios.</p>
+          </div>
+          <Input
+            label="Telefono"
+            value={test.telefono}
+            onChange={(value) => setTest((prev) => ({ ...prev, telefono: value }))}
+            onBlur={validarTest}
+            error={errors.telefono}
+            required
+            placeholder="+549..."
+          />
+          <Input
+            label="Nombre"
+            value={test.nombre}
+            onChange={(value) => setTest((prev) => ({ ...prev, nombre: value }))}
+            onBlur={validarTest}
+            error={errors.nombre}
+            required
+          />
+          <Textarea
+            label="Mensaje"
+            value={test.cuerpo}
+            onChange={(value) => setTest((prev) => ({ ...prev, cuerpo: value }))}
+            onBlur={validarTest}
+            error={errors.cuerpo}
+            required
+            maxLength={900}
+          />
+          <button
+            type="submit"
+            disabled={probar.isPending}
+            className="w-full rounded-lg border border-green-700 px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {probar.isPending ? 'Probando...' : 'Enviar prueba'}
+          </button>
+        </form>
+      </section>
+      <TestHistoryList logs={testLogs} isLoading={loadingTestLogs} onRetry={retryTest} />
+    </div>
   );
 }
 
@@ -774,7 +1065,7 @@ function DestinatariosWhatsapp({ empresas, destinatarios }) {
       <form onSubmit={submit} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div>
           <h2 className="font-bold text-gray-900">{form.id ? 'Editar destinatario' : 'Destinatario externo'}</h2>
-          <p className="text-sm text-gray-500">Contactos que no necesariamente tienen usuario cliente.</p>
+          <p className="text-sm text-gray-600">Contactos que no necesariamente tienen usuario cliente.</p>
         </div>
         <Input label="Nombre" value={form.nombre} onChange={(value) => setField('nombre', value)} required />
         <Input label="Telefono" value={form.telefono} onChange={(value) => setField('telefono', value)} required placeholder="+549..." />
@@ -799,18 +1090,18 @@ function DestinatariosWhatsapp({ empresas, destinatarios }) {
 
       <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white shadow-sm">
         {destinatarios.length === 0 ? (
-          <div className="p-6 text-center text-sm text-gray-400">No hay destinatarios externos cargados.</div>
+          <div className="p-6 text-center text-sm text-gray-600">No hay destinatarios externos cargados.</div>
         ) : destinatarios.map((destinatario) => (
           <article key={destinatario.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-semibold text-gray-900">{destinatario.nombre}</h3>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${destinatario.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${destinatario.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
                   {destinatario.activo ? 'Activo' : 'Inactivo'}
                 </span>
               </div>
               <p className="text-sm text-gray-600">{destinatario.telefono}</p>
-              <p className="text-xs text-gray-400">{destinatario.empresa_nombre || 'Sin empresa'}{destinatario.email ? ` - ${destinatario.email}` : ''}</p>
+              <p className="text-xs text-gray-600">{destinatario.empresa_nombre || 'Sin empresa'}{destinatario.email ? ` - ${destinatario.email}` : ''}</p>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setForm({
@@ -839,12 +1130,12 @@ function EnviosWhatsapp({ envios, isLoading }) {
     <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="border-b border-gray-100 px-5 py-4">
         <h2 className="font-bold text-gray-900">Ultimos envios WhatsApp</h2>
-        <p className="text-sm text-gray-500">Auditoria de llamadas realizadas al webhook de n8n.</p>
+        <p className="text-sm text-gray-600">Auditoria de llamadas realizadas al webhook de n8n.</p>
       </div>
       {isLoading ? (
         <div className="grid min-h-[180px] place-items-center"><Spinner /></div>
       ) : envios.length === 0 ? (
-        <div className="p-6 text-center text-sm text-gray-400">Todavia no hay envios registrados.</div>
+        <div className="p-6 text-center text-sm text-gray-600">Todavia no hay envios registrados.</div>
       ) : (
         <div className="max-h-[420px] divide-y divide-gray-100 overflow-auto">
           {envios.map((envio) => (
@@ -852,20 +1143,20 @@ function EnviosWhatsapp({ envios, isLoading }) {
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${envio.estado === 'enviado' ? 'bg-emerald-50 text-emerald-700' : envio.estado === 'fallido' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${envio.estado === 'enviado' ? 'bg-emerald-50 text-emerald-700' : envio.estado === 'fallido' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'}`}>
                       {envio.estado}
                     </span>
                     <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">{getEventoLabel(envio.evento)}</span>
                   </div>
                   <h3 className="mt-2 font-semibold text-gray-900">{envio.destinatario?.nombre || 'Sin nombre'}</h3>
                   <p className="text-sm text-gray-600">{envio.destinatario?.telefono}</p>
-                  <p className="mt-1 text-xs text-gray-400">{envio.regla_nombre || 'Prueba manual'}{envio.status_code ? ` - HTTP ${envio.status_code}` : ''}</p>
+                  <p className="mt-1 text-xs text-gray-600">{envio.regla_nombre || 'Prueba manual'}{envio.status_code ? ` - HTTP ${envio.status_code}` : ''}</p>
                   {envio.error && <p className="mt-1 text-xs text-red-600">{envio.error}</p>}
                   {resumenRespuestaWebhook(envio.respuesta) && (
-                    <p className="mt-1 break-words text-xs text-gray-500">{resumenRespuestaWebhook(envio.respuesta)}</p>
+                    <p className="mt-1 break-words text-xs text-gray-600">{resumenRespuestaWebhook(envio.respuesta)}</p>
                   )}
                 </div>
-                <time className="shrink-0 text-xs text-gray-400">{formatoFecha(envio.created_at)}</time>
+                <time className="shrink-0 text-xs text-gray-600">{formatoFecha(envio.created_at)}</time>
               </div>
             </article>
           ))}
@@ -918,28 +1209,20 @@ export default function NotificacionesAdmin() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl p-4 md:p-6">
+    <div className="mx-auto max-w-7xl min-w-0 overflow-x-hidden p-4 md:p-6">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Notificaciones</h1>
-          <p className="text-sm text-gray-500">Panel de control para avisos internos y WhatsApp via n8n.</p>
+          <p className="text-sm text-gray-600">Panel de control para avisos internos y WhatsApp via n8n.</p>
         </div>
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setPanel('internas')}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${panel === 'internas' ? 'bg-green-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            Internas
-          </button>
-          <button
-            type="button"
-            onClick={() => setPanel('whatsapp')}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${panel === 'whatsapp' ? 'bg-green-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            WhatsApp
-          </button>
-        </div>
+        <Tabs
+          value={panel}
+          onChange={setPanel}
+          items={[
+            { value: 'internas', label: 'Internas' },
+            { value: 'whatsapp', label: 'WhatsApp' },
+          ]}
+        />
       </div>
 
       {panel === 'internas' ? (

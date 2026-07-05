@@ -3,10 +3,14 @@ import api from '../lib/apiClient.js';
 
 const KEY = 'pedidos-admin';
 
-export const usePedidos = (params) =>
+export const usePedidos = (params, options = {}) =>
   useQuery({
     queryKey: [KEY, params],
     queryFn: () => api.get('/pedidos', { params }).then(r => r.data),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    ...options,
   });
 
 export const useUpdateEstadoPedido = () => {

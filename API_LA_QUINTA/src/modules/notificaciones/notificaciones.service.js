@@ -1,4 +1,8 @@
 import { ApiError } from '../../utils/ApiError.js';
+import { z } from 'zod';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import sanitizeHtml from 'sanitize-html';
+import * as auditoriaService from '../admin-auditoria/admin-auditoria.service.js';
 import * as repo from './notificaciones.repository.js';
 
 const TIPOS = ['menu', 'recordatorio', 'confirmado', 'sistema'];
@@ -7,6 +11,43 @@ const CANALES = ['interna', 'whatsapp'];
 const EVENTOS = ['manual', 'nuevo_registro', 'menu_publicado', 'pedido_estado_cambiado', 'pedido_semanal_pendiente'];
 const ALCANCES_REGLA = ['todos', 'empresa', 'empleado', 'empleado_evento', 'destinatarios_whatsapp'];
 const WHATSAPP_CONFIG_KEY = 'whatsapp_n8n';
+const WEBHOOK_MASK = '********';
+const N8N_TIMEOUT_MS = 10000;
+
+const webhookUrlSchema = z.string()
+  .trim()
+  .min(1, 'webhook_url es requerido')
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'webhook_url debe ser una URL https valida');
+
+const whatsappConfigSchema = z.object({
+  activo: z.boolean().default(false),
+  webhook_url: z.string().trim().optional().default(''),
+});
+
+const whatsappTestSchema = z.object({
+  telefono: z.string().trim().min(1, 'telefono es requerido')
+    .refine((value) => value.startsWith('+'), 'telefono debe tener formato E.164')
+    .transform((value, ctx) => {
+      const phone = parsePhoneNumberFromString(value);
+      if (!phone?.isValid()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'telefono debe ser un numero valido en formato E.164',
+        });
+        return z.NEVER;
+      }
+      return phone.number;
+    }),
+  nombre: z.string().trim().min(1).max(160).default('Prueba La Quinta'),
+  cuerpo: z.string().trim().min(1, 'mensaje es requerido').max(900, 'mensaje debe tener 900 caracteres o menos'),
+});
 
 const ESTADO_TITULO = {
   pendiente: 'Tu pedido esta pendiente',
@@ -46,6 +87,40 @@ function normalizarBoolean(valor, fallback = true) {
   return Boolean(valor);
 }
 
+function apiValidationError(error) {
+  if (error instanceof ApiError) return error;
+  if (error instanceof z.ZodError) {
+    return ApiError.badRequest('Datos invalidos', error.errors.map((item) => ({
+      path: item.path.join('.'),
+      message: item.message,
+    })));
+  }
+  return error;
+}
+
+function parseConApiError(schema, payload) {
+  try {
+    return schema.parse(payload);
+  } catch (error) {
+    throw apiValidationError(error);
+  }
+}
+
+function validarWebhookUrl(webhookUrl) {
+  try {
+    return webhookUrlSchema.parse(webhookUrl);
+  } catch (error) {
+    throw apiValidationError(error);
+  }
+}
+
+function sanitizarMensajeWhatsapp(mensaje) {
+  return sanitizeHtml(String(mensaje || ''), {
+    allowedTags: [],
+    allowedAttributes: {},
+  }).trim();
+}
+
 function normalizarHora(valor) {
   const hora = String(valor || '').trim();
   if (!/^\d{2}:\d{2}$/.test(hora)) throw ApiError.badRequest('hora debe tener formato HH:mm');
@@ -55,6 +130,13 @@ function normalizarHora(valor) {
 }
 
 function fechaCorta(fecha) {
+  if (fecha instanceof Date) {
+    return [
+      fecha.getFullYear(),
+      String(fecha.getMonth() + 1).padStart(2, '0'),
+      String(fecha.getDate()).padStart(2, '0'),
+    ].join('-');
+  }
   return String(fecha || '').split('T')[0];
 }
 
@@ -148,18 +230,23 @@ function normalizarRegla(payload = {}, partial = false) {
 }
 
 function normalizarConfigWhatsapp(payload = {}) {
-  const activo = Boolean(payload.activo);
-  const webhookUrl = String(payload.webhook_url || '').trim();
-  if (activo && !webhookUrl) throw ApiError.badRequest('webhook_url es requerido para activar WhatsApp');
-  if (webhookUrl) {
-    try {
-      const url = new URL(webhookUrl);
-      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('invalid');
-    } catch {
-      throw ApiError.badRequest('webhook_url debe ser una URL http/https valida');
-    }
-  }
+  const parsed = parseConApiError(whatsappConfigSchema, {
+    activo: Boolean(payload.activo),
+    webhook_url: payload.webhook_url,
+  });
+  const activo = parsed.activo;
+  const webhookUrl = parsed.webhook_url;
+  if (webhookUrl) validarWebhookUrl(webhookUrl);
   return { activo, webhook_url: webhookUrl };
+}
+
+function enmascararConfigWhatsapp(config = {}) {
+  const configured = Boolean(config.webhook_url);
+  return {
+    activo: Boolean(config.activo),
+    configured,
+    masked_webhook_url: configured ? WEBHOOK_MASK : '',
+  };
 }
 
 function normalizarDestinatarioWhatsapp(payload = {}, partial = false) {
@@ -336,6 +423,7 @@ async function dispararEventoInternoLegacy(evento, contexto) {
 }
 
 async function enviarWebhookWhatsapp({ config, regla, evento, destinatario, titulo, cuerpo, contexto }) {
+  const webhookUrl = validarWebhookUrl(config.webhook_url);
   const payload = {
     canal: 'whatsapp',
     evento,
@@ -352,11 +440,19 @@ async function enviarWebhookWhatsapp({ config, regla, evento, destinatario, titu
   });
 
   try {
-    const response = await fetch(config.webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), N8N_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     const text = await response.text();
     const detalle = {
       ok: response.ok,
@@ -365,6 +461,8 @@ async function enviarWebhookWhatsapp({ config, regla, evento, destinatario, titu
       status_code: response.status,
       respuesta: text.slice(0, 1000),
       error: response.ok ? null : `Webhook respondio ${response.status}`,
+      errorCode: response.ok ? null : 'N8N_HTTP_ERROR',
+      message: response.ok ? 'Webhook enviado correctamente' : 'El webhook respondio con error',
     };
     await repo.actualizarEnvioWhatsapp(envio.id, {
       estado: detalle.estado,
@@ -374,13 +472,16 @@ async function enviarWebhookWhatsapp({ config, regla, evento, destinatario, titu
     });
     return detalle;
   } catch (error) {
+    const isTimeout = error?.name === 'AbortError';
     const detalle = {
       ok: false,
       envio_id: envio.id,
       estado: 'fallido',
       status_code: null,
       respuesta: null,
-      error: error.message,
+      error: isTimeout ? `Timeout de ${N8N_TIMEOUT_MS}ms al llamar n8n` : error.message,
+      errorCode: isTimeout ? 'N8N_TIMEOUT' : 'N8N_NETWORK_ERROR',
+      message: isTimeout ? 'n8n no respondio a tiempo' : 'No se pudo conectar con n8n',
     };
     await repo.actualizarEnvioWhatsapp(envio.id, {
       estado: detalle.estado,
@@ -551,13 +652,36 @@ export const eliminarRegla = async (id) => {
 
 export const getConfigWhatsapp = async () => {
   const record = await repo.getConfiguracion(WHATSAPP_CONFIG_KEY);
-  return record?.valor || { activo: false, webhook_url: '' };
+  return enmascararConfigWhatsapp(record?.valor || { activo: false, webhook_url: '' });
+};
+
+export const revelarConfigWhatsapp = async (adminUser) => {
+  const record = await repo.getConfiguracion(WHATSAPP_CONFIG_KEY);
+  const config = record?.valor || { activo: false, webhook_url: '' };
+  if (!config.webhook_url) throw ApiError.notFound('Webhook no configurado');
+
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'revelar_webhook_whatsapp',
+    entidad_tipo: 'notificacion_configuracion',
+    entidad_id: WHATSAPP_CONFIG_KEY,
+    resumen: 'Reveal manual de webhook n8n WhatsApp',
+    metadata: { configured: true },
+  });
+
+  return { webhook_url: config.webhook_url };
 };
 
 export const actualizarConfigWhatsapp = async (payload = {}) => {
+  const actual = (await repo.getConfiguracion(WHATSAPP_CONFIG_KEY))?.valor || { activo: false, webhook_url: '' };
   const config = normalizarConfigWhatsapp(payload);
-  const record = await repo.upsertConfiguracion(WHATSAPP_CONFIG_KEY, config);
-  return record.valor;
+  const webhookUrl = config.webhook_url || actual.webhook_url || '';
+  if (config.activo && !webhookUrl) throw ApiError.badRequest('webhook_url es requerido para activar WhatsApp');
+  const record = await repo.upsertConfiguracion(WHATSAPP_CONFIG_KEY, {
+    activo: config.activo,
+    webhook_url: webhookUrl,
+  });
+  return enmascararConfigWhatsapp(record.valor);
 };
 
 export const listarDestinatariosWhatsapp = () => repo.findDestinatariosWhatsapp();
@@ -592,17 +716,40 @@ export const listarEnviosWhatsapp = (filtros = {}) => repo.findEnviosWhatsapp({
   offset: Number(filtros.offset || 0),
 });
 
-export const probarWebhookWhatsapp = async (payload = {}) => {
-  const config = await getConfigWhatsapp();
+export const listarWhatsappTestLogs = (filtros = {}) => repo.findWhatsappTestLogs({
+  limit: Math.min(Number(filtros.limit || 10), 50),
+});
+
+export const probarWebhookWhatsapp = async (payload = {}, adminUser = {}) => {
+  const config = (await repo.getConfiguracion(WHATSAPP_CONFIG_KEY))?.valor || { activo: false, webhook_url: '' };
   if (!config.activo || !config.webhook_url) {
-    throw ApiError.badRequest('Configura y activa el webhook de n8n antes de probar');
+    const error = ApiError.badRequest('Configura y activa el webhook de n8n antes de probar');
+    error.errorCode = 'INVALID_WEBHOOK_URL';
+    throw error;
   }
+
+  try {
+    validarWebhookUrl(config.webhook_url);
+  } catch (error) {
+    const invalid = ApiError.badRequest('El webhook configurado debe ser una URL https valida');
+    invalid.errorCode = 'INVALID_WEBHOOK_URL';
+    invalid.errors = error.errors || [];
+    throw invalid;
+  }
+
+  const datos = parseConApiError(whatsappTestSchema, {
+    telefono: payload.telefono,
+    nombre: payload.nombre || 'Prueba La Quinta',
+    cuerpo: payload.cuerpo || payload.mensaje,
+  });
+  const cuerpoSanitizado = sanitizarMensajeWhatsapp(datos.cuerpo);
+  if (!cuerpoSanitizado) throw ApiError.badRequest('mensaje es requerido');
 
   const destinatario = {
     tipo: 'prueba',
     id: null,
-    nombre: normalizarTexto(payload.nombre || 'Prueba La Quinta', 'nombre', 160),
-    telefono: normalizarTexto(payload.telefono, 'telefono', 40),
+    nombre: datos.nombre,
+    telefono: datos.telefono,
     email: null,
     empresa_id: null,
     empresa_nombre: null,
@@ -610,8 +757,30 @@ export const probarWebhookWhatsapp = async (payload = {}) => {
   const contexto = crearContextoBase('manual', { prueba: true });
   const regla = { id: null, nombre: 'Prueba manual de webhook' };
   const titulo = normalizarTexto(payload.titulo || 'Prueba de WhatsApp', 'titulo', 160);
-  const cuerpo = normalizarTexto(payload.cuerpo || 'Mensaje de prueba desde La Quinta.', 'cuerpo', 900);
+  const cuerpo = cuerpoSanitizado;
   const resultado = await enviarWebhookWhatsapp({ config, regla, evento: 'manual', destinatario, titulo, cuerpo, contexto });
+
+  const responseBody = resultado.respuesta
+    ? { raw: resultado.respuesta }
+    : { error: resultado.error || null };
+  await repo.crearWhatsappTestLog({
+    destinatario: datos.telefono,
+    telefono: datos.telefono,
+    nombre: datos.nombre,
+    mensaje: cuerpoSanitizado,
+    statusCode: resultado.status_code,
+    success: resultado.ok,
+    responseBody,
+    errorCode: resultado.errorCode,
+    requestedBy: adminUser?.sub || adminUser?.id || null,
+  });
+
+  const httpStatus = resultado.ok
+    ? 201
+    : resultado.errorCode === 'N8N_TIMEOUT'
+      ? 504
+      : 502;
+
   return {
     enviado: resultado.ok,
     envio_id: resultado.envio_id,
@@ -619,6 +788,9 @@ export const probarWebhookWhatsapp = async (payload = {}) => {
     status_code: resultado.status_code,
     respuesta: resultado.respuesta,
     error: resultado.error,
+    errorCode: resultado.errorCode,
+    message: resultado.message,
+    httpStatus,
   };
 };
 

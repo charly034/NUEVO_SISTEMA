@@ -327,6 +327,52 @@ export async function findEnviosWhatsapp({ limit = 50, offset = 0 } = {}) {
   return rows;
 }
 
+export async function crearWhatsappTestLog({
+  destinatario,
+  telefono,
+  nombre,
+  mensaje,
+  statusCode = null,
+  success,
+  responseBody = null,
+  errorCode = null,
+  requestedBy = null,
+}) {
+  const { rows } = await query(
+    `INSERT INTO whatsapp_test_logs (
+       destinatario, telefono, nombre, mensaje, status_code, success,
+       response_body, error_code, requested_by
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
+     RETURNING id, created_at, destinatario, telefono, nombre, mensaje,
+       status_code, success, response_body, error_code, requested_by`,
+    [
+      destinatario,
+      telefono,
+      nombre,
+      mensaje,
+      statusCode,
+      success,
+      JSON.stringify(responseBody ?? null),
+      errorCode,
+      requestedBy,
+    ]
+  );
+  return rows[0];
+}
+
+export async function findWhatsappTestLogs({ limit = 10 } = {}) {
+  const { rows } = await query(
+    `SELECT id, created_at, destinatario, telefono, nombre, mensaje,
+            status_code, success, response_body, error_code, requested_by
+     FROM whatsapp_test_logs
+     ORDER BY created_at DESC, id DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
 export async function findSemanaPublicadaObjetivo() {
   const { rows } = await query(
     `SELECT id, nombre, fecha_inicio, fecha_fin

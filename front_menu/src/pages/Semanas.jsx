@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMenusSemanales, useCreateMenu, useDeleteMenu, useCambiarEstadoMenu } from '../hooks/useMenus.js';
+import { useMenusSemanales, useCreateMenu, useDeleteMenu, useCambiarEstadoMenu, useDuplicarMenu } from '../hooks/useMenus.js';
 import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
@@ -39,6 +39,11 @@ function formatCorto(iso) {
   return `${parseInt(d)} ${MESES[parseInt(m) - 1]}`;
 }
 
+function esSemanaCursada(lunesIso, estado) {
+  if (!['cerrado', 'publicado'].includes(estado)) return false;
+  return addDias(lunesIso, 6) < localISO(new Date());
+}
+
 function nombreSugerido(lunesIso) {
   const [, lm, ld] = soloFecha(lunesIso).split('-');
   const domingoIso = addDias(lunesIso, 6);
@@ -61,24 +66,30 @@ function SemanaTile({ lunesIso, menu, selected, onSelect, esHoy }) {
   const cfg = ESTADO_CFG[estado];
   const diasMap = new Set((menu?.dias ?? []).map(d => d.dia));
   const sinSet  = new Set((menu?.sin_servicio ?? []).map(d => d.dia));
+  const rangoLabel = `${formatCorto(lunesIso)} a ${formatCorto(domingo)}`;
+  const mostrarEstadisticas = menu && esSemanaCursada(lunesIso, estado);
+  const cardStyle = {
+    flex: 1,
+    minWidth: 0,
+    padding: '10px 6px 8px',
+    borderRadius: 12,
+    border: selected ? '2px solid #16a34a' : `2px solid ${esHoy ? '#fde68a' : '#e5e7eb'}`,
+    background: selected ? '#f0fdf4' : esHoy ? '#fffbeb' : '#fff',
+    boxShadow: selected ? '0 0 0 3px #bbf7d0' : '0 1px 4px rgba(0,0,0,0.06)',
+    textAlign: 'center',
+    transition: 'all 0.15s',
+    position: 'relative',
+  };
 
   return (
-    <button
-      onClick={() => onSelect(lunesIso)}
-      style={{
-        flex: 1,
-        minWidth: 0,
-        padding: '10px 6px 8px',
-        borderRadius: 12,
-        border: selected ? '2px solid #16a34a' : `2px solid ${esHoy ? '#fde68a' : '#e5e7eb'}`,
-        background: selected ? '#f0fdf4' : esHoy ? '#fffbeb' : '#fff',
-        boxShadow: selected ? '0 0 0 3px #bbf7d0' : '0 1px 4px rgba(0,0,0,0.06)',
-        cursor: 'pointer',
-        textAlign: 'center',
-        transition: 'all 0.15s',
-        position: 'relative',
-      }}
-    >
+    <div style={cardStyle}>
+      <button
+        type="button"
+        onClick={() => onSelect(lunesIso)}
+        aria-label={`${selected ? 'Semana seleccionada' : 'Seleccionar semana'} del ${rangoLabel}`}
+        title={`Semana del ${rangoLabel}`}
+        style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'center' }}
+      >
       {esHoy && (
         <span style={{
           position: 'absolute', top: 5, right: 6,
@@ -113,7 +124,16 @@ function SemanaTile({ lunesIso, menu, selected, onSelect, esHoy }) {
       }}>
         {cfg.label}
       </span>
-    </button>
+      </button>
+      {mostrarEstadisticas && (
+        <Link
+          to={`/estadisticas?desde=${lunesIso}&hasta=${domingo}`}
+          style={{ display: 'inline-block', marginTop: 6, fontSize: 10, fontWeight: 700, color: '#15803d', textDecoration: 'none' }}
+        >
+          Ver estadísticas
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -156,8 +176,63 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
   );
 }
 
+function ModalDuplicarForm({ menu, onConfirm, onCancel, loading }) {
+  const lunesBase = soloFecha(menu?.fecha_inicio || getLunesActual());
+  const lunesInicial = addSemanas(lunesBase, 1);
+  const [fechaInicio, setFechaInicio] = useState(lunesInicial);
+  const [nombre, setNombre] = useState(nombreSugerido(lunesInicial));
+  const fechaFin = addDias(fechaInicio, 6);
+
+  const cambiarFecha = (value) => {
+    setFechaInicio(value);
+    setNombre(nombreSugerido(value));
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        onConfirm({ nombre, fecha_inicio: fechaInicio, fecha_fin: fechaFin });
+      }}
+      className="space-y-4"
+    >
+      <p className="text-sm text-gray-600">
+        Se copiarán platos, opciones y días sin servicio de <strong>{menu?.nombre}</strong> a una nueva semana en borrador.
+      </p>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700">Lunes de destino</span>
+        <input
+          type="date"
+          value={fechaInicio}
+          onChange={(event) => cambiarFecha(event.target.value)}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+          required
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700">Nombre</span>
+        <input
+          type="text"
+          value={nombre}
+          onChange={(event) => setNombre(event.target.value)}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+          required
+        />
+      </label>
+      <p className="text-xs text-gray-400">Rango resultante: {formatCorto(fechaInicio)} — {formatCorto(fechaFin)}</p>
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancelar</button>
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading && <Spinner size="sm" />}
+          Duplicar semana
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ── Panel de detalle ─────────────────────────────────────────────────
-function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, onReabrir, onDelete }) {
+function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, onReabrir, onDelete, onDuplicar }) {
   const domingo = addDias(lunesIso, 6);
 
   if (!menu) {
@@ -241,10 +316,19 @@ function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, on
           >
             Editar grilla →
           </Link>
+          <button
+            type="button"
+            onClick={onDuplicar}
+            style={btnStyle('#f3f4f6', '#374151')}
+          >
+            Duplicar
+          </button>
           {estado === 'borrador' && (
             <button
+              type="button"
               onClick={onDelete}
-              title="Eliminar menú"
+              aria-label={`Eliminar menu ${menu.nombre}`}
+              title="Eliminar menu"
               style={{ padding: '7px 8px', borderRadius: 8, background: 'transparent', border: '1.5px solid #e5e7eb', cursor: 'pointer', fontSize: 14 }}
             >
               🗑️
@@ -360,9 +444,17 @@ function PanelVacio({ lunesIso, domingoIso }) {
           </div>
         </div>
       ) : (
-        <button onClick={() => setCreando(true)} className="btn-primary">
-          + Crear menú para esta semana
-        </button>
+        <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
+          <button onClick={() => setCreando(true)} className="btn-primary">
+            + Crear menú para esta semana
+          </button>
+          <Link
+            to={`/sugeridor?semana=${lunesIso}`}
+            className="btn-secondary"
+          >
+            Generar menú
+          </Link>
+        </div>
       )}
     </div>
   );
@@ -381,11 +473,13 @@ export default function Semanas() {
   const [ventana, setVentana] = useState(-2);        // offset de la 1ª tile visible
   const [selLunes, setSelLunes] = useState(lunesActual);
   const [modalPublicar, setModalPublicar] = useState(false);
+  const [modalDuplicar, setModalDuplicar] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReabrir, setConfirmReabrir] = useState(false);
 
   const query     = useMenusSemanales({ limit: 100 });
   const deleteMut = useDeleteMenu();
+  const duplicarMut = useDuplicarMenu();
   const estadoMut = useCambiarEstadoMenu();
 
   const menus = query.data?.menus ?? [];
@@ -430,6 +524,19 @@ export default function Semanas() {
     }
   };
 
+  const handleDuplicar = async (data) => {
+    if (!menuSel) return;
+    try {
+      const res = await duplicarMut.mutateAsync({ id: menuSel.id, data });
+      const nuevo = res.data;
+      toast.success('Semana duplicada');
+      setModalDuplicar(false);
+      if (nuevo?.fecha_inicio) handleSelectTile(soloFecha(nuevo.fecha_inicio));
+    } catch (e) {
+      toast.error(e?.message || 'No se pudo duplicar la semana');
+    }
+  };
+
   // Cuando se hace click en tile fuera de la ventana, ajustar ventana
   const handleSelectTile = (lunes) => {
     setSelLunes(lunes);
@@ -457,7 +564,10 @@ export default function Semanas() {
           </p>
         </div>
         <button
+          type="button"
           onClick={irAHoy}
+          aria-label="Ir a la semana actual"
+          title="Ir a la semana actual"
           style={{ fontSize: 12, color: '#16a34a', background: 'none', border: '1.5px solid #bbf7d0', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 600 }}
         >
           ↩ Esta semana
@@ -472,7 +582,10 @@ export default function Semanas() {
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
           {/* Flecha izquierda */}
           <button
+            type="button"
             onClick={() => setVentana(v => v - 1)}
+            aria-label="Ver semanas anteriores"
+            title="Semanas anteriores"
             style={{
               width: 32, borderRadius: 8, border: '1.5px solid #e5e7eb',
               background: '#fafafa', cursor: 'pointer', fontSize: 16,
@@ -499,7 +612,10 @@ export default function Semanas() {
 
           {/* Flecha derecha */}
           <button
+            type="button"
             onClick={() => setVentana(v => v + 1)}
+            aria-label="Ver semanas siguientes"
+            title="Semanas siguientes"
             style={{
               width: 32, borderRadius: 8, border: '1.5px solid #e5e7eb',
               background: '#fafafa', cursor: 'pointer', fontSize: 16,
@@ -542,6 +658,7 @@ export default function Semanas() {
             onPublicar={() => setModalPublicar(true)}
             onReabrir={() => setConfirmReabrir(true)}
             onDelete={() => setConfirmDelete(true)}
+            onDuplicar={() => setModalDuplicar(true)}
           />
         )}
       </div>
@@ -554,6 +671,17 @@ export default function Semanas() {
             onConfirm={(fechaLimite) => handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: fechaLimite } })}
             onCancel={() => setModalPublicar(false)}
             loading={estadoMut.isPending}
+          />
+        )}
+      </Modal>
+
+      <Modal open={modalDuplicar} onClose={() => setModalDuplicar(false)} title="Duplicar semana">
+        {menuSel && (
+          <ModalDuplicarForm
+            menu={menuSel}
+            onConfirm={handleDuplicar}
+            onCancel={() => setModalDuplicar(false)}
+            loading={duplicarMut.isPending}
           />
         )}
       </Modal>

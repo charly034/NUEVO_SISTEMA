@@ -1,5 +1,5 @@
 schema: la_quinta_flows_v2
-updated_at: "2026-07-02"
+updated_at: "2026-07-04"
 
 flows:
   local_start:
@@ -84,21 +84,62 @@ flows:
       - "Admin sin token ve AdminLogin"
       - "Superadmin puede abrir /administradores"
 
+  admin_dashboard:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/Dashboard.jsx"
+      - "front_menu/src/hooks/useFechaOperativa.js"
+      - "front_menu/src/hooks/useMenus.js"
+      - "front_menu/src/hooks/usePedidos.js"
+      - "API_LA_QUINTA/src/modules/health/health.controller.js"
+    sequence:
+      - "Dashboard consulta GET /api/v1/health para obtener la fecha operativa desde el servidor/API."
+      - "front_menu/src/hooks/useFechaOperativa.js convierte serverTime/timestamp a YYYY-MM-DD en America/Argentina/Buenos_Aires."
+      - "Con esa fecha calcula lunes actual, lunes proximo y domingo proximo; no depende del reloj del dispositivo para pedir la semana."
+      - "Dashboard consulta menus-semanales desde lunes actual hasta domingo proximo y pedidos de la semana actual con limit 500."
+      - "El KPI semanas creadas usa una consulta independiente a menus-semanales sin rango de fechas y limit 1 para leer pagination.total historico, mientras las tarjetas Esta semana/Proxima semana conservan la ventana operativa."
+      - "Las tarjetas Esta semana y Proxima semana navegan completas a /semanas/:id; cada fila de dia navega a /semanas/:id?dia=<dia> para abrir la edicion del dia."
+      - "La alerta de envios WhatsApp fallidos puede ocultarse por tanda de fallos vista en localStorage y vuelve a aparecer si cambia la cantidad/id del ultimo fallo."
+      - "Disponibles para rotar distingue platos nunca servidos como nuevo y expande el listado completo dentro del Dashboard sin navegar a Historial."
+      - "Si /health falla, Dashboard cae al calculo local anterior para no bloquear toda la pantalla."
+    manual_smoke_checks:
+      - "Abrir / con sesion admin y verificar que Pedidos de esta semana coincide con GET /api/v1/pedidos?semana_inicio=<lunes-operativo>&limit=500."
+      - "Verificar que la tarjeta Hoy usa la fecha operativa del servidor y que muestra el menu de la semana publicada."
+
   admin_empresas_empleados:
     status: verified_in_repo
     files:
       - "front_menu/src/App.jsx"
+      - "front_menu/src/pages/Clientes.jsx"
       - "front_menu/src/pages/Empresas.jsx"
       - "front_menu/src/hooks/useEmpresas.js"
       - "front_menu/src/hooks/useEmpleados.js"
     sequence:
-      - "Admin abre /empresas para gestionar empresas."
+      - "Admin abre /clientes para gestionar empresas; la vista por defecto es Empresas."
+      - "La ruta /empresas redirige a /clientes y /empleados redirige a /clientes para mantener compatibilidad sin duplicar pantallas."
+      - "Clientes.jsx centraliza sub-vistas de administracion de clientes: Empresas, Pagos y Notificaciones."
+      - "El sidebar desktop/mobile muestra Clientes como grupo desplegable, similar a Menu semanal, con entradas Empresas, Pagos, Notificaciones y Sugerencias de clientes."
+      - "Sugerencias de clientes conserva el path /recomendaciones-menu para compatibilidad, pero visualmente pertenece a Clientes."
+      - "En el sidebar desktop, click en Clientes navega a /clientes (Empresas por defecto); el chevron solo abre/cierra sus sub-vistas."
+      - "Admin gestiona planes de vianda en Clientes > Empresas: nombre, gramaje, postre, bebida, activo y orden."
+      - "Crear/editar empresa permite elegir plan_id; empresas.plan legacy se conserva para compatibilidad."
+      - "Empresas.jsx consulta GET /api/v1/empresas con page, pageSize, search y estado; el contador usa total del backend."
+      - "Las tarjetas de empresa diferencian activa/inactiva visualmente y agrupan copiar/regenerar codigo y reabrir plazo junto al badge de codigo."
+      - "Antes de eliminar, ConfirmDeleteModal consulta GET /api/v1/empresas/:id/dependencias; bloquea si hay pedidos activos o saldo de cuenta corriente."
+      - "DELETE /api/v1/empresas/:id no borra fisicamente: marca activo=false y deleted_at."
       - "La gestion de empleados vive como panel dentro de Empresas.jsx segun empresa activa."
       - "ModalEmpleado permite crear/editar empleado con telefono y fecha_nacimiento; API devuelve ambos campos en listado/detalle."
+      - "El panel de empleados permite importar CSV pegado o cargado desde archivo; front_menu parsea columnas nombre, apellido, email, telefono, fecha_nacimiento, password y rol, y envia POST /api/v1/empleados/importar."
+      - "La importacion devuelve creados, omitidos y errores por fila; los emails existentes se omiten sin bloquear filas validas."
       - "La ruta /empleados renderiza Empresas.jsx para evitar pantalla en blanco y llevar al panel que contiene empleados."
     manual_smoke_checks:
-      - "Abrir /empresas y verificar lista de empresas y panel de empleados."
+      - "Abrir /clientes y verificar que carga Empresas por defecto con lista de empresas y panel de empleados."
+      - "Abrir /empresas y verificar que redirige a /clientes."
+      - "Crear/editar un plan de vianda y asociarlo a una empresa."
+      - "Buscar empresas por nombre, slug o email; cambiar chips Todas/Activas/Inactivas y navegar paginas."
+      - "Intentar eliminar una empresa con pedido activo o saldo y verificar bloqueo explicito; eliminar una sin dependencias y verificar que desaparece del listado."
       - "Crear o editar empleado con telefono y fecha de nacimiento; verificar que se muestran en la fila del empleado."
+      - "Importar CSV de empleados con al menos una fila valida y verificar resumen de creados/omitidos/errores."
       - "Abrir /empleados y verificar que no queda pantalla vacia."
 
   cliente_pedido_semanal:
@@ -125,6 +166,7 @@ flows:
       - "Semana actual con menu publicado muestra dos acciones: Hacer pedido abre WeeklyOrderView y Ver menu abre MenuViewScreen."
       - "Otras semanas con menu publicado abren primero MenuViewScreen; desde ahi Hacer mi pedido abre WeeklyOrderView solo si quedan dias editables."
       - "Semanas sin menu abren SuggestionSheet desde Inicio y guardan con POST /api/v1/pedidos/sugerencias sin navegar al stack."
+      - "SuggestionSheet muestra chips desde GET /api/v1/pedidos/sugerencias/opciones para la semana lunes-domingo configurada por admin; no usa opciones hardcodeadas."
       - "Semanas cerradas abren WeeklyOrderView en modo solo lectura."
       - "front_clientes/src/pages/SugerenciasPage.jsx tambien usa POST /api/v1/pedidos/sugerencias para no desalinear admin ni pedido_sugerencias"
       - "si la semana sin menu ya tiene recomendacionesUsuario o comentarioRecomendacion, SemanaCardLectura muestra agradecimiento y no muestra CTA de sugerir"
@@ -191,14 +233,21 @@ flows:
       - "API_LA_QUINTA/src/modules/menus-semanales"
     sequence:
       - "Admin crea menu semanal"
+      - "Admin puede duplicar una semana con POST /api/v1/menus-semanales/:id/duplicar; el nuevo menu queda en borrador y copia platos/dias sin servicio."
       - "Admin agrega platos por dia/opcion"
       - "Admin puede marcar dia sin servicio"
       - "Admin cambia estado del menu"
+      - "En el sidebar desktop/mobile, click en Menu semanal navega a /semanas; el chevron solo abre/cierra las vistas del grupo."
+      - "El submenu Menu semanal se agrupa por proposito: Planificacion contiene Semanas (/semanas) y Generar menu (/sugeridor); Analisis contiene Historial de platos (/historial) y Estadisticas (/estadisticas)."
+      - "Las semanas sin menu en /semanas pueden abrir /sugeridor?semana=YYYY-MM-DD para precargar la fecha a generar."
+      - "En /sugeridor, Usar esta crea el menu desde la variacion elegida y redirige al editor de grilla /semanas/:id; Crear menu seleccionado queda como fallback."
+      - "Las semanas cursadas cerradas/publicadas en /semanas muestran enlace contextual a /estadisticas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD."
       - "Al reabrir un menu desde front_menu, se publica con fecha_limite_pedidos=null para no arrastrar un limite vencido."
       - "Al pasar un menu a publicado, API crea notificaciones tipo menu para empleados activos y usa dedupe_key para no duplicar por menu/empleado."
       - "Cliente consume menu publicado desde pedidos/menu"
     manual_smoke_checks:
       - "Crear semana con fecha_inicio/fecha_fin validas"
+      - "Duplicar una semana hacia una fecha sin menu existente y verificar que aparece como borrador."
       - "Agregar opcion A para lunes"
       - "Marcar un dia sin servicio"
       - "Publicar/cambiar estado si UI lo permite"
@@ -214,8 +263,11 @@ flows:
       - "API_LA_QUINTA/src/middlewares/upload-plato-image.middleware.js"
       - "API_LA_QUINTA/scripts/backfill-platos-metadata-aproximada.js"
     sequence:
-      - "Admin abre Platos y crea/edita un plato."
+      - "Admin abre /platos y crea/edita un plato."
+      - "La ruta /platos mantiene busqueda, filtros, orden y pagina en query params compartibles; /platos?tab=guarniciones redirige a /guarniciones."
+      - "El sidebar desktop agrupa /platos y /guarniciones bajo Catalogo; mobile los expone en Mas."
       - "PlatoForm permite nombre, descripcion, descripcion_larga/receta, kcal aproximadas, alergenos, vegetariano, tags, tipo, guarnicion e imagen."
+      - "El selector tiene_guarnicion de PlatoForm sigue leyendo front_menu/src/hooks/useGuarniciones.js."
       - "Si se selecciona foto JPG/PNG/WebP <=5MB, front_menu envia multipart/form-data con field foto."
       - "API valida formato/tamano, convierte a WebP comprimido max 1200x900 y guarda en uploads/platos."
       - "API persiste foto_url y metadata en platos; /uploads/platos sirve el archivo."
@@ -225,6 +277,21 @@ flows:
       - "Crear plato con imagen PNG/JPG y verificar que queda foto_url /uploads/platos/*.webp."
       - "Editar plato con nueva imagen y verificar reemplazo visual en listado admin."
       - "Abrir cliente MenuViewScreen y verificar foto/kcal/alergenos si el plato esta en menu."
+
+  admin_guarniciones:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/Guarniciones.jsx"
+      - "front_menu/src/components/platos/GuarnicionesPanel.jsx"
+      - "front_menu/src/hooks/useGuarniciones.js"
+      - "API_LA_QUINTA/src/modules/guarniciones"
+    sequence:
+      - "Admin abre /guarniciones y lista/filtra/ordena guarniciones como entidad separada de /platos."
+      - "La vista mantiene busqueda, filtros, orden y pagina local en query params compartibles."
+      - "GuarnicionesPanel crea nuevas guarniciones usando el mismo hook useGuarniciones que consume GET/POST/PATCH/DELETE /api/v1/guarniciones."
+    manual_smoke_checks:
+      - "Abrir /guarniciones y verificar busqueda, filtros por estado/tipo, edicion inline y cambio activo/inactivo."
+      - "Abrir /platos y verificar que el formulario de plato sigue mostrando el estado de guarnicion disponible."
 
   admin_pedidos:
     status: verified_in_repo
@@ -238,7 +305,21 @@ flows:
       - "Admin puede ver detalle GET /api/v1/pedidos/:id"
       - "Admin cambia estado PATCH /api/v1/pedidos/:id/estado"
       - "Backend registra pedido_eventos tipo estado_cambiado"
+      - "Backend registra admin_auditoria accion=cambiar_estado para pedidos si la tabla existe."
       - "Backend crea una notificacion para el empleado del pedido con dedupe_key pedido-estado:<pedido_id>:<estado>."
+      - "PedidosAdmin y PedidosHoy muestran snapshot de plan para cocina: tamano de vianda, postre y bebida."
+      - "PedidosAdmin y PedidosHoy agrupan la lista de cocina por plato/preparacion/guarnicion, independiente del plan; dentro de cada grupo desglosan cantidades por tamano y resumen cantidad de postres/bebidas."
+      - "PedidosHoy mantiene filtros de empresa/plato en query params compartibles; el filtro de platos se acota a los platos pedidos por la empresa seleccionada y se resetea si deja de ser valido."
+      - "PedidosHoy distingue dia sin pedidos reales de filtros sin coincidencias; si hay pedidos pero los filtros no coinciden muestra accion para limpiar filtros."
+      - "PedidosHoy marca Sin plato asignado como incidencia visual y textual en resumen de produccion y detalle imprimible."
+      - "PedidosAdmin separa sus pestanas principales por proposito: Seguimiento de pedidos para pedidos individuales/cambio de estado y Produccion de cocina para cantidades por dia e impresion."
+      - "PedidosAdmin muestra en Produccion de cocina los siete dias de la semana, de lunes a domingo, aunque un dia tenga 0 pedidos."
+      - "PedidosAdmin distingue semana sin pedidos de filtros sin coincidencias; si hay filtros activos muestra accion para limpiar filtros."
+      - "PedidosAdmin mantiene Semana actual como reset local de /pedidos y deja /pedidos-hoy como accion separada."
+      - "PedidosAdmin cambia estado masivo de pedidos en secuencia para evitar saturar transacciones; si hay errores, deja seleccionados solo los pedidos fallidos y muestra el primer mensaje del backend."
+      - "PedidosAdmin no muestra observaciones/notas de pedidos en seguimiento, produccion, detalle imprimible ni alertas por dia; el contrato backend conserva esos campos por compatibilidad historica."
+      - "RecomendacionesMenu selecciona semanas completas lunes-domingo y permite elegir desde el catalogo los platos sugeribles que vera el cliente en semanas sin menu."
+      - "front_menu/src/hooks/usePedidos.js fuerza refetch al montar y al volver al foco para reflejar pedidos cargados por seeds u otros usuarios."
     manual_smoke_checks:
       - "Crear pedido desde cliente"
       - "Verlo en panel admin"
@@ -246,22 +327,75 @@ flows:
       - "Verificar que el cambio persiste"
       - "Verificar que el cliente ve una notificacion nueva y aumenta el contador no leidas."
 
+  admin_finanzas:
+    status: verified_in_repo
+    files:
+      - "API_LA_QUINTA/src/modules/finanzas"
+      - "API_LA_QUINTA/src/database/migrations/1719000045000_finanzas-cuenta-corriente.js"
+      - "API_LA_QUINTA/test/finanzas.service.test.js"
+      - "front_menu/src/pages/PedidosPagos.jsx"
+      - "front_menu/src/pages/Clientes.jsx"
+      - "front_menu/src/pages/Empresas.jsx"
+      - "front_menu/src/hooks/useFinanzas.js"
+      - "front_menu/src/components/finanzas/CuentaCorrienteFicha.jsx"
+    sequence:
+      - "Admin abre /clientes?vista=pagos desde la solapa Clientes para ver la vista Pedidos y pagos."
+      - "La ruta /pedidos-pagos redirige a /clientes?vista=pagos para compatibilidad."
+      - "Admin puede abrir la ficha Cuenta corriente desde Pagos, desde una empresa en Clientes > Empresas o desde un empleado dentro del panel de la empresa."
+      - "Admin consulta GET /api/v1/finanzas/resumen para totales financieros agregados."
+      - "Admin consulta GET /api/v1/finanzas/pedidos-pagos para listar pedidos con estado_financiero separado del estado operativo."
+      - "front_menu/src/pages/PedidosPagos.jsx filtra por empresa, persona, rango de fechas, estado operativo, estado financiero, texto, menu/plato cuando el dato viene disponible y metodo de pago si el backend lo expone en filas."
+      - "La vista agrupa localmente por fecha, empresa, persona o estado financiero y calcula totales visibles por grupo."
+      - "Admin consulta GET /api/v1/finanzas/cuenta-corriente/empresas/:empresaId o /empleados/:empleadoId para ver pedidos, pagos, ajustes y saldo."
+      - "CuentaCorrienteFicha muestra pestanas Resumen, Pedidos, Pagos, Deuda, Comprobantes y Configuracion de cobro; para empresas agrega Empleados con desglose por empleado."
+      - "CuentaCorrienteFicha permite calcular periodos diario, semanal, quincenal, mensual o personalizado con boton Sacar cuenta usando los datos ya cargados de cuenta corriente."
+      - "CuentaCorrienteFicha expone Resumen viandas como ventana tipo planilla dentro de la cuenta corriente: agrupa por fecha/dia, muestra cantidad, total, observaciones y detalle expandible por empleado, plan, plato, guarnicion y precio."
+      - "Resumen viandas exporta XLSX con hojas Resumen viandas y Detalle viandas desde los pedidos del periodo seleccionado."
+      - "Admin registra pago con POST /api/v1/finanzas/pagos; el pago queda activo y no se aplica automaticamente salvo llamada posterior."
+      - "Desde Pedidos y pagos, registrar pago puede crear el pago y aplicar manualmente el monto al pedido seleccionado con POST /api/v1/finanzas/pagos/:id/aplicar."
+      - "Desde CuentaCorrienteFicha, registrar pago y pago grupal de empresa crean pagos con periodo_desde/periodo_hasta cuando hay periodo seleccionado."
+      - "Admin aplica pago con POST /api/v1/finanzas/pagos/:id/aplicar; si no envia aplicaciones, API sugiere/aplica por defecto a pedidos mas viejos con saldo pendiente del mismo pagador."
+      - "Admin puede desasociar una aplicacion con DELETE /api/v1/finanzas/pagos/:id/aplicaciones/:aplicacionId; la API recalcula el estado financiero del pedido."
+      - "Admin anula un pago con POST /api/v1/finanzas/pagos/:id/anular; la API conserva el registro, ignora sus aplicaciones para saldos y recalcula pedidos afectados."
+      - "Admin registra ajustes manuales con POST /api/v1/finanzas/ajustes para casos como cancelado/no entregado cobrado o saldo corregido."
+      - "Cada mutacion financiera registra admin_auditoria si la tabla existe."
+    hard_rules:
+      - "No usar pedidos.estado como estado financiero; pedidos.estado_financiero es la fuente financiera."
+      - "No borrar pagos fisicamente en flujos normales; anular con auditoria."
+      - "Un pago de empresa solo puede aplicarse a pedidos de esa empresa; un pago de empleado solo a pedidos de ese empleado."
+      - "Las aplicaciones no pueden superar el saldo disponible del pago."
+      - "Pedido cancelado normalmente no se cobra en resumen/cuenta corriente; usar ajuste financiero manual si se necesita excepcion."
+    manual_smoke_checks:
+      - "Crear pago admin para una empresa y verificar que aparece en cuenta corriente de empresa."
+      - "Abrir /clientes?vista=pagos y verificar filtros, agrupacion, metricas, exportacion CSV/XLSX e impresion PDF."
+      - "Abrir /pedidos-pagos y verificar que redirige a /clientes?vista=pagos."
+      - "Abrir /clientes, tocar Cuenta en una empresa y en un empleado, y verificar la ficha de cuenta corriente con pestanas y periodo."
+      - "Aplicar pago a un pedido con importe_total cargado y verificar estado_financiero parcial/pagado."
+      - "Anular pago y verificar que el pedido vuelve a pendiente/parcial segun corresponda."
+      - "Verificar evento en /admin/auditoria con entidad_tipo finanzas_pago o finanzas_ajuste."
+
   admin_notificaciones:
     status: verified_in_repo
     files:
       - "front_menu/src/pages/NotificacionesAdmin.jsx"
+      - "front_menu/src/pages/Clientes.jsx"
       - "front_menu/src/hooks/useNotificaciones.js"
       - "API_LA_QUINTA/src/modules/notificaciones"
     sequence:
-      - "Admin abre /notificaciones desde sidebar o menu Mas mobile."
+      - "Admin abre /clientes?vista=notificaciones desde la solapa Clientes."
+      - "La ruta /notificaciones redirige a /clientes?vista=notificaciones para compatibilidad."
       - "Panel Internas permite envio manual a todos, empresa o empleado con POST /api/v1/notificaciones/admin."
       - "Panel Internas administra reglas de eventos con GET/POST/PATCH/DELETE /api/v1/notificaciones/admin/reglas?canal=interna."
       - "Panel WhatsApp administra activo/webhook_url de n8n con GET/PATCH /api/v1/notificaciones/admin/whatsapp/config."
+      - "GET /whatsapp/config devuelve configured y masked_webhook_url, nunca la URL real."
+      - "front_menu enmascara el webhook_url por defecto y permite revelarlo manualmente con GET /whatsapp/config/reveal; la API registra admin_auditoria accion=revelar_webhook_whatsapp y la UI borra el valor revelado del state a los 30 segundos."
       - "Panel WhatsApp administra destinatarios externos con /api/v1/notificaciones/admin/whatsapp/destinatarios."
       - "Panel WhatsApp administra reglas canal=whatsapp con filtros por alcance, empresa, empleado, rol, plan, modo_pedido, dias_laborales, preferencia WhatsApp y contactos externos."
       - "Para evento pedido_semanal_pendiente, el formulario muestra programacion semanal con dia_semana y hora; el scheduler de API corre cada minuto y ejecuta la regla si coincide."
       - "pedido_semanal_pendiente usa la semana publicada objetivo mas cercana con fecha_fin >= CURRENT_DATE y envia solo a empleados activos sin pedido no-cancelado para esa semana."
-      - "Panel WhatsApp muestra auditoria de llamadas al webhook con GET /api/v1/notificaciones/admin/whatsapp/envios y permite prueba manual con POST /api/v1/notificaciones/admin/whatsapp/probar; si n8n rechaza la llamada, la API responde 502 con status_code/respuesta/error y el panel lo muestra como error."
+      - "Panel WhatsApp muestra auditoria de llamadas al webhook con GET /api/v1/notificaciones/admin/whatsapp/envios y permite prueba manual con POST /api/v1/notificaciones/admin/whatsapp/probar."
+      - "Cada prueba manual valida telefono E.164 y mensaje <=900 en frontend/backend, sanitiza el mensaje en API, usa timeout hacia n8n y registra whatsapp_test_logs; la UI lista GET /whatsapp/test-logs?limit=10 con detalle JSON y accion Reintentar."
+      - "Si la prueba falla por INVALID_WEBHOOK_URL, la UI hace scroll al input del webhook y lo resalta temporalmente."
       - "GET /api/v1/notificaciones/admin lista ultimas notificaciones internas con empleado y empresa."
       - "El cliente las consume con GET /api/v1/notificaciones y el badge de Inicio usa GET /api/v1/notificaciones/no-leidas/count."
       - "Eventos automaticos disponibles: nuevo_registro, menu_publicado y pedido_estado_cambiado; cada evento consulta reglas activas por canal."
@@ -276,6 +410,23 @@ flows:
       - "Iniciar sesion como ese empleado, abrir Inicio y verificar contador."
       - "Abrir /notificaciones cliente, marcar leida y verificar que baja el contador."
 
+  admin_auditoria:
+    status: verified_in_repo
+    files:
+      - "front_menu/src/pages/Auditoria.jsx"
+      - "front_menu/src/hooks/useAdminAuditoria.js"
+      - "API_LA_QUINTA/src/modules/admin-auditoria"
+      - "API_LA_QUINTA/src/database/migrations/1719000042000_admin-auditoria.js"
+    sequence:
+      - "Superadmin abre /auditoria desde sidebar o menu Mas mobile."
+      - "front_menu consulta GET /api/v1/admin/auditoria con filtros opcionales entidad_tipo y accion."
+      - "API devuelve eventos de admin_auditoria ordenados por created_at DESC."
+      - "Eventos de menus, empleados e importacion CSV guardan antes/despues cuando aplica."
+      - "Cambios de estado de pedidos siguen guardando pedido_eventos y ademas se reflejan en admin_auditoria si la tabla existe."
+    manual_smoke_checks:
+      - "Duplicar una semana o actualizar un empleado y verificar evento en /auditoria."
+      - "Filtrar por entidad menu_semanal, empleado o pedido."
+
   cliente_historial_perfil:
     status: verified_in_repo
     files:
@@ -284,7 +435,15 @@ flows:
       - "front_clientes/src/services/api.js"
     sequence:
       - "Historial usa endpoints cliente autenticados"
-      - "Cancelar pedido en Historial llama DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD, actualiza cache mi-historial como cancelado, limpia el pedido activo en caches pedido-semanal e invalida ambas queries."
+      - "HistorialPage mantiene pestañas internas Pedidos y Cuenta sin cambiar la ruta canonica /mis-pedidos ni BottomNavigation."
+      - "La pestaña Pedidos consulta GET /api/v1/pedidos/mi-historial y conserva la cancelacion de pedidos cancelables."
+      - "La pestaña Cuenta consulta GET /api/v1/finanzas/mi-historial via front_clientes/src/services/api.js."
+      - "API_LA_QUINTA.finanzas filtra GET /finanzas/mi-historial por req.empleado: rol cliente ve solo su cuenta; rol admin de empleado ve la cuenta de su empresa."
+      - "Persona cliente ve pedidos propios, pagos propios, deuda propia e indicador pagado_por_empresa cuando una aplicacion de pago de empresa cubre su pedido."
+      - "Empresa cliente ve pedidos de empleados, totales, pagos de empresa, deuda pendiente, comprobantes y descarga CSV local del resumen."
+      - "El portal cliente no permite editar pagos, aplicar/desasociar pagos ni anular pagos."
+      - "Cancelar pedido en Historial llama DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD; si hay dias vencidos, la API conserva esos items y cancela solo los dias pendientes. La UI invalida mi-historial, mi-historial-financiero y pedido-semanal sin vaciar items localmente."
+      - "Historial permite cancelar un dia puntual con DELETE /api/v1/pedidos/:id/dias/:dia cuando item.puede_cancelar=true; los dias ya vencidos o entregados quedan sin boton de cancelacion."
       - "Perfil usa authApi.actualizarPerfil y authApi.cambiarPassword"
       - "PerfilPage muestra Empresa, Plan, Telefono y Cumpleanos desde el empleado autenticado."
       - "PerfilPage usa PATCH /api/v1/auth/preferencias para preferencias alimentarias"
@@ -293,6 +452,9 @@ flows:
       - "Inicio consulta GET /api/v1/notificaciones/no-leidas/count para mostrar el badge real de no leidas; no debe hardcodear contadores."
     manual_smoke_checks:
       - "Abrir /mis-pedidos con sesion cliente"
+      - "Abrir la pestaña Cuenta y verificar que carga resumen financiero sin mostrar pagos de otra persona/empresa."
+      - "Con un usuario rol admin de empleados, verificar que Cuenta muestra pedidos de empleados y pagos de empresa."
+      - "Descargar resumen desde Cuenta y verificar que genera CSV con pedidos/pagos filtrados por identidad."
       - "Abrir /mi-cuenta y verificar Empresa, Plan, Telefono y Cumpleanos."
       - "Cambiar password con validacion visible"
       - "Abrir /notificaciones y verificar loading/empty/listado sin sesion cruzada"
@@ -307,6 +469,7 @@ flows:
       - "API_LA_QUINTA/scripts/seed-platos-completo.js"
       - "API_LA_QUINTA/scripts/seed-full-reset.js"
       - "API_LA_QUINTA/scripts/backfill-platos-metadata-aproximada.js"
+      - "API_LA_QUINTA/scripts/limpiar-descripciones-placeholder-platos.js"
       - "API_LA_QUINTA/scripts/backfill-demo-perfiles.js"
       - "API_LA_QUINTA/scripts/menus-historicos.csv"
       - "API_LA_QUINTA/src/database/seeds/menus-historicos.csv"
@@ -317,14 +480,17 @@ flows:
       - "import-menus-csv.js carga estado por fecha: semanas pasadas cerrado, semana actual publicado y futuras borrador."
       - "import-menus-csv.js mantiene menus_semanales, menu_semanal_dias, menu_semanal_sin_servicio e historial_uso_platos alineados con el CSV."
       - "seed-platos-fijos.js, seed-platos-completo.js, import-menus-csv.js y seed-full-reset.js recalculan metadata aproximada de platos luego de crear/actualizar catalogo."
-      - "backfill-platos-metadata-aproximada.js exporta actualizarMetadataPlatos y metadataParaPlato; carga descripciones, receta/preparacion breve, kcal aproximadas, alergenos y vegetariano para platos existentes; no inventa foto_url."
+      - "backfill-platos-metadata-aproximada.js exporta actualizarMetadataPlatos y metadataParaPlato; actualiza kcal aproximadas, alergenos y vegetariano, preserva descripciones reales y limpia a NULL solo descripciones placeholder conocidas; no inventa foto_url ni textos editoriales genericos."
+      - "npm run platos:limpiar-placeholders audita descripciones placeholder de platos en modo dry-run; solo limpia descripcion/descripcion_larga con npm run platos:limpiar-placeholders:apply."
       - "npm run seed es el comando consolidado para catalogo + menus; ejecuta seed:catalogo y luego seed:menus."
-      - "npm run seed:catalogo ejecuta seed-guarniciones-completo.js y seed-platos-completo.js; deja guarniciones, platos y metadata aproximada."
+      - "npm run seed:catalogo ejecuta seed-guarniciones-completo.js y seed-platos-completo.js; deja guarniciones, platos y metadata nutricional aproximada sin generar descripciones placeholder nuevas."
       - "npm run seed:menus ejecuta import-menus-csv.js; recrea menus desde CSV e historial asociado."
       - "seed-full-reset.js se expone como npm run seed:demo-reset; es destructivo, bloquea NODE_ENV=production y exige SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
       - "seed:demo-reset crea dos usuarios del panel admin: superadmin con SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD y admin operativo con DEMO_ADMIN_EMAIL/DEMO_ADMIN_PASSWORD, que deben ser emails distintos."
       - "npm run setup ejecuta solo migraciones y es el comando seguro de setup para produccion; npm run setup:demo ejecuta migraciones + seed:demo-reset y queda restringido a dev/testing."
       - "backfill-demo-perfiles.js se expone como npm run seed:demo-profiles; completa empresas/empleados demo existentes con email, telefono, codigo_registro, fecha_nacimiento y preferencias sin borrar datos ni cambiar passwords; bloquea NODE_ENV=production."
+      - "seed-test-data.js se expone como npm run seed:test-data; crea 4 empresas, 25 empleados, asegura menus de test publicados/cerrados para semanas objetivo y genera pedidos realistas con snapshot de plan; requiere TEST_DATA_PASSWORD de al menos 8 caracteres, acepta 12345678 para QA local y bloquea NODE_ENV=production."
+      - "limpiar-datos-prueba.js se expone como npm run datos-prueba:limpiar (dry-run) y datos-prueba:limpiar:apply; elimina empresas/empleados/pedidos/menus seed de prueba conocidos y exige CLEAN_TEST_DATA_CONFIRM=ELIMINAR_DATOS_PRUEBA para aplicar."
       - "seed:admin crea un usuario en usuarios_admin; si no existe otro superadmin activo lo crea como superadmin, si ya existe lo crea como admin y preserva rol superadmin para emails que ya lo tengan."
     validation_2026_06_29:
       - "Auditoria local: 215 entradas del CSV -> 123 platos canonicos; faltantes en seed-platos-completo: 0."
@@ -340,6 +506,16 @@ flows:
       - "package.json cambia setup a solo migraciones y agrega setup:demo para base demo destructiva explicita."
       - "seed:demo-profiles ejecutado en DB local: 4 empresas con email/telefono/codigo_registro y 20 empleados con telefono/fecha_nacimiento/preferencias."
       - "Consolidacion de comandos npm: seed:catalogo, seed:menus, seed, seed:demo, seed:demo-reset, seed:admin y seed:demo-profiles reemplazan aliases dispersos."
+      - "seed:test-data queda como seed no destructivo para escenarios de QA con 4 empresas, una de 13 empleados, menus semanales garantizados y pedidos historicos/actuales/proxima semana con snapshot de plan."
+      - "Validacion local de seed:test-data: 4 empresas procesadas, 25 empleados procesados, 122 pedidos, 522 items, 18 dias sin pedido y 218 eventos; 6 menus objetivo con 10 opciones cada uno; pedidos seed con plan_id/menu_semanal_id completos; empleados activos por empresa 4/4/4/13."
+    validation_2026_07_03:
+      - "Backfill de metadata de platos deja de generar descripcion/descripcion_larga genericas; preserva contenido real y limpia a NULL solo placeholders conocidos."
+      - "Se agrega npm run platos:limpiar-placeholders con dry-run por defecto y npm run platos:limpiar-placeholders:apply para limpiar datos existentes antes de produccion."
+      - "seed-full-reset.js deja de crear empresa literal TEST y usuario test@test.com; datos-prueba:limpiar permite auditar/aplicar limpieza de datos demo/QA antes de preproduccion."
+    validation_2026_07_04:
+      - "Scheduler pedido_semanal_pendiente verificado localmente: DB/API usan America/Argentina/Buenos_Aires; las ejecuciones quedan en notificacion_ejecuciones_programadas y los webhooks en notificacion_envios_whatsapp."
+      - "Correccion 2026-07-04: notificaciones.service.js normaliza objetos Date a YYYY-MM-DD antes de buscar empleados sin pedido; evita fallas PostgreSQL por fechas tipo Mon Jun ... en ejecuciones programadas."
+      - "seed:test-data acepta TEST_DATA_PASSWORD=12345678 para facilitar login QA local; sigue bloqueado en NODE_ENV=production."
 
 validation_2026_07_02:
   verified_in_repo:
@@ -352,7 +528,8 @@ validation_2026_07_02:
     - "API_LA_QUINTA npm run seed:demo-profiles OK; 4 empresas y 20 empleados demo completados."
     - "Auditoria DB local posterior: 146/146 platos con descripcion, receta, kcal y alergenos; 2 con foto_url; 4/4 empresas con email, telefono y codigo_registro; 20/20 empleados con telefono, fecha_nacimiento y preferencias."
     - "API_LA_QUINTA npm run lint OK."
-    - "API_LA_QUINTA npm test OK en rerun: 39 tests."
+    - "API_LA_QUINTA npm run migrate OK para 1719000042000_admin-auditoria."
+    - "API_LA_QUINTA npm test OK en rerun: 40 tests."
     - "front_menu npm run lint OK."
     - "front_menu npm run build OK."
     - "front_clientes npm run lint OK."

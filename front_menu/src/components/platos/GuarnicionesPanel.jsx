@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCreateGuarnicion } from '../../hooks/useGuarniciones.js';
 import { toast } from '../../lib/toast.js';
 import Modal from '../ui/Modal.jsx';
@@ -8,16 +8,26 @@ export default function GuarnicionesPanel({ modalOpen, onModalClose }) {
   const crear = useCreateGuarnicion();
   const [nueva, setNueva]         = useState('');
   const [nuevaTipo, setNuevaTipo] = useState(null);
+  const [errors, setErrors]       = useState({});
+  const nombreRef                 = useRef(null);
 
   const handleCerrar = () => {
     onModalClose();
     setNueva('');
     setNuevaTipo(null);
+    setErrors({});
   };
 
   const handleAgregar = async (e) => {
     e.preventDefault();
-    if (!nueva.trim()) return;
+    if (!nueva.trim()) {
+      setErrors({ nombre: 'El nombre es obligatorio' });
+      requestAnimationFrame(() => {
+        nombreRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nombreRef.current?.focus({ preventScroll: true });
+      });
+      return;
+    }
     try {
       await crear.mutateAsync({ nombre: nueva.trim(), tipo: nuevaTipo });
       handleCerrar();
@@ -33,13 +43,20 @@ export default function GuarnicionesPanel({ modalOpen, onModalClose }) {
             Nombre <span className="text-red-500">*</span>
           </label>
           <input
+            ref={nombreRef}
             autoFocus
             value={nueva}
-            onChange={e => setNueva(e.target.value)}
+            onChange={e => {
+              setNueva(e.target.value);
+              setErrors(er => ({ ...er, nombre: '' }));
+            }}
             placeholder="Ej: Arroz primavera"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none
-              focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+            aria-invalid={Boolean(errors.nombre)}
+            className={`w-full px-3 py-2 text-sm border rounded-lg outline-none
+              focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors
+              ${errors.nombre ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
           />
+          {errors.nombre && <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
@@ -66,7 +83,7 @@ export default function GuarnicionesPanel({ modalOpen, onModalClose }) {
         </div>
         <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
           <button type="button" onClick={handleCerrar} className="btn-secondary">Cancelar</button>
-          <button type="submit" disabled={crear.isPending || !nueva.trim()} className="btn-primary disabled:opacity-50">
+          <button type="submit" disabled={crear.isPending} className="btn-primary disabled:opacity-50">
             {crear.isPending && <Spinner size="sm" />}
             Agregar
           </button>

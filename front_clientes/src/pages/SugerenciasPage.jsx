@@ -1,25 +1,20 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Lightbulb, CheckCircle2, AlertCircle } from 'lucide-react';
-import { apiPost } from '../services/apiCliente.js';
+import { apiGet, apiPost } from '../services/apiCliente.js';
 import BtnPrimary from '../components/ui/BtnPrimary.jsx';
-
-const SUGERENCIAS_PREDEFINIDAS = [
-  'Milanesa', 'Pollo grillado', 'Pasta', 'Ensaladas', 'Sushi', 'Burger',
-  'Wok', 'Salmon', 'Pizza', 'Tacos', 'Curry', 'Risotto',
-];
 
 function rangoSemana(semanaId) {
   if (!semanaId) return 'esta semana';
   const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const [y, m, d] = String(semanaId).split('T')[0].split('-').map(Number);
   const lunes = new Date(y, m - 1, d);
-  const viernes = new Date(y, m - 1, d + 4);
+  const domingo = new Date(y, m - 1, d + 6);
   const ml = meses[lunes.getMonth()];
-  const mv = meses[viernes.getMonth()];
+  const mv = meses[domingo.getMonth()];
   const ini = ml === mv ? lunes.getDate() : `${lunes.getDate()} ${ml}`;
-  return `${ini} – ${viernes.getDate()} ${mv}`;
+  return `${ini} al ${domingo.getDate()} ${mv}`;
 }
 
 export default function SugerenciasPage() {
@@ -30,6 +25,16 @@ export default function SugerenciasPage() {
   const [seleccionadas, setSeleccionadas] = useState([]);
   const [comentario, setComentario] = useState('');
   const [enviado, setEnviado] = useState(false);
+
+  const { data: opciones = [], isLoading: cargandoOpciones } = useQuery({
+    queryKey: ['pedido-sugerencia-opciones', semanaId],
+    queryFn: () => apiGet(`/pedidos/sugerencias/opciones?semana_inicio=${encodeURIComponent(semanaId)}`, { requiereAuth: true }),
+    enabled: Boolean(semanaId),
+  });
+
+  const sugerenciasDisponibles = opciones
+    .map(opcion => opcion.nombre || opcion.plato_nombre)
+    .filter(Boolean);
 
   const toggle = (s) =>
     setSeleccionadas(prev =>
@@ -92,7 +97,13 @@ export default function SugerenciasPage() {
             <p className="text-sm font-bold text-[#2A2C1F]">¿Qué te gustaría comer?</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {SUGERENCIAS_PREDEFINIDAS.map(s => (
+            {cargandoOpciones && <p className="text-sm text-[#7A7868]">Cargando platos sugeridos...</p>}
+            {!cargandoOpciones && sugerenciasDisponibles.length === 0 && (
+              <p className="rounded-xl border border-[#E8E2D4] bg-white px-4 py-3 text-sm text-[#7A7868]">
+                Todavia no hay platos sugeridos para esta semana. Podes dejarnos un comentario.
+              </p>
+            )}
+            {sugerenciasDisponibles.map(s => (
               <button
                 key={s}
                 onClick={() => toggle(s)}

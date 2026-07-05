@@ -26,6 +26,16 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
   - Requiere token.
   - Confirma un pedido propio.
 
+- `DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD`
+  - Requiere token.
+  - Cancela el pedido completo solo si todos los dias activos siguen dentro de plazo.
+  - Si la semana ya empezo y hay dias vencidos, conserva esos dias y marca como `sin_pedido` solo los dias pendientes cancelables.
+
+- `DELETE /api/v1/pedidos/:pedidoId/dias/:dia`
+  - Requiere token.
+  - Cancela un dia puntual del pedido propio marcandolo como `sin_pedido`.
+  - Rechaza dias ya vencidos, ya sin pedido o pedidos que no pertenezcan al empleado autenticado.
+
 - `POST /api/v1/pedidos/sugerencias`
   - Requiere token.
   - Guarda sugerencias del empleado autenticado para una semana sin menú publicado.
@@ -91,6 +101,8 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Sábado y domingo pueden venir como `sin_pedido` por defecto en empresas que trabajan lunes a domingo.
 - Si un día no tiene menú especial, se pueden mostrar platos fijos con el aviso: "Todavía no hay menú especial para este día. Podés elegir un plato fijo".
 - Si un día está vencido, no se puede editar.
+- Si un día está vencido, tampoco se puede cancelar desde Historial.
+- Al cancelar una semana en curso, los días ya vencidos o entregados deben quedar visibles en Historial; solo se cancelan los días pendientes que todavía están dentro de plazo.
 - Si un día está marcado sin servicio/feriado en el menú, aparece como `sin_pedido` por defecto para evitar viandas accidentales y no se puede editar desde el cliente.
 - Si la semana está fuera de plazo, el backend debe rechazar POST/PUT aunque el frontend haya mostrado el botón por error.
 - El plazo vigente para POST/PUT lo define la empresa (`modo_pedido`, `limite_hora`, `limite_dia_semana`, `limite_anticipacion_dias` y `plazo_override_hasta` si aplica); `menus_semanales.fecha_limite_pedidos` no debe bloquear el pedido cliente.
@@ -120,7 +132,8 @@ Esta nota documenta el flujo real de pedidos semanales desde la app cliente. La 
 - Error de API: mensaje claro sin exponer detalles internos.
 - Guardado OK: la card se sincroniza con la respuesta real.
 - Recarga de página: el pedido confirmado o modificado se reconstruye desde DB.
-- Pedido cancelado/eliminado: no debe contar como pedido activo ni mostrar `Ver pedido` en Inicio; Historial invalida también la cache de `Pedido semanal`.
+- Pedido cancelado completo: no debe contar como pedido activo ni mostrar `Ver pedido` en Inicio; Historial invalida también la cache de `Pedido semanal`.
+- Pedido cancelado parcialmente: conserva el pedido activo con los días vencidos y muestra como `Sin vianda` los días pendientes cancelados.
 - Semana sin menú asignado: mostrar pantalla de sugerencia de menú.
 
 ## Decisiones UX cliente 2026-06-28

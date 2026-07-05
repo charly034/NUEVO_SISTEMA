@@ -1,5 +1,5 @@
 schema: la_quinta_project_history_v2
-updated_at: "2026-07-02"
+updated_at: "2026-07-04"
 
 product_summary:
   from_chat_summary:
@@ -70,6 +70,14 @@ conversation_decisions_or_context:
 
 timeline:
   verified_in_repo:
+    - date: "2026-07-04"
+      event: "PedidosHoy mejora UX operativa: filtros empresa/plato persistidos en URL, opciones de plato acotadas por empresa seleccionada, estado vacio contextual para filtros sin coincidencias, alerta textual/visual de Sin plato asignado y mejoras de accesibilidad del header/drawer movil."
+    - date: "2026-07-04"
+      event: "seed:test-data permite usar TEST_DATA_PASSWORD=12345678 para QA local y mantiene el bloqueo de ejecucion en produccion."
+    - date: "2026-07-02"
+      event: "Se agrega entidad planes_vianda para planes de vianda configurables: Plan Clasico 450 y Plan Abundante 600 con combinaciones de postre/bebida. Empresas referencia plan_id manteniendo plan legacy; pedidos guarda snapshot del plan para cocina; PedidosAdmin/PedidosHoy muestran tamano, postre y bebida."
+    - date: "2026-07-02"
+      event: "Panel admin implementa mejoras de auditoria operativa: Dashboard con alertas, PedidosHoy con resumen de produccion por opcion/plato/guarnicion, duplicar semana via endpoint transaccional, importacion CSV de empleados, auditoria admin nivel 2, filtros de estadisticas por periodo/empresa, webhook n8n enmascarado y Sugeridor con ultimo uso/uso historico."
     - date: "2026-07-02"
       event: "WeeklyOrderView bloquea filas sin servicio para seleccion, API rechaza items enviados para esos dias y Confirmar pedido semanal solo se habilita con cambios reales contra el pedido inicial."
     - date: "2026-06-30"
@@ -202,6 +210,18 @@ timeline:
       event: "Auditoria de migraciones/seeds para produccion: setup queda limitado a migraciones, setup:demo concentra reset demo destructivo, los seeds que crean platos recalculan metadata aproximada, los seeds demo/test cargan codigo_registro y perfiles completos, y seed:demo-profiles completa datos demo existentes sin borrar ni cambiar passwords."
     - date: "2026-07-02"
       event: "Se consolidan comandos npm de seeds: seed carga catalogo+menus, seed:catalogo prepara guarniciones/platos/metadata, seed:menus importa historico, seed:demo queda no destructivo y seed:demo-reset concentra el reset destructivo dev-only."
+    - date: "2026-07-02"
+      event: "Se crea seed:test-data para QA: 4 empresas, 25 empleados, una empresa de 13 empleados y pedidos realistas para semanas anteriores, actual y proxima."
+    - date: "2026-07-03"
+      event: "seed:test-data se adapta al esquema de planes_vianda: asegura menus semanales de test, publica/cierra semanas objetivo y genera pedidos con snapshot de plan para que carguen en vistas admin/cliente."
+    - date: "2026-07-03"
+      event: "Panel admin separa Platos y Guarniciones en rutas reales /platos y /guarniciones, agrupadas bajo Catalogo; ambas vistas guardan filtros/busqueda/orden/pagina en la URL y /platos?tab=guarniciones redirige a /guarniciones."
+    - date: "2026-07-03"
+      event: "Limpieza pre-produccion de catalogo: backfill-platos-metadata-aproximada deja de generar descripciones/recetas placeholder, preserva contenido real y limpia placeholders conocidos a NULL; se agrega npm run platos:limpiar-placeholders con dry-run por defecto y platos:limpiar-placeholders:apply para aplicar."
+    - date: "2026-07-03"
+      event: "Limpieza pre-produccion de datos QA: seed-full-reset deja de crear empresa TEST/test@test.com y se agrega limpiar-datos-prueba.js con dry-run/apply para remover empresas, empleados, pedidos y menus seed de prueba conocidos."
+    - date: "2026-07-04"
+      event: "PedidosAdmin elimina la funcionalidad visible de observaciones/notas de pedidos: ya no aparecen indicadores, alertas por dia, detalle por item ni bloques imprimibles; el backend mantiene los campos por compatibilidad historica."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."

@@ -111,7 +111,7 @@ export const cambiarEstado = async (id, estado, extra = {}) => {
 // También incluye los días sin servicio
 export const findByIdWithDias = async (id) => {
   const menuResult = await query(
-    'SELECT id, nombre, fecha_inicio, fecha_fin, created_at, updated_at FROM menus_semanales WHERE id = $1',
+    'SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, created_at, updated_at FROM menus_semanales WHERE id = $1',
     [id]
   );
   const menu = menuResult.rows[0];

@@ -5,15 +5,6 @@ import { formatearRangoPedido } from "../../utils/fechasPedido.js";
 import Boton from "../ui/Boton.jsx";
 import SemanaHeader from "./SemanaHeader.jsx";
 
-const ideasRapidas = [
-  "Pastel de papa",
-  "Ravioles con fileto",
-  "Pollo al horno con calabaza",
-  "Tarta de verduras",
-  "Milanesa con puré",
-  "Wok de vegetales",
-];
-
 export default function SemanaCardRecomendacion({
   guardando = false,
   onCancelar,
@@ -31,10 +22,10 @@ export default function SemanaCardRecomendacion({
 
   const opciones = useMemo(
     () => [
+      ...(semana.opcionesSugerencia || []).map((opcion) => opcion.nombre || opcion.plato_nombre),
       ...(semana.sugerencias || []).map((sugerencia) => sugerencia.plato),
-      ...ideasRapidas,
     ].filter((opcion, indice, lista) => lista.indexOf(opcion) === indice),
-    [semana.sugerencias],
+    [semana.opcionesSugerencia, semana.sugerencias],
   );
 
   const puedeEnviar = seleccionadas.length > 0 || comentario.trim().length > 0;

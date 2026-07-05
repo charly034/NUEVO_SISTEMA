@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import Spinner from '../ui/Spinner.jsx';
+import PlatoPhoto from '../ui/PlatoPhoto.jsx';
 import { useGuarniciones } from '../../hooks/useGuarniciones.js';
 
 // ── Tipos de plato ────────────────────────────────────────────────
@@ -105,6 +106,7 @@ function TagInput({ value = [], onChange }) {
 export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
   const { data: guarniciones = [] } = useGuarniciones();
   const guarnicionesActivas = guarniciones.filter(g => g.activo).length;
+  const nombreRef = useRef(null);
 
   const [form, setForm] = useState(() => ({
     nombre:           initial?.nombre           ?? '',
@@ -164,10 +166,24 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
     return err;
   };
 
+  const focusFirstError = (err) => {
+    const first = Object.keys(err)[0];
+    const target = first === 'nombre' ? nombreRef.current : null;
+    if (!target) return;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.focus({ preventScroll: true });
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const err = validate();
-    if (Object.keys(err).length > 0) { setErrors(err); return; }
+    if (Object.keys(err).length > 0) {
+      setErrors(err);
+      focusFirstError(err);
+      return;
+    }
     onSubmit({
       nombre:           form.nombre.trim(),
       descripcion:      form.descripcion.trim() || undefined,
@@ -191,6 +207,7 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
           Nombre <span className="text-red-500">*</span>
         </label>
         <input
+          ref={nombreRef}
           type="text"
           value={form.nombre}
           onChange={set('nombre')}
@@ -210,11 +227,13 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         </label>
         <div className="flex items-center gap-3">
           <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-            {fotoPreview ? (
-              <img src={fotoPreview} alt="Vista previa del plato" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-xs text-gray-400 text-center px-2">Sin foto</span>
-            )}
+            <PlatoPhoto
+              src={fotoPreview}
+              alt={form.nombre || 'Nuevo plato'}
+              plato={form}
+              imgClassName="w-full h-full object-cover"
+              size="lg"
+            />
           </div>
           <div className="min-w-0 flex-1">
             <input

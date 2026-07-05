@@ -38,13 +38,22 @@ npm run dev
   `admin`.
 - `npm run seed:demo` crea datos demo no destructivos y completa perfiles demo
   existentes sin borrar datos ni cambiar contraseñas.
+- `npm run seed:test-data` crea datos de prueba realistas: 4 empresas, 25
+  empleados en total, pedidos de semanas anteriores, semana actual y semana
+  próxima; además asegura menús de test publicados/cerrados y snapshot de plan
+  en pedidos. Requiere `TEST_DATA_PASSWORD`, acepta `12345678` para QA local y
+  no corre en producción.
+- `npm run datos-prueba:limpiar` audita datos demo/QA conocidos en modo
+  dry-run; `CLEAN_TEST_DATA_CONFIRM=ELIMINAR_DATOS_PRUEBA npm run
+  datos-prueba:limpiar:apply` elimina empresas/empleados/pedidos/menús seed
+  de prueba antes de preparar una base limpia.
 - No ejecutar `npm run seed:demo-reset` ni `node scripts/seed-full-reset.js` en
   producción.
 - `seed:demo-reset` es destructivo y requiere
   `SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE`.
 - Los passwords de seeds demo/dev deben venir por variables de entorno:
   `DEMO_ADMIN_PASSWORD`, `DEMO_CLIENT_PASSWORD`, `TEST_DATA_PASSWORD`,
-  `SUPERADMIN_PASSWORD`, `DEFAULT_DEMO_PASSWORD` y `TEST_USER_PASSWORD`.
+  `SUPERADMIN_PASSWORD` y `DEFAULT_DEMO_PASSWORD`.
 - Para una base demo completa desde cero, usar `npm run setup:demo` solo en
   desarrollo/testing. Es destructivo, exige `SEED_FULL_RESET_CONFIRM`, crea un
   superadmin con `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` y un admin operativo

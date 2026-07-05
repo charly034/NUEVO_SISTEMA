@@ -2,6 +2,7 @@ import * as repo from './pedidos.repository.js';
 import * as empresasRepo from '../empresas/empresas.repository.js';
 import * as guarnicionesRepo from '../guarniciones/guarniciones.repository.js';
 import * as notificacionesService from '../notificaciones/notificaciones.service.js';
+import * as auditoriaService from '../admin-auditoria/admin-auditoria.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { getClient } from '../../database/connection.js';
 import { validarPedidoInput } from './pedidos.validation.js';
@@ -25,6 +26,8 @@ const DIAS_LABEL = {
 
 // Indice de dia en la semana (lunes=0 ... domingo=6)
 const DIA_IDX = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4, sabado: 5, domingo: 6 };
+const DIAS_VALIDOS = Object.keys(DIA_IDX);
+const ESTADOS_CANCELABLES_CLIENTE = new Set(['pendiente', 'en_proceso']);
 
 function fechaISO(fecha) {
   if (fecha instanceof Date) return fecha.toISOString().split('T')[0];
@@ -151,6 +154,19 @@ function todosLosDiasCerrados(menuSemana, diasPedido) {
 
 function obtenerDiasSinServicio(menu) {
   return new Set((menu?.sin_servicio || []).map((item) => item.dia));
+}
+
+function construirSnapshotPlan(empresa) {
+  const plan = empresa?.plan_detalle || null;
+  return {
+    plan_id: plan?.id || empresa?.plan_id || null,
+    plan_codigo: plan?.codigo || empresa?.plan_codigo || null,
+    plan_nombre: plan?.nombre || empresa?.plan_nombre || empresa?.plan || null,
+    plan_gramaje_min: plan?.gramaje_min ?? empresa?.plan_gramaje_min ?? null,
+    plan_gramaje_max: plan?.gramaje_max ?? empresa?.plan_gramaje_max ?? null,
+    plan_incluye_postre: Boolean(plan?.incluye_postre ?? empresa?.plan_incluye_postre),
+    plan_incluye_bebida: Boolean(plan?.incluye_bebida ?? empresa?.plan_incluye_bebida),
+  };
 }
 
 function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible, diasPedido = [] }) {
@@ -344,21 +360,42 @@ function normalizarPayloadSugerencia(payload = {}) {
   };
 }
 
-function crearSugerenciasSemana(diasPedido) {
-  const sugerenciasBase = [
-    'Milanesa con pure de papas',
-    'Tarta de verduras con ensalada',
-    'Wok de pollo con arroz',
-    'Ravioles con salsa fileto',
-    'Hamburguesa casera con vegetales',
-    'Pastel de papa',
-    'Pollo al horno con calabaza',
-  ];
+function validarSemanaInicioLunes(semanaInicio) {
+  const iso = fechaISO(semanaInicio);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) {
+    throw ApiError.badRequest('semana_inicio es requerido en formato YYYY-MM-DD');
+  }
+  const fecha = new Date(`${iso}T00:00:00`);
+  if (fecha.getDay() !== 1) {
+    throw ApiError.badRequest('semana_inicio debe ser lunes');
+  }
+  return iso;
+}
 
-  return diasPedido.slice(0, 3).map((dia, indice) => ({
-    dia: DIAS_LABEL[dia] || dia,
-    plato: sugerenciasBase[indice % sugerenciasBase.length],
-  }));
+function normalizarOpcionSugerencia(opcion) {
+  return {
+    id: opcion.id,
+    semana_inicio: fechaISO(opcion.semana_inicio),
+    plato_id: opcion.plato_id,
+    plato_nombre: opcion.plato_nombre,
+    nombre: opcion.plato_nombre,
+    descripcion: opcion.descripcion || '',
+    tags: Array.isArray(opcion.tags) ? opcion.tags : [],
+    tipo: opcion.tipo || '',
+    foto_url: opcion.foto_url || null,
+    orden: opcion.orden ?? 0,
+  };
+}
+
+function crearSugerenciasSemana(diasPedido, opciones = []) {
+  return opciones.slice(0, Math.max(diasPedido.length, 1)).map((opcion, indice) => {
+    const dia = diasPedido[indice % Math.max(diasPedido.length, 1)] || 'lunes';
+    return {
+      id: opcion.plato_id,
+      dia: DIAS_LABEL[dia] || dia,
+      plato: opcion.plato_nombre,
+    };
+  });
 }
 
 /**
@@ -509,6 +546,14 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
   if (![...fechas].some((fecha) => fecha >= semanaActual)) fechas.add(semanaActual);
   fechas.add(addDias([...fechas].sort().at(-1) || semanaActual, 7));
 
+  const opcionesSugerencia = await repo.findOpcionesSugerenciaBySemanas([...fechas]);
+  const opcionesSugerenciaPorSemana = new Map();
+  for (const opcion of opcionesSugerencia) {
+    const semanaInicio = fechaISO(opcion.semana_inicio);
+    if (!opcionesSugerenciaPorSemana.has(semanaInicio)) opcionesSugerenciaPorSemana.set(semanaInicio, []);
+    opcionesSugerenciaPorSemana.get(semanaInicio).push(opcion);
+  }
+
   const semanas = [...fechas].sort().map((semanaInicio) => {
     const menuSemana = menusPorSemana.get(semanaInicio) || {
       disponible: false,
@@ -526,6 +571,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
     const fechaFin = addDias(semanaInicio, Math.max(diasPedido.length - 1, 0));
     const tieneMenuPublicado = Boolean(menuSemana?.menu?.id);
     const esSemanaSugerencias = !tieneMenuPublicado && semanaInicio > semanaActual;
+    const opcionesSugerenciaSemana = opcionesSugerenciaPorSemana.get(semanaInicio) || [];
     const itemsPorDia = new Map((pedidoVisible?.items || []).map((item) => [item.dia, item]));
     const sinServicioPorDia = new Map(
       (menuSemana.menu?.sin_servicio || []).map((item) => [item.dia, item.motivo || 'Sin servicio']),
@@ -548,7 +594,8 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
       },
       diasSeleccionados: pedidoVisible?.items?.length || 0,
       editable: ['sin_pedido', 'pendiente', 'confirmado'].includes(estado),
-      sugerencias: esSemanaSugerencias ? crearSugerenciasSemana(diasPedido) : [],
+      sugerencias: esSemanaSugerencias ? crearSugerenciasSemana(diasPedido, opcionesSugerenciaSemana) : [],
+      opcionesSugerencia: esSemanaSugerencias ? opcionesSugerenciaSemana.map(normalizarOpcionSugerencia) : [],
       recomendacionesUsuario: sugerenciaVisible?.ideas || [],
       comentarioRecomendacion: sugerenciaVisible?.comentario || '',
       dias: diasPedido.map((dia, indice) => {
@@ -801,6 +848,35 @@ export const getSugerenciasPedidoAdmin = async (filters) => {
   return sugerencias.map(normalizarSugerenciaAdmin);
 };
 
+export const getOpcionesSugerencia = async ({ semana_inicio }) => {
+  const semanaInicio = validarSemanaInicioLunes(semana_inicio);
+  const opciones = await repo.findOpcionesSugerencia(semanaInicio);
+  return opciones.map(normalizarOpcionSugerencia);
+};
+
+export const reemplazarOpcionesSugerencia = async ({ semana_inicio, plato_ids }) => {
+  const semanaInicio = validarSemanaInicioLunes(semana_inicio);
+  const ids = Array.isArray(plato_ids)
+    ? [...new Set(plato_ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0))]
+    : [];
+
+  if (ids.length > 24) throw ApiError.badRequest('No se pueden configurar mas de 24 platos sugeridos');
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await repo.replaceOpcionesSugerencia({ semana_inicio: semanaInicio, plato_ids: ids }, client);
+    const opciones = await repo.findOpcionesSugerencia(semanaInicio, client);
+    await client.query('COMMIT');
+    return opciones.map(normalizarOpcionSugerencia);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const getPedidoById = async (id) => {
   const pedido = await repo.findById(id);
   if (!pedido) throw ApiError.notFound(`Pedido con id ${id} no encontrado`);
@@ -888,6 +964,7 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
       menu_semanal_id,
       semana_inicio,
       observaciones,
+      plan_snapshot: construirSnapshotPlan(empresa),
     }, client);
 
     const diasProtegidos = (pedidoPrevio?.items || [])
@@ -991,30 +1068,159 @@ export const confirmarPedidoEmpleado = async (empleadoId, empresaId, pedidoId, a
   }
 };
 
-export const getMiHistorial = (empleadoId) => repo.findHistorialByEmpleado(empleadoId);
+export const getMiHistorial = async (empleadoId) => {
+  const historial = await repo.findHistorialByEmpleado(empleadoId);
+  const empresaId = historial.find((pedido) => pedido.empresa_id)?.empresa_id;
+  const empresa = empresaId ? await empresasRepo.findById(empresaId) : null;
+
+  return historial.map((pedido) => {
+    const estadoCancelable = ESTADOS_CANCELABLES_CLIENTE.has(pedido.estado);
+    const items = (pedido.items || []).map((item) => ({
+      ...item,
+      puede_cancelar: Boolean(
+        estadoCancelable &&
+        empresa &&
+        !item.sin_pedido &&
+        !verificarLimiteEmpresa(empresa, fechaISO(pedido.semana_inicio), [item.dia])
+      ),
+    }));
+
+    return {
+      ...pedido,
+      puede_cancelar: items.some((item) => item.puede_cancelar),
+      items,
+    };
+  });
+};
 
 export const cancelarMiPedido = async (empleadoId, semanaInicio, actor = {}) => {
   if (!semanaInicio) throw ApiError.badRequest('semana_inicio es requerido');
   const client = await getClient();
   try {
     await client.query('BEGIN');
-    const pedido = await repo.cancelarPedidoByEmpleado(empleadoId, semanaInicio, client);
-    if (!pedido) {
+    const pedidoActual = await repo.findPedidoByEmpleadoSemana(empleadoId, semanaInicio, client);
+    if (!pedidoActual || !ESTADOS_CANCELABLES_CLIENTE.has(pedidoActual.estado)) {
       throw ApiError.conflict('El pedido no existe o ya no se puede cancelar');
     }
+
+    const empresa = await empresasRepo.findById(pedidoActual.empresa_id);
+    if (!empresa) throw ApiError.notFound('Empresa no encontrada');
+
+    const itemsActivos = (pedidoActual.items || []).filter((item) => !item.sin_pedido);
+    const diasCancelables = itemsActivos
+      .filter((item) => !verificarLimiteEmpresa(empresa, fechaISO(pedidoActual.semana_inicio), [item.dia]))
+      .map((item) => item.dia);
+    const diasProtegidos = itemsActivos
+      .filter((item) => !diasCancelables.includes(item.dia))
+      .map((item) => item.dia);
+
+    if (diasCancelables.length === 0) {
+      throw ApiError.conflict('No quedan dias pendientes que se puedan cancelar');
+    }
+
+    if (diasProtegidos.length === 0) {
+      const pedido = await repo.cancelarPedidoByEmpleado(empleadoId, semanaInicio, client);
+      if (!pedido) {
+        throw ApiError.conflict('El pedido no existe o ya no se puede cancelar');
+      }
+      await repo.registrarEvento({
+        pedido_id: pedido.id,
+        tipo: 'pedido_cancelado',
+        actor_tipo: actor.actor_tipo || 'empleado',
+        actor_id: actor.actor_id || empleadoId,
+        actor_nombre: actor.actor_nombre || null,
+        estado_anterior: pedido.estado_anterior || null,
+        estado_nuevo: pedido.estado,
+        resumen: 'Pedido cancelado por el usuario',
+        metadata: { semana_inicio: pedido.semana_inicio, dias_cancelados: diasCancelables },
+      }, client);
+      await client.query('COMMIT');
+      return { ...pedido, cancelacion: { completa: true, dias_cancelados: diasCancelables, dias_conservados: [] } };
+    }
+
+    for (const dia of diasCancelables) {
+      await repo.cancelarItemPedido(pedidoActual.id, dia, client);
+    }
+
     await repo.registrarEvento({
-      pedido_id: pedido.id,
-      tipo: 'pedido_cancelado',
+      pedido_id: pedidoActual.id,
+      tipo: 'pedido_cancelado_parcial',
       actor_tipo: actor.actor_tipo || 'empleado',
       actor_id: actor.actor_id || empleadoId,
       actor_nombre: actor.actor_nombre || null,
-      estado_anterior: pedido.estado_anterior || null,
-      estado_nuevo: pedido.estado,
-      resumen: 'Pedido cancelado por el usuario',
-      metadata: { semana_inicio: pedido.semana_inicio },
+      estado_anterior: pedidoActual.estado,
+      estado_nuevo: pedidoActual.estado,
+      resumen: `Pedido cancelado parcialmente (${diasCancelables.length} dias)`,
+      metadata: {
+        semana_inicio: fechaISO(pedidoActual.semana_inicio),
+        dias_cancelados: diasCancelables,
+        dias_conservados: diasProtegidos,
+      },
     }, client);
+
+    const pedidoCompleto = await repo.findPedidoByEmpleadoSemana(empleadoId, semanaInicio, client);
     await client.query('COMMIT');
-    return pedido;
+    return {
+      ...normalizarPedidoGuardado(pedidoCompleto, 'Dias pendientes cancelados correctamente'),
+      cancelacion: {
+        completa: false,
+        dias_cancelados: diasCancelables,
+        dias_conservados: diasProtegidos,
+      },
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const cancelarDiaMiPedido = async (empleadoId, empresaId, pedidoId, dia, actor = {}) => {
+  if (!DIAS_VALIDOS.includes(dia)) {
+    throw ApiError.badRequest(`Dia invalido. Opciones: ${DIAS_VALIDOS.join(', ')}`);
+  }
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const pedido = await repo.findPedidoCabeceraById(pedidoId, client);
+    if (!pedido) throw ApiError.notFound('Pedido no encontrado');
+    if (Number(pedido.empleado_id) !== Number(empleadoId) || Number(pedido.empresa_id) !== Number(empresaId)) {
+      throw ApiError.forbidden('No podes cancelar un pedido que no te pertenece');
+    }
+    if (!ESTADOS_CANCELABLES_CLIENTE.has(pedido.estado)) {
+      throw ApiError.conflict('El pedido ya no se puede cancelar');
+    }
+
+    const empresa = await empresasRepo.findById(empresaId);
+    if (!empresa) throw ApiError.notFound('Empresa no encontrada');
+
+    const errorLimite = verificarLimiteEmpresa(empresa, fechaISO(pedido.semana_inicio), [dia]);
+    if (errorLimite) throw ApiError.conflict(errorLimite);
+
+    const pedidoCompletoAntes = await repo.findPedidoByEmpleadoSemana(empleadoId, fechaISO(pedido.semana_inicio), client);
+    const item = (pedidoCompletoAntes?.items || []).find((pedidoItem) => pedidoItem.dia === dia);
+    if (!item || item.sin_pedido) {
+      throw ApiError.conflict(`No hay vianda activa para cancelar el ${dia}`);
+    }
+
+    await repo.cancelarItemPedido(pedido.id, dia, client);
+    await repo.registrarEvento({
+      pedido_id: pedido.id,
+      tipo: 'pedido_dia_cancelado',
+      actor_tipo: actor.actor_tipo || 'empleado',
+      actor_id: actor.actor_id || empleadoId,
+      actor_nombre: actor.actor_nombre || null,
+      estado_anterior: pedido.estado,
+      estado_nuevo: pedido.estado,
+      resumen: `Dia cancelado por el usuario: ${dia}`,
+      metadata: { semana_inicio: fechaISO(pedido.semana_inicio), dia },
+    }, client);
+
+    const pedidoCompleto = await repo.findPedidoByEmpleadoSemana(empleadoId, fechaISO(pedido.semana_inicio), client);
+    await client.query('COMMIT');
+    return normalizarPedidoGuardado(pedidoCompleto, `Vianda del ${dia} cancelada correctamente`);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -1047,6 +1253,15 @@ export const cambiarEstado = async (id, estado, actor = {}) => {
       pedido,
       estadoAnterior: anterior.estado,
     }, client);
+    await auditoriaService.registrarAdminAction({
+      adminUser: actor.adminUser || null,
+      accion: 'cambiar_estado',
+      entidad_tipo: 'pedido',
+      entidad_id: pedido.id,
+      resumen: `Cambió pedido ${pedido.id} de ${anterior.estado} a ${estado}`,
+      antes: anterior,
+      despues: pedido,
+    }, client.query.bind(client));
 
     await client.query('COMMIT');
     return pedido;

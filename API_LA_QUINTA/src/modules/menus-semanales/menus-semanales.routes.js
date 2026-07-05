@@ -3,6 +3,7 @@ import { validate } from '../../middlewares/validation.middleware.js';
 import { requireAdmin } from '../../middlewares/auth.middleware.js';
 import {
   createMenuSemanalSchema,
+  duplicarMenuSemanalSchema,
   updateMenuSemanalSchema,
   menuSemanalParamsSchema,
   menusSemanalesQuerySchema,
@@ -28,6 +29,7 @@ import {
   getPlatosUsados,
   getPlatosNoUsados,
   cambiarEstadoMenu,
+  duplicarMenuSemanal,
 } from './menus-semanales.controller.js';
 
 const router = Router();
@@ -52,6 +54,7 @@ router.get('/historial/no-usados',      validate({ query: historialFiltrosSchema
 router.get('/',    validate({ query: menusSemanalesQuerySchema }), getMenusSemanales);
 router.get('/:id', validate({ params: menuSemanalParamsSchema }), getMenuSemanal);
 router.post('/',   validate({ body: createMenuSemanalSchema }),   createMenuSemanal);
+router.post('/:id/duplicar', validate({ params: menuSemanalParamsSchema, body: duplicarMenuSemanalSchema }), duplicarMenuSemanal);
 router.put('/:id', validate({ params: menuSemanalParamsSchema, body: updateMenuSemanalSchema }), updateMenuSemanal);
 router.delete('/:id', validate({ params: menuSemanalParamsSchema }), deleteMenuSemanal);
 router.patch('/:id/estado', validate({ params: menuSemanalParamsSchema }), cambiarEstadoMenu);

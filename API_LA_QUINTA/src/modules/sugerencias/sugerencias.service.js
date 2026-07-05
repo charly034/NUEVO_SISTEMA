@@ -78,8 +78,20 @@ async function generarVariacion(platos, fechaInicio, variacion, diasRotacion) {
     sugerencias.push({
       dia,
       fecha,
-      opcionA: opcionA ? { id: opcionA.id, nombre: opcionA.nombre, tags: opcionA.tags ?? [] } : null,
-      opcionC: opcionC ? { id: opcionC.id, nombre: opcionC.nombre, tags: opcionC.tags ?? [] } : null,
+      opcionA: opcionA ? {
+        id: opcionA.id,
+        nombre: opcionA.nombre,
+        tags: opcionA.tags ?? [],
+        ultimo_uso: opcionA.ultimo_uso,
+        total_usos: opcionA.total_usos ?? 0,
+      } : null,
+      opcionC: opcionC ? {
+        id: opcionC.id,
+        nombre: opcionC.nombre,
+        tags: opcionC.tags ?? [],
+        ultimo_uso: opcionC.ultimo_uso,
+        total_usos: opcionC.total_usos ?? 0,
+      } : null,
     });
   }
 

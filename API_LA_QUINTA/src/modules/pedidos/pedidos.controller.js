@@ -94,6 +94,14 @@ export const getSugerenciasPedidoAdmin = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getSugerenciasPedidoAdmin(req.query), 'Sugerencias obtenidas');
 });
 
+export const getOpcionesSugerencia = asyncHandler(async (req, res) => {
+  sendSuccess(res, await service.getOpcionesSugerencia(req.query), 'Opciones de sugerencia obtenidas');
+});
+
+export const reemplazarOpcionesSugerencia = asyncHandler(async (req, res) => {
+  sendSuccess(res, await service.reemplazarOpcionesSugerencia(req.body), 'Opciones de sugerencia actualizadas');
+});
+
 export const getPedidoById = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getPedidoById(req.params.id), 'Pedido obtenido');
 });
@@ -104,6 +112,7 @@ export const updateEstado = asyncHandler(async (req, res) => {
     actor_tipo: 'admin',
     actor_id: req.adminUser?.sub,
     actor_nombre: adminNombre || req.adminUser?.email || req.adminUser?.rol || 'Admin',
+    adminUser: req.adminUser,
   }), 'Estado actualizado');
 });
 
@@ -118,4 +127,19 @@ export const cancelarMiPedido = asyncHandler(async (req, res) => {
     actor_nombre: `${req.empleado.nombre ?? ''} ${req.empleado.apellido ?? ''}`.trim(),
   });
   sendSuccess(res, pedido, 'Pedido cancelado');
+});
+
+export const cancelarDiaMiPedido = asyncHandler(async (req, res) => {
+  const pedido = await service.cancelarDiaMiPedido(
+    req.empleado.sub,
+    req.empleado.empresa_id,
+    req.params.id,
+    req.params.dia,
+    {
+      actor_tipo: 'empleado',
+      actor_id: req.empleado.sub,
+      actor_nombre: `${req.empleado.nombre ?? ''} ${req.empleado.apellido ?? ''}`.trim(),
+    },
+  );
+  sendSuccess(res, pedido, 'Dia cancelado');
 });

@@ -30,6 +30,25 @@ function labelDias(n) {
   return `hace ${n}d`;
 }
 
+function descripcionFiltros(filtros) {
+  if (filtros.desde || filtros.hasta) {
+    return `del ${filtros.desde || 'inicio'} al ${filtros.hasta || 'hoy'}`;
+  }
+  if (filtros.mes) return `el mes ${filtros.mes}`;
+  if (filtros.semana) return `la semana ${filtros.semana}`;
+  if (filtros.dias) return `los ultimos ${filtros.dias} dias`;
+  return 'todos los periodos';
+}
+
+function LoadingHistorial({ label }) {
+  return (
+    <div className="card flex items-center justify-center gap-3 py-12 text-sm text-gray-500">
+      <Spinner size="lg" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 // ── Panel de filtros ─────────────────────────────────────────────
 const ATAJOS = [
   { label: 'Esta semana',    params: { dias: '7'  } },
@@ -180,8 +199,9 @@ function DetallePlatoModal({ plato, onClose }) {
 function TabUsados({ filtros }) {
   const [detalle, setDetalle] = useState(null);
   const hayFiltro = Object.values(filtros).some(Boolean);
-  const { data, isLoading, isError, error, refetch } = useUsados(filtros);
+  const { data, isLoading, isFetching, isError, error, refetch } = useUsados(filtros);
   const platos = data ?? [];
+  const filtroLabel = descripcionFiltros(filtros);
 
   if (!hayFiltro) {
     return (
@@ -191,7 +211,7 @@ function TabUsados({ filtros }) {
     );
   }
 
-  if (isLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+  if (isLoading) return <LoadingHistorial label={`Cargando platos usados para ${filtroLabel}...`} />;
   if (isError)  return <ErrorMessage message={error.message} onRetry={refetch} />;
 
   return (
@@ -199,21 +219,28 @@ function TabUsados({ filtros }) {
       {platos.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-3xl mb-2">🍽️</p>
-          <p className="text-sm text-gray-400">Ningún plato fue usado en este período.</p>
+          <p className="text-sm text-gray-400">Ningun plato fue usado para {filtroLabel}.</p>
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50">
             <p className="text-xs font-semibold text-gray-500">
-              {platos.length} plato{platos.length !== 1 ? 's' : ''} usados en el período
+              {platos.length} plato{platos.length !== 1 ? 's' : ''} usados para {filtroLabel}
             </p>
+            {isFetching && !isLoading && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600">
+                <Spinner size="sm" /> Actualizando...
+              </span>
+            )}
           </div>
           <div className="divide-y divide-gray-50">
             {platos.map((p) => (
-              <div
+              <button
+                type="button"
                 key={p.plato_id}
                 onClick={() => setDetalle({ id: p.plato_id, nombre: p.plato_nombre_snapshot })}
-                className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                aria-label={`Ver detalle de ${p.plato_nombre_snapshot}`}
+                className="flex w-full items-center justify-between px-5 py-3.5 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500 transition-colors"
               >
                 <div>
                   <p className="text-sm font-medium text-gray-800">{p.plato_nombre_snapshot}</p>
@@ -225,9 +252,9 @@ function TabUsados({ filtros }) {
                   <span className="badge bg-brand-50 text-brand-700">
                     {labelDias(diasDesde(p.fecha_servicio))}
                   </span>
-                  <span className="text-gray-300 text-xs">Ver →</span>
+                  <span className="text-brand-600 text-xs font-semibold">Ver →</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -240,17 +267,18 @@ function TabUsados({ filtros }) {
 // ── Tab: Platos no usados ────────────────────────────────────────
 function TabNoUsados({ filtros }) {
   const [detalle, setDetalle] = useState(null);
-  const { data, isLoading, isError, error, refetch } = useNoUsados(filtros);
+  const { data, isLoading, isFetching, isError, error, refetch } = useNoUsados(filtros);
   const platos = data ?? [];
+  const filtroLabel = descripcionFiltros(filtros);
 
-  if (isLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+  if (isLoading) return <LoadingHistorial label={`Cargando platos sin usar para ${filtroLabel}...`} />;
   if (isError)  return <ErrorMessage message={error.message} onRetry={refetch} />;
 
   return (
     <>
       {platos.length === 0 ? (
         <div className="text-center py-12 space-y-3">
-          <p className="text-sm font-medium text-gray-700">Todos los platos se usaron en este período</p>
+          <p className="text-sm font-medium text-gray-700">Todos los platos se usaron para {filtroLabel}</p>
           <p className="text-xs text-gray-400">La rotación está bien cubierta. Podés ver el menú de esta semana para agregar más variedad.</p>
           <Link to="/semanas" className="inline-block text-xs text-brand-600 hover:underline font-medium">
             Ver menú semanal →
@@ -258,17 +286,24 @@ function TabNoUsados({ filtros }) {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50">
             <p className="text-xs font-semibold text-gray-500">
-              {platos.length} plato{platos.length !== 1 ? 's' : ''} sin usar en el período
+              {platos.length} plato{platos.length !== 1 ? 's' : ''} sin usar para {filtroLabel}
             </p>
+            {isFetching && !isLoading && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600">
+                <Spinner size="sm" /> Actualizando...
+              </span>
+            )}
           </div>
           <div className="divide-y divide-gray-50">
             {platos.map((p) => (
-              <div
+              <button
+                type="button"
                 key={p.id}
                 onClick={() => setDetalle(p)}
-                className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                aria-label={`Ver detalle de ${p.nombre}`}
+                className="flex w-full items-center justify-between px-5 py-3.5 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500 transition-colors"
               >
                 <div>
                   <p className="text-sm font-medium text-gray-800">{p.nombre}</p>
@@ -284,9 +319,9 @@ function TabNoUsados({ filtros }) {
                   ) : (
                     <span className="badge bg-gray-100 text-gray-500">Nunca usado</span>
                   )}
-                  <span className="text-gray-300 text-xs">Ver →</span>
+                  <span className="text-brand-600 text-xs font-semibold">Ver →</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -298,8 +333,8 @@ function TabNoUsados({ filtros }) {
 
 // ── Página principal ─────────────────────────────────────────────
 const TABS = [
-  { id: 'no-usados', label: '🔄 Para rotar',   desc: 'Platos no usados en el período' },
-  { id: 'usados',    label: '📋 Usados',        desc: 'Platos que sí se usaron'         },
+  { id: 'no-usados', label: '🔄 Sin usar en el período', desc: 'Candidatos para rotar' },
+  { id: 'usados',    label: '📋 Usados en el período',    desc: 'Platos que sí se sirvieron' },
 ];
 
 export default function Historial() {

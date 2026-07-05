@@ -1,5 +1,7 @@
 ﻿import { useState, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { usePedidos, useUpdateEstadoPedido } from '../hooks/usePedidos.js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import { useEmpleados } from '../hooks/useEmpleados.js';
@@ -66,6 +68,49 @@ const EVENTO_LABELS = {
   estado_cambiado: 'Cambio de estado',
 };
 
+function labelEstado(estado) {
+  return ESTADO_MAP[estado]?.label?.toLowerCase() || estado || '';
+}
+
+function esResumenInterno(resumen = '') {
+  return /\b(seed|test data|datos de prueba|simulado)\b/i.test(resumen);
+}
+
+function descripcionEvento(evento) {
+  if (evento.tipo === 'estado_cambiado' && evento.estado_anterior && evento.estado_nuevo) {
+    return `Cambio de estado: ${labelEstado(evento.estado_anterior)} -> ${labelEstado(evento.estado_nuevo)}`;
+  }
+
+  if (evento.tipo === 'pedido_creado') return 'Pedido creado';
+  if (evento.tipo === 'pedido_actualizado') return 'Pedido actualizado';
+  if (evento.tipo === 'pedido_cancelado') return 'Pedido cancelado';
+
+  if (evento.resumen && !esResumenInterno(evento.resumen)) return evento.resumen;
+  return EVENTO_LABELS[evento.tipo] ?? 'Evento registrado';
+}
+
+function EmptyPedidos({ filtrosActivos, onLimpiarFiltros }) {
+  return (
+    <div className="text-center py-12 text-gray-400">
+      <p className="text-4xl mb-3">📋</p>
+      <p className="text-sm">
+        {filtrosActivos
+          ? 'No hay pedidos que coincidan con los filtros aplicados.'
+          : 'No hay pedidos para esta semana.'}
+      </p>
+      {filtrosActivos && (
+        <button
+          type="button"
+          onClick={onLimpiarFiltros}
+          className="mt-3 rounded-lg border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50"
+        >
+          Limpiar filtros
+        </button>
+      )}
+    </div>
+  );
+}
+
 function iniciales(nombre, apellido) {
   return `${(apellido||'')[0]||''}${(nombre||'')[0]||''}`.toUpperCase();
 }
@@ -74,6 +119,86 @@ function avatarColor(str) {
   let h = 0;
   for (const c of (str||'')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+function texto(valor, fallback = '') {
+  return valor == null ? fallback : String(valor);
+}
+
+function getPlanNombre(pedido) {
+  return pedido?.plan_nombre || 'Plan sin snapshot';
+}
+
+function getPlanDetalle(pedido) {
+  const partes = [];
+  if (pedido?.plan_gramaje_min) {
+    partes.push(`${pedido.plan_gramaje_min}-${pedido.plan_gramaje_max || pedido.plan_gramaje_min} g`);
+  }
+  partes.push(pedido?.plan_incluye_postre ? 'con postre' : 'sin postre');
+  partes.push(pedido?.plan_incluye_bebida ? 'con bebida' : 'sin bebida');
+  return partes.join(' · ');
+}
+
+function getTamanoPlan(pedido) {
+  if (pedido?.plan_gramaje_min) return `${pedido.plan_gramaje_min} g`;
+  return 'Sin tamaño';
+}
+
+function getClavePreparacion(item) {
+  return [
+    item.plato_id || texto(item.plato_nombre).trim().toLowerCase() || 'sin-plato',
+    item.opcion || '',
+    item.guarnicion_id || texto(item.guarnicion_nombre).trim().toLowerCase() || '',
+  ].join('__');
+}
+
+function crearGrupoCocina(item) {
+  return {
+    plato_nombre: item.plato_nombre,
+    opcion: item.opcion,
+    guarnicion_nombre: item.guarnicion_nombre,
+    cantidad: 0,
+    tamanos: {},
+    postres: 0,
+    bebidas: 0,
+    personas: [],
+  };
+}
+
+function sumarDetallePlan(grupo, pedido) {
+  const tamano = getTamanoPlan(pedido);
+  grupo.tamanos[tamano] = (grupo.tamanos[tamano] || 0) + 1;
+  if (pedido?.plan_incluye_postre) grupo.postres++;
+  if (pedido?.plan_incluye_bebida) grupo.bebidas++;
+}
+
+function ordenarTamanos([a], [b]) {
+  const na = parseInt(a, 10);
+  const nb = parseInt(b, 10);
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  return texto(a).localeCompare(texto(b));
+}
+
+function resumenTamanos(tamanos = {}) {
+  const partes = Object.entries(tamanos)
+    .sort(ordenarTamanos)
+    .map(([tamano, cantidad]) => `${cantidad} de ${tamano}`);
+  return partes.join(' · ');
+}
+
+function resumenExtras(grupo) {
+  return `Postres: ${grupo.postres || 0} · Bebidas: ${grupo.bebidas || 0}`;
+}
+
+function resumenItems(items = []) {
+  const resumen = { viandas: items.length, tamanos: {}, postres: 0, bebidas: 0 };
+  for (const item of items) {
+    const tamano = getTamanoPlan(item);
+    resumen.tamanos[tamano] = (resumen.tamanos[tamano] || 0) + 1;
+    if (item.plan_incluye_postre) resumen.postres++;
+    if (item.plan_incluye_bebida) resumen.bebidas++;
+  }
+  return resumen;
 }
 
 // ── Exportar Excel ────────────────────────────────────────────────────────────
@@ -94,6 +219,10 @@ function buildRows(pedidos, semana, { soloEmpresa = null, soloDia = null } = {})
         EMPRESA: p.empresa_nombre || '',
         FECHA: fechaStr,
         'Nombre y Apellido': nombreCompleto,
+        PLAN: getPlanNombre(p),
+        TAMANO: p.plan_gramaje_min ? `${p.plan_gramaje_min}-${p.plan_gramaje_max || p.plan_gramaje_min} g` : '',
+        POSTRE: p.plan_incluye_postre ? 'Si' : 'No',
+        BEBIDA: p.plan_incluye_bebida ? 'Si' : 'No',
         Principal: item.plato_nombre || '',
         GUARNICION: item.guarnicion_nombre || '',
       });
@@ -101,9 +230,9 @@ function buildRows(pedidos, semana, { soloEmpresa = null, soloDia = null } = {})
   }
   rows.sort((a, b) => {
     if (a._fechaISO !== b._fechaISO) return a._fechaISO < b._fechaISO ? -1 : 1;
-    if (a.EMPRESA !== b.EMPRESA) return a.EMPRESA.localeCompare(b.EMPRESA);
-    if (a.Principal !== b.Principal) return a.Principal.localeCompare(b.Principal);
-    return a['Nombre y Apellido'].localeCompare(b['Nombre y Apellido']);
+    if (a.EMPRESA !== b.EMPRESA) return texto(a.EMPRESA).localeCompare(texto(b.EMPRESA));
+    if (a.Principal !== b.Principal) return texto(a.Principal).localeCompare(texto(b.Principal));
+    return texto(a['Nombre y Apellido']).localeCompare(texto(b['Nombre y Apellido']));
   });
   return rows.map(row =>
     Object.fromEntries(Object.entries(row).filter(([key]) => key !== '_fechaISO'))
@@ -115,9 +244,9 @@ function exportarExcel(pedidos, semana, filtros = {}) {
   if (rows.length === 0) return;
 
   const ws = XLSX.utils.json_to_sheet(rows, {
-    header: ['EMPRESA', 'FECHA', 'Nombre y Apellido', 'Principal', 'GUARNICION'],
+    header: ['EMPRESA', 'FECHA', 'Nombre y Apellido', 'PLAN', 'TAMANO', 'POSTRE', 'BEBIDA', 'Principal', 'GUARNICION'],
   });
-  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 42 }, { wch: 25 }, { wch: 25 }];
+  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 42 }, { wch: 28 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 25 }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
@@ -219,10 +348,12 @@ function buildGruposCocina(pedidos, dia) {
   const map = {};
   for (const p of pedidos) {
     for (const item of (p.items || []).filter(i => i.dia === dia)) {
-      const key = `${item.plato_id}__${item.opcion||''}__${item.guarnicion_id||''}`;
-      if (!map[key]) map[key] = { plato_nombre: item.plato_nombre, opcion: item.opcion, guarnicion_nombre: item.guarnicion_nombre, cantidad: 0, personas: [] };
+      const planNombre = getPlanNombre(p);
+      const key = getClavePreparacion(item);
+      if (!map[key]) map[key] = crearGrupoCocina(item);
       map[key].cantidad++;
-      map[key].personas.push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, empresa: p.empresa_nombre, notas: item.notas });
+      sumarDetallePlan(map[key], p);
+      map[key].personas.push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, empresa: p.empresa_nombre, plan: planNombre });
     }
   }
   return Object.values(map).sort((a, b) => b.cantidad - a.cantidad);
@@ -241,7 +372,6 @@ function htmlProduccion(dia, gruposCocina, semana) {
   const fechaIdx = DIAS_ORDEN.indexOf(dia);
   const fecha = fechaIdx >= 0 ? fmtFull(addDias(semana, fechaIdx)) : '';
   const total = gruposCocina.reduce((s, g) => s + g.cantidad, 0);
-  const notas = gruposCocina.flatMap(g => g.personas.filter(p => p.notas).map(p => ({ ...p, plato: g.plato_nombre })));
   return `
 <div>
   <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1a5c2a;padding-bottom:4px;margin-bottom:8px">
@@ -262,16 +392,13 @@ function htmlProduccion(dia, gruposCocina, semana) {
         <td style="padding:4px 8px">
           <span style="font-weight:500">${g.plato_nombre}</span>
           ${g.opcion || g.guarnicion_nombre ? ` <span style="color:#666;font-size:12px">·  ${[g.opcion ? 'Op.'+g.opcion : '', g.guarnicion_nombre ? '+ '+g.guarnicion_nombre : ''].filter(Boolean).join(' · ')}</span>` : ''}
+          <div style="color:#1a5c2a;font-size:12px;margin-top:1px">${resumenTamanos(g.tamanos)}</div>
+          <div style="color:#666;font-size:11px;margin-top:1px">${resumenExtras(g)}</div>
         </td>
         <td style="padding:4px 8px;text-align:center;font-size:20px;font-weight:bold;color:#1a5c2a;border-left:2px solid #bbb">${g.cantidad}</td>
       </tr>`).join('')}
     </tbody>
   </table>
-  ${notas.length ? `
-  <div style="margin-top:8px;border:1px solid #f59e0b;border-radius:3px;padding:5px 8px;background:#fffbeb">
-    <div style="font-size:12px;font-weight:bold;color:#b45309;margin-bottom:2px">⚠ Observaciones (${notas.length})</div>
-    ${notas.map(n => `<div style="font-size:12px;color:#92400e"><strong>${n.nombre}</strong> (${n.empresa}) — ${n.notas} <span style="color:#aaa">· ${n.plato}</span></div>`).join('')}
-  </div>` : ''}
 </div>`;
 }
 
@@ -285,9 +412,9 @@ function htmlDetalle(dia, pedidos, semana) {
     if (!items.length) continue;
     const emp = p.empresa_nombre || 'Sin empresa';
     if (!porEmpresa[emp]) porEmpresa[emp] = [];
-    porEmpresa[emp].push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items });
+    porEmpresa[emp].push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items, plan: getPlanNombre(p), planDetalle: getPlanDetalle(p) });
   }
-  const empresas = Object.entries(porEmpresa).sort(([a],[b]) => a.localeCompare(b));
+  const empresas = Object.entries(porEmpresa).sort(([a],[b]) => texto(a).localeCompare(texto(b)));
   const total = empresas.reduce((s, [, ps]) => s + ps.length, 0);
   if (!empresas.length) return '';
   return `
@@ -306,22 +433,22 @@ function htmlDetalle(dia, pedidos, semana) {
     </div>
     <table style="width:100%;border-collapse:collapse">
       <thead><tr style="background:#e8f5e9">
-        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:26%">Nombre</th>
-        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:38%">Plato</th>
-        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:22%">Guarnición</th>
-        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:14%">Nota</th>
+        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:28%">Nombre</th>
+        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:22%">Plan</th>
+        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:32%">Plato</th>
+        <th style="padding:3px 6px;text-align:left;font-size:12px;color:#1a5c2a;border-bottom:1px solid #999;width:18%">Guarnición</th>
       </tr></thead>
       <tbody>
         ${personas.sort((a,b) => {
           const pa = a.items[0]?.plato_nombre || '';
           const pb = b.items[0]?.plato_nombre || '';
-          return pa.localeCompare(pb) || a.nombre.localeCompare(b.nombre);
+          return texto(pa).localeCompare(texto(pb)) || texto(a.nombre).localeCompare(texto(b.nombre));
         }).map((p, ri) => p.items.map((item, idx) => `
         <tr style="border-bottom:1px solid #ddd;${ri % 2 === 1 ? 'background:#f7faf8' : ''}">
           <td style="padding:3px 6px;font-weight:${idx===0?'600':'400'};color:${idx===0?'#111':'#888'};white-space:nowrap;font-size:13px">${idx===0 ? p.nombre : ''}</td>
+          <td style="padding:3px 6px;font-size:12px;color:#166534">${idx===0 ? `${p.plan}<br><span style="color:#777;font-size:10px">${p.planDetalle}</span>` : ''}</td>
           <td style="padding:3px 6px;font-size:13px">${item.plato_nombre}${item.opcion ? ` <span style="color:#888;font-size:11px">Op.${item.opcion}</span>` : ''}</td>
           <td style="padding:3px 6px;color:#166534;font-size:13px">${item.guarnicion_nombre || ''}</td>
-          <td style="padding:3px 6px;color:#b45309;font-style:italic;font-size:11px">${item.notas ? '⚠ '+item.notas : ''}</td>
         </tr>`).join('')).join('')}
       </tbody>
     </table>
@@ -372,12 +499,24 @@ function Avatar({ nombre, apellido, size = 'md' }) {
 
 function EstadoBadge({ pedido, onCambiar, loading }) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
   const e = ESTADO_MAP[pedido.estado] || ESTADO_MAP.pendiente;
+
+  const toggleMenu = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuHeight = 178;
+    const opensUp = rect.bottom + menuHeight + 8 > window.innerHeight;
+    setMenuPos({
+      top: opensUp ? Math.max(8, rect.top - menuHeight - 6) : rect.bottom + 6,
+      right: Math.max(8, window.innerWidth - rect.right),
+    });
+    setOpen(o => !o);
+  };
 
   return (
     <div className="relative" onClick={ev => ev.stopPropagation()}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={toggleMenu}
         disabled={loading}
         className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${e.cls} ${loading ? 'opacity-60' : 'hover:opacity-80'} transition-opacity`}
       >
@@ -387,9 +526,17 @@ function EstadoBadge({ pedido, onCambiar, loading }) {
       </button>
 
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px]">
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)} />
+            <div
+              className="fixed z-[80] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[160px]"
+              style={{
+                top: menuPos?.top ?? 0,
+                right: menuPos?.right ?? 8,
+              }}
+              onClick={ev => ev.stopPropagation()}
+            >
             {ESTADOS.filter(s => s.key !== pedido.estado).map(s => (
               <button
                 key={s.key}
@@ -399,8 +546,10 @@ function EstadoBadge({ pedido, onCambiar, loading }) {
                 <span>{s.icon}</span><span>{s.label}</span>
               </button>
             ))}
-          </div>
-        </>
+            </div>
+          </>,
+          document.body
+        )
       )}
     </div>
   );
@@ -481,7 +630,6 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
   const [expandido, setExpandido] = useState(false);
   const itemsPorDia = Object.fromEntries((pedido.items||[]).map(i => [i.dia, i]));
   const totalDias = diasSemana.filter(d => itemsPorDia[d]).length;
-  const tieneNotas = (pedido.items||[]).some(i => i.notas);
   const isSelected = selected.has(pedido.id);
 
   return (
@@ -503,9 +651,9 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
         <div className="ml-3 flex-1 min-w-0">
           <p className="font-semibold text-gray-900 text-sm leading-tight truncate">
             {pedido.empleado_apellido}, {pedido.empleado_nombre}
-            {tieneNotas && <span className="ml-2 text-amber-500 text-xs">⚠ notas</span>}
           </p>
           <p className="text-xs text-gray-400">{pedido.empresa_nombre} · {totalDias} día{totalDias !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-green-700">{getPlanNombre(pedido)} · {getPlanDetalle(pedido)}</p>
         </div>
 
         <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -520,18 +668,6 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
 
       {expandido && (
         <div className="border-t border-gray-50 divide-y divide-gray-50">
-          {tieneNotas && (
-            <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-start gap-2">
-              <span className="text-amber-500 text-sm mt-0.5">⚠</span>
-              <div>
-                {(pedido.items||[]).filter(i => i.notas).map(i => (
-                  <p key={i.dia} className="text-xs text-amber-700">
-                    <strong>{DIAS_FULL[i.dia]}:</strong> {i.notas}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
           {diasSemana.map(dia => {
             const item = itemsPorDia[dia];
             if (!item) return null;
@@ -543,7 +679,6 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
                   <div className="flex flex-wrap gap-x-3 mt-0.5">
                     {item.opcion && <span className="text-[11px] text-gray-400">Opción {item.opcion}</span>}
                     {item.guarnicion_nombre && <span className="text-[11px] text-emerald-600">+ {item.guarnicion_nombre}</span>}
-                    {item.notas && <span className="text-[11px] text-amber-600 font-medium">⚠ {item.notas}</span>}
                   </div>
                 </div>
               </div>
@@ -558,15 +693,10 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
                     <span className="mt-1 w-2 h-2 rounded-full bg-green-600 shrink-0" />
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-700">
-                        {EVENTO_LABELS[evento.tipo] ?? evento.tipo}
-                        {evento.estado_anterior && evento.estado_nuevo && (
-                          <span className="font-normal text-slate-500"> · {evento.estado_anterior} → {evento.estado_nuevo}</span>
-                        )}
+                        {descripcionEvento(evento)}
                       </p>
                       <p className="text-slate-500">
-                        {evento.resumen || 'Evento registrado'}
-                        {evento.actor_nombre && <span> · {evento.actor_nombre}</span>}
-                        <span> · {fmtEvento(evento.created_at)}</span>
+                        {[evento.actor_nombre, fmtEvento(evento.created_at)].filter(Boolean).join(' · ')}
                       </p>
                     </div>
                   </div>
@@ -677,15 +807,14 @@ function BotonImprimir({ dia, gruposCocina, pedidos, semana, diasDisponibles }) 
 
 // ── Vista por día ─────────────────────────────────────────────────────────────
 
-function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
+function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, onLimpiarFiltros }) {
   const [subVista, setSubVista] = useState('cocina'); // 'cocina' | 'empresa'
   const [filtroPlatoTxt, setFiltroPlatoTxt] = useState('');
 
-  const diasConItems = DIAS_ORDEN.filter(dia =>
-    pedidos.some(p => (p.items||[]).some(i => i.dia === dia))
-  );
+  const hayPedidosSemana = pedidos.some(p => (p.items || []).length > 0);
+  const diasVisibles = hayPedidosSemana ? DIAS_ORDEN : [];
   const fechaDia = (dia) => { const idx = DIAS_ORDEN.indexOf(dia); return idx >= 0 ? addDias(semana, idx) : null; };
-  const dia = diaActivo || diasConItems[0];
+  const dia = diasVisibles.includes(diaActivo) ? diaActivo : diasVisibles[0];
 
   const itemsDia = pedidos.flatMap(p =>
     (p.items||[]).filter(i => i.dia === dia).map(i => ({
@@ -693,6 +822,13 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
       empleado_nombre: p.empleado_nombre,
       empleado_apellido: p.empleado_apellido,
       empresa_nombre: p.empresa_nombre,
+      plan_id: p.plan_id,
+      plan_nombre: getPlanNombre(p),
+      plan_detalle: getPlanDetalle(p),
+      plan_gramaje_min: p.plan_gramaje_min,
+      plan_gramaje_max: p.plan_gramaje_max,
+      plan_incluye_postre: p.plan_incluye_postre,
+      plan_incluye_bebida: p.plan_incluye_bebida,
     }))
   );
 
@@ -700,10 +836,11 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
   const gruposCocina = (() => {
     const map = {};
     for (const item of itemsDia) {
-      const key = `${item.plato_id}__${item.opcion||''}__${item.guarnicion_id||''}`;
-      if (!map[key]) map[key] = { plato_nombre: item.plato_nombre, opcion: item.opcion, guarnicion_nombre: item.guarnicion_nombre, cantidad: 0, personas: [] };
+      const key = getClavePreparacion(item);
+      if (!map[key]) map[key] = crearGrupoCocina(item);
       map[key].cantidad++;
-      map[key].personas.push({ nombre: `${item.empleado_apellido}, ${item.empleado_nombre}`, empresa: item.empresa_nombre, notas: item.notas });
+      sumarDetallePlan(map[key], item);
+      map[key].personas.push({ nombre: `${texto(item.empleado_apellido)}, ${texto(item.empleado_nombre)}`, empresa: item.empresa_nombre, plan: item.plan_nombre });
     }
     return Object.values(map).sort((a,b) => b.cantidad - a.cantidad);
   })();
@@ -716,33 +853,30 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
       if (!items.length) continue;
       const emp = p.empresa_nombre || 'Sin empresa';
       if (!map[emp]) map[emp] = [];
-      map[emp].push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items, notas: items.filter(i => i.notas) });
+      map[emp].push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items });
     }
-    return Object.entries(map).sort(([a],[b]) => a.localeCompare(b));
+    return Object.entries(map).sort(([a],[b]) => texto(a).localeCompare(texto(b)));
   })();
 
   const gruposCocinaFiltrados = (() => {
     if (!filtroPlatoTxt.trim()) return gruposCocina;
     const q = filtroPlatoTxt.toLowerCase();
-    return gruposCocina.filter(g => g.plato_nombre.toLowerCase().includes(q));
+    return gruposCocina.filter(g => texto(g.plato_nombre).toLowerCase().includes(q));
   })();
 
-  const notasDia = itemsDia.filter(i => i.notas);
+  const resumenDia = resumenItems(itemsDia);
 
-  if (diasConItems.length === 0) {
+  if (!hayPedidosSemana) {
     return (
-      <div className="text-center py-12 text-gray-400">
-        <p className="text-4xl mb-3">📋</p>
-        <p className="text-sm">No hay pedidos para esta semana.</p>
-      </div>
+      <EmptyPedidos filtrosActivos={filtrosActivos} onLimpiarFiltros={onLimpiarFiltros} />
     );
   }
 
   return (
     <div>
       {/* Tabs de días — compactos */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-        {diasConItems.map(d => {
+      <div className="flex flex-wrap gap-1.5 mb-4 pb-1">
+        {diasVisibles.map(d => {
           const count = pedidos.reduce((n,p) => n + (p.items||[]).filter(i => i.dia === d).length, 0);
           const activo = d === dia;
           return (
@@ -785,20 +919,26 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
               />
             </div>
           )}
-          <BotonImprimir dia={dia} gruposCocina={gruposCocina} pedidos={pedidos} semana={semana} diasDisponibles={diasConItems} />
+          <BotonImprimir dia={dia} gruposCocina={gruposCocina} pedidos={pedidos} semana={semana} diasDisponibles={diasVisibles} />
         </div>
       )}
 
-      {/* Alerta de notas */}
-      {notasDia.length > 0 && (
-        <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <p className="text-xs font-bold text-amber-800 mb-1">⚠️ Observaciones — {DIAS_FULL[dia]}</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-            {notasDia.map((item, i) => (
-              <span key={i} className="text-xs text-amber-700">
-                <strong>{item.empleado_apellido}, {item.empleado_nombre}:</strong> {item.notas}
-              </span>
-            ))}
+      {dia && (
+        <div className="mb-3 grid grid-cols-3 gap-2">
+          <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-sm">
+            <p className="text-[11px] font-medium text-gray-400">Viandas</p>
+            <p className="text-lg font-bold text-gray-900">{resumenDia.viandas}</p>
+            {resumenTamanos(resumenDia.tamanos) && (
+              <p className="text-[11px] text-gray-500 leading-tight">{resumenTamanos(resumenDia.tamanos)}</p>
+            )}
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 shadow-sm">
+            <p className="text-[11px] font-medium text-amber-600">Postres</p>
+            <p className="text-lg font-bold text-amber-800">{resumenDia.postres}</p>
+          </div>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 shadow-sm">
+            <p className="text-[11px] font-medium text-blue-600">Bebidas</p>
+            <p className="text-lg font-bold text-blue-800">{resumenDia.bebidas}</p>
           </div>
         </div>
       )}
@@ -807,7 +947,9 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
       {subVista === 'cocina' && (
         <div className="space-y-2">
           {gruposCocinaFiltrados.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8">Sin resultados.</p>
+            <p className="text-gray-400 text-sm text-center py-8">
+              {itemsDia.length === 0 ? 'Sin pedidos para este día.' : 'Sin resultados.'}
+            </p>
           )}
           {gruposCocinaFiltrados.map((grupo, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-100 flex items-center gap-3 px-4 py-3 shadow-sm">
@@ -817,6 +959,10 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
                   {grupo.opcion && <span className="text-xs text-gray-400">Opción {grupo.opcion}</span>}
                   {grupo.guarnicion_nombre && <span className="text-xs text-emerald-600">+ {grupo.guarnicion_nombre}</span>}
                 </div>
+                <p className="mt-1 text-xs font-medium text-green-700">
+                  {grupo.cantidad} vianda{grupo.cantidad !== 1 ? 's' : ''} · {resumenTamanos(grupo.tamanos)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-gray-500">{resumenExtras(grupo)}</p>
               </div>
               <div className="bg-green-700 text-white text-xl font-bold w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
                 {grupo.cantidad}
@@ -846,7 +992,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
               </div>
               {/* Filas */}
               <div className="divide-y divide-gray-50">
-                {personas.sort((a,b) => a.nombre.localeCompare(b.nombre)).map((p, j) => (
+                {personas.sort((a,b) => texto(a.nombre).localeCompare(texto(b.nombre))).map((p, j) => (
                   <div key={j} className="flex items-start gap-3 px-4 py-2">
                     <Avatar nombre={p.nombre.split(',')[1]?.trim()||''} apellido={p.nombre.split(',')[0]?.trim()||''} size="sm" />
                     <div className="flex-1 min-w-0">
@@ -856,7 +1002,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo }) {
                           <span className="font-medium text-gray-700">{item.plato_nombre}</span>
                           {item.opcion && <span className="text-gray-400"> · Op. {item.opcion}</span>}
                           {item.guarnicion_nombre && <span className="text-emerald-600"> + {item.guarnicion_nombre}</span>}
-                          {item.notas && <span className="text-amber-600 font-medium"> ⚠ {item.notas}</span>}
+                          <span className="text-green-700"> · {item.plan_nombre}</span>
                         </div>
                       ))}
                     </div>
@@ -919,7 +1065,7 @@ export default function PedidosAdmin() {
   const [bulkLoading, setBulkLoading]     = useState(false);
   const [loadingId, setLoadingId]         = useState(null);
 
-  const { data: pedidosRaw = [], isLoading } = usePedidos({ semana_inicio: semana, empresa_id: empresaFiltro || undefined });
+  const { data: pedidosRaw = [], isLoading } = usePedidos({ semana_inicio: semana, empresa_id: empresaFiltro || undefined, limit: 500 });
   const { data: empresas = [] } = useEmpresas();
   const updateEstado = useUpdateEstadoPedido();
 
@@ -957,6 +1103,21 @@ export default function PedidosAdmin() {
     return DIAS_ORDEN.filter(d => usados.has(d));
   }, [pedidos]);
 
+  const filtrosActivos = Boolean(empresaFiltro || estadoFiltro || busqueda.trim());
+
+  const limpiarFiltros = () => {
+    setEmpresaFiltro('');
+    setEstadoFiltro('');
+    setBusqueda('');
+    setSelected(new Set());
+  };
+
+  const volverSemanaActual = () => {
+    setSemana(getLunes());
+    setDiaActivo(null);
+    setSelected(new Set());
+  };
+
   const handleCambiarEstado = useCallback(async (id, estado) => {
     setLoadingId(id);
     try {
@@ -969,13 +1130,36 @@ export default function PedidosAdmin() {
 
   const handleBulkEstado = async (estado) => {
     setBulkLoading(true);
+    const ids = [...selected];
+    const fallidos = [];
     try {
-      await Promise.all([...selected].map(id => updateEstado.mutateAsync({ id, estado })));
-      toast.success(`${selected.size} pedidos actualizados a "${ESTADO_MAP[estado]?.label}"`);
+      for (const id of ids) {
+        try {
+          await updateEstado.mutateAsync({ id, estado });
+        } catch (e) {
+          fallidos.push({
+            id,
+            mensaje: e?.response?.data?.message || e?.message || 'No se pudo actualizar',
+          });
+        }
+      }
+
+      const actualizados = ids.length - fallidos.length;
+      if (actualizados > 0) {
+        toast.success(`${actualizados} pedido${actualizados !== 1 ? 's' : ''} actualizado${actualizados !== 1 ? 's' : ''} a "${ESTADO_MAP[estado]?.label}"`);
+      }
+
+      if (fallidos.length > 0) {
+        const primerError = fallidos[0]?.mensaje;
+        toast.error(`${fallidos.length} pedido${fallidos.length !== 1 ? 's' : ''} no se pudieron actualizar${primerError ? `: ${primerError}` : ''}`);
+        setSelected(new Set(fallidos.map(f => f.id)));
+        return;
+      }
+
       setSelected(new Set());
-    } catch {
-      toast.error('Error en actualización masiva');
-    } finally { setBulkLoading(false); }
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
   const toggleSelect = (id) => setSelected(prev => {
@@ -996,16 +1180,28 @@ export default function PedidosAdmin() {
     <div className="px-4 pt-0 pb-4 md:p-6 max-w-7xl mx-auto">
 
       {/* ── Header mobile (sticky) ── */}
-      <div className="md:hidden sticky top-0 z-20 bg-green-700 text-white px-4 py-3 -mx-4 -mt-0 mb-4 print:hidden flex items-center gap-2">
+      <div className="md:hidden sticky top-0 z-20 bg-green-700 text-white px-4 py-3 -mx-4 -mt-0 mb-4 print:hidden flex flex-wrap items-center gap-2">
         <h1 className="text-base font-bold flex-1">Pedidos</h1>
         <button onClick={() => cambiarSemana(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 text-white text-lg leading-none">‹</button>
         <div className="text-center">
           <p className="text-xs font-semibold leading-tight">{fmt(semana)} — {fmt(domingoSemana)}</p>
-          {!esEstaSemana && <button onClick={() => { setSemana(getLunes()); setDiaActivo(null); }} className="text-[10px] text-green-200 underline">Hoy</button>}
+          <p className="text-[10px] text-green-200">{fmtFull(semana).split('/')[2]}</p>
         </div>
         <button onClick={() => cambiarSemana(1)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 text-white text-lg leading-none">›</button>
         <div className="ml-1">
           <BotonExportar pedidos={pedidos} semana={semana} empresas={[...new Set(pedidos.map(p => p.empresa_nombre).filter(Boolean))].sort()} compact />
+        </div>
+        <div className="basis-full flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={volverSemanaActual}
+            className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${esEstaSemana ? 'bg-white/15 text-green-100' : 'bg-white text-green-800'}`}
+          >
+            Semana actual
+          </button>
+          <Link to="/pedidos-hoy" className="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/25">
+            📅 Pedidos de hoy
+          </Link>
         </div>
       </div>
 
@@ -1019,9 +1215,16 @@ export default function PedidosAdmin() {
             <p className="text-[11px] text-gray-400">{fmtFull(semana).split('/')[2]}</p>
           </div>
           <button onClick={() => cambiarSemana(1)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-lg">›</button>
-          {!esEstaSemana && (
-            <button onClick={() => { setSemana(getLunes()); setDiaActivo(null); }} className="ml-1 text-xs text-green-700 underline">Hoy</button>
-          )}
+          <button
+            type="button"
+            onClick={volverSemanaActual}
+            className={`ml-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${esEstaSemana ? 'border-green-100 bg-green-50 text-green-700' : 'border-green-200 text-green-700 hover:bg-green-50'}`}
+          >
+            Semana actual
+          </button>
+          <Link to="/pedidos-hoy" className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+            📅 Pedidos de hoy
+          </Link>
         </div>
         <div className="flex gap-2 print:hidden">
           <BotonExportar pedidos={pedidos} semana={semana} empresas={[...new Set(pedidos.map(p => p.empresa_nombre).filter(Boolean))].sort()} />
@@ -1087,24 +1290,30 @@ export default function PedidosAdmin() {
           </select>
         </div>
         {/* Vista tabs */}
-        <div className="flex rounded-xl border border-gray-200 overflow-hidden">
-          {[['empresa','👤 Personas'],['dia','📅 Por día']].map(([v,l]) => (
+        <div className="grid gap-2 sm:grid-cols-2" role="tablist" aria-label="Vistas de pedidos">
+          {[
+            ['empresa', 'Seguimiento de pedidos', 'Estados y pedidos individuales'],
+            ['dia', 'Producción de cocina', 'Cantidades por día e impresión'],
+          ].map(([v, l, sub]) => (
             <button
               key={v}
               onClick={() => setVista(v)}
-              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${vista === v ? 'bg-green-700 text-white' : 'text-gray-600 hover:bg-gray-50'} ${v === 'dia' ? 'border-l border-gray-200' : ''}`}
+              role="tab"
+              aria-selected={vista === v}
+              className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${vista === v ? 'border-green-700 bg-green-700 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:border-green-300 hover:bg-green-50'}`}
             >
-              {l}
+              <span className="block text-sm font-semibold">{l}</span>
+              <span className={`mt-0.5 block text-xs ${vista === v ? 'text-green-100' : 'text-gray-400'}`}>{sub}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Filtros activos */}
-      {(busqueda || estadoFiltro) && (
+      {filtrosActivos && (
         <p className="text-xs text-gray-400 mb-3 print:hidden">
           Mostrando {pedidos.length} de {pedidosRaw.length} pedidos
-          <button onClick={() => { setBusqueda(''); setEstadoFiltro(''); }} className="ml-2 text-green-700 underline">Limpiar filtros</button>
+          <button onClick={limpiarFiltros} className="ml-2 text-green-700 underline">Limpiar filtros</button>
         </p>
       )}
 
@@ -1130,10 +1339,7 @@ export default function PedidosAdmin() {
       {/* ── Vista por persona (agrupada por empresa) ── */}
       {vista === 'empresa' && !isLoading && (() => {
         if (pedidos.length === 0) return (
-          <div className="text-center py-12 text-gray-400">
-            <p className="text-4xl mb-3">📋</p>
-            <p className="text-sm">No hay pedidos para esta semana.</p>
-          </div>
+          <EmptyPedidos filtrosActivos={filtrosActivos} onLimpiarFiltros={limpiarFiltros} />
         );
         const porEmpresa = {};
         for (const p of pedidos) {
@@ -1141,7 +1347,7 @@ export default function PedidosAdmin() {
           if (!porEmpresa[k]) porEmpresa[k] = [];
           porEmpresa[k].push(p);
         }
-        const grupos = Object.entries(porEmpresa).sort(([a],[b]) => a.localeCompare(b));
+        const grupos = Object.entries(porEmpresa).sort(([a],[b]) => texto(a).localeCompare(texto(b)));
         return (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs text-gray-400 pb-1 print:hidden">
@@ -1171,6 +1377,8 @@ export default function PedidosAdmin() {
           semana={semana}
           diaActivo={diaActivo}
           setDiaActivo={setDiaActivo}
+          filtrosActivos={filtrosActivos}
+          onLimpiarFiltros={limpiarFiltros}
         />
       )}
     </div>

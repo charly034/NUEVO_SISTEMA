@@ -1,22 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Lightbulb } from "lucide-react";
 import BottomSheet from "../ui/BottomSheet.jsx";
 import BtnPrimary from "../ui/BtnPrimary.jsx";
-
-const SUGERENCIAS_PREDEFINIDAS = [
-  "Milanesa",
-  "Pollo grillado",
-  "Pasta",
-  "Ensaladas",
-  "Sushi",
-  "Burger",
-  "Wok",
-  "Salmon",
-  "Pizza",
-  "Tacos",
-  "Curry",
-  "Risotto",
-];
 
 export default function SuggestionSheet({ abierto, onCerrar, onGuardar, semana }) {
   const [seleccionadas, setSeleccionadas] = useState([]);
@@ -32,6 +17,13 @@ export default function SuggestionSheet({ abierto, onCerrar, onGuardar, semana }
         : [...previas, sugerencia],
     );
   };
+
+  const opcionesSugeridas = useMemo(() => {
+    const opciones = Array.isArray(semana?.opcionesSugerencia) && semana.opcionesSugerencia.length > 0
+      ? semana.opcionesSugerencia.map((opcion) => opcion.nombre || opcion.plato_nombre)
+      : (semana?.sugerencias || []).map((sugerencia) => sugerencia.plato);
+    return [...new Set(opciones.map((opcion) => String(opcion || "").trim()).filter(Boolean))];
+  }, [semana]);
 
   const guardar = async () => {
     setGuardando(true);
@@ -81,7 +73,12 @@ export default function SuggestionSheet({ abierto, onCerrar, onGuardar, semana }
                 <p className="text-sm font-bold text-[#2A2C1F]">Que te gustaria comer?</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {SUGERENCIAS_PREDEFINIDAS.map((sugerencia) => {
+                {opcionesSugeridas.length === 0 && (
+                  <p className="rounded-xl border border-[#E8E2D4] bg-[#FAF8F3] px-4 py-3 text-sm text-[#7A7868]">
+                    Todavia no hay platos sugeridos para esta semana. Podes dejarnos un comentario.
+                  </p>
+                )}
+                {opcionesSugeridas.map((sugerencia) => {
                   const activa = seleccionadas.includes(sugerencia);
                   return (
                     <button

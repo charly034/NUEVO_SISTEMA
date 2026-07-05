@@ -49,6 +49,11 @@ export const useWhatsappConfig = () =>
     queryFn: () => api.get('/notificaciones/admin/whatsapp/config').then(r => r.data),
   });
 
+export const useRevealWebhookUrl = () =>
+  useMutation({
+    mutationFn: () => api.get('/notificaciones/admin/whatsapp/config/reveal').then(r => r.data),
+  });
+
 export const useGuardarWhatsappConfig = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -89,10 +94,19 @@ export const useEnviosWhatsapp = (filters = {}) =>
     queryFn: () => api.get('/notificaciones/admin/whatsapp/envios', { params: filters }).then(r => r.data),
   });
 
+export const useWhatsappTestLogs = (filters = {}) =>
+  useQuery({
+    queryKey: [KEY, 'whatsapp-test-logs', filters],
+    queryFn: () => api.get('/notificaciones/admin/whatsapp/test-logs', { params: filters }).then(r => r.data),
+  });
+
 export const useProbarWebhookWhatsapp = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data) => api.post('/notificaciones/admin/whatsapp/probar', data).then(r => r.data),
-    onSettled: () => qc.invalidateQueries({ queryKey: [KEY, 'whatsapp-envios'] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: [KEY, 'whatsapp-envios'] });
+      qc.invalidateQueries({ queryKey: [KEY, 'whatsapp-test-logs'] });
+    },
   });
 };

@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { useEmpresas, useCreateEmpresa, useUpdateEmpresa, useDeleteEmpresa, useReopenPlazo, useClearOverride, useRegenerarCodigo } from '../hooks/useEmpresas.js';
-import { useEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado, useGenerarResetCode } from '../hooks/useEmpleados.js';
+import { useEffect, useRef, useState } from 'react';
+import { getDependenciasEmpresa, useEmpresas, useCreateEmpresa, useUpdateEmpresa, useDeleteEmpresa, useReopenPlazo, useClearOverride, useRegenerarCodigo } from '../hooks/useEmpresas.js';
+import { useEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado, useGenerarResetCode, useImportarEmpleados } from '../hooks/useEmpleados.js';
+import { usePlanes, useCreatePlan, useUpdatePlan, useDeletePlan } from '../hooks/usePlanes.js';
+import { useDebounce } from '../hooks/useDebounce.js';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 import { adminAuth } from '../auth.js';
+import CuentaCorrienteFicha from '../components/finanzas/CuentaCorrienteFicha.jsx';
 
 function normalizarFechaInput(fecha) {
   return fecha ? String(fecha).split('T')[0] : '';
@@ -18,14 +21,101 @@ function formatearFechaCorta(fecha) {
   });
 }
 
-const PLANES = { basico: 'Básico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
+const PLANES = { basico: 'BÃ¡sico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
 const MODOS = { semanal: 'Semanal', diario: 'Diario', ambos: 'Ambos' };
-const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sábado', lunes_domingo: 'Lunes a domingo' };
+const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sÃ¡bado', lunes_domingo: 'Lunes a domingo' };
+
+function etiquetaPlan(plan) {
+  if (!plan) return 'Sin plan';
+  const rango = plan.gramaje_max ? `${plan.gramaje_min}-${plan.gramaje_max} g` : `${plan.gramaje_min} g`;
+  const extras = [
+    plan.incluye_postre ? 'postre' : null,
+    plan.incluye_bebida ? 'bebida' : null,
+  ].filter(Boolean).join(' + ');
+  return `${plan.nombre} Â· ${rango}${extras ? ` Â· ${extras}` : ''}`;
+}
+
+function generarSlug(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+const iconButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900';
+const dangerIconButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 bg-white text-red-500 transition-colors hover:bg-red-50 hover:text-red-700';
+
+function CuentaCorrienteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <path d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13" />
+      <path d="M16 13h4" />
+      <path d="M6 9h6" />
+    </svg>
+  );
+}
+
+function EditarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+    </svg>
+  );
+}
+
+function EliminarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v5M14 11v5" />
+    </svg>
+  );
+}
+
+function LlaveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12l8-8" />
+      <path d="M16 4h3v3" />
+      <path d="M14 6l4 4" />
+    </svg>
+  );
+}
+
+function ReabrirPlazoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+      <path d="M8 2v4M16 2v4" />
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 10h18" />
+      <circle cx="16" cy="16" r="3" />
+      <path d="M16 14.5V16l1 1" />
+    </svg>
+  );
+}
 
 export default function Empresas() {
   const adminUser = adminAuth.storedUser();
   const esSuperAdmin = adminUser?.rol === 'superadmin';
-  const { data: empresas = [], isLoading } = useEmpresas();
+  const [busquedaEmpresa, setBusquedaEmpresa] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState('todas');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const busquedaDebounced = useDebounce(busquedaEmpresa, 300);
+  const { data: empresasResponse, isLoading } = useEmpresas({
+    page,
+    pageSize,
+    search: busquedaDebounced,
+    estado: estadoFiltro,
+  });
+  const { data: planes = [] } = usePlanes();
   const createEmpresa = useCreateEmpresa();
   const updateEmpresa = useUpdateEmpresa();
   const deleteEmpresa = useDeleteEmpresa();
@@ -35,7 +125,15 @@ export default function Empresas() {
 
   const [empresaActiva, setEmpresaActiva] = useState(null);
   const [modalEmpresa, setModalEmpresa] = useState(null); // null | 'nueva' | empresa
+  const [modalPlan, setModalPlan] = useState(null); // null | 'nuevo' | plan
   const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
+  const [modalEliminar, setModalEliminar] = useState(null);
+  const [cuentaCorriente, setCuentaCorriente] = useState(null);
+  const empresas = empresasResponse?.data || [];
+  const totalEmpresas = empresasResponse?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(totalEmpresas / pageSize));
+  const hayBusquedaEmpresa = busquedaDebounced.trim().length > 0;
+  const textoCantidadEmpresas = `${totalEmpresas} empresa${totalEmpresas !== 1 ? 's' : ''}`;
 
   const handleGuardarEmpresa = async (form) => {
     try {
@@ -53,11 +151,11 @@ export default function Empresas() {
   };
 
   const handleEliminarEmpresa = async (e) => {
-    if (!await confirmar({ titulo: `¿Eliminar "${e.nombre}"?`, texto: 'Se eliminarán todos sus empleados. Esta acción no se puede deshacer.', botonConfirmar: 'Sí, eliminar empresa' })) return;
     try {
       await deleteEmpresa.mutateAsync(e.id);
       if (empresaActiva?.id === e.id) setEmpresaActiva(null);
       toast.success('Empresa eliminada');
+      setModalEliminar(null);
     } catch (err) {
       toast.error(err?.message || 'Error al eliminar');
     }
@@ -66,114 +164,99 @@ export default function Empresas() {
   if (isLoading) return <p className="p-6 text-gray-500">Cargando...</p>;
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Empresas</h1>
+    <div className="mx-auto max-w-7xl min-w-0 p-4 md:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Empresas</h1>
+          <p className="text-sm text-gray-500">{textoCantidadEmpresas}</p>
+        </div>
         <button onClick={() => setModalEmpresa('nueva')} className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800">
           + Nueva empresa
         </button>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         {/* Lista de empresas */}
         <div className="space-y-3">
+          <input
+            value={busquedaEmpresa}
+            onChange={(event) => {
+              setBusquedaEmpresa(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Buscar por empresa, slug o email..."
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none"
+          />
+          <EstadoFiltroChips
+            value={estadoFiltro}
+            onChange={(value) => {
+              setEstadoFiltro(value);
+              setPage(1);
+            }}
+          />
           {empresas.map(e => (
-            <div
+            <EmpresaCard
               key={e.id}
-              onClick={() => setEmpresaActiva(e)}
-              className={`bg-white rounded-xl border-2 p-4 cursor-pointer transition-colors ${empresaActiva?.id === e.id ? 'border-green-600' : 'border-gray-100 hover:border-gray-300'}`}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-gray-900">{e.nombre}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">@{e.slug} · {PLANES[e.plan]} · {MODOS[e.modo_pedido]}</p>
-                  {e.limite_hora && (
-                    <p className="text-xs text-amber-600 mt-0.5">
-                      ⏰ {e.modo_pedido === 'semanal'
-                        ? `Límite: ${e.limite_dia_semana || 'lunes'} ${e.limite_hora}hs`
-                        : e.limite_anticipacion_dias > 0
-                          ? `Límite: día anterior ${e.limite_hora}hs`
-                          : `Límite: mismo día ${e.limite_hora}hs`}
-                    </p>
-                  )}
-                  {e.plazo_override_hasta && new Date() <= new Date(e.plazo_override_hasta) && (
-                    <p className="text-xs text-green-700 mt-0.5 font-medium">
-                      🔓 Plazo reabierto hasta {new Date(e.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
-                    </p>
-                  )}
-                  {/* Código de registro */}
-                  {e.codigo_registro ? (
-                    <div className="mt-2 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 w-fit" onClick={ev => ev.stopPropagation()}>
-                      <span className="text-xs text-indigo-500 font-medium">Código</span>
-                      <span className="font-mono font-bold text-indigo-800 tracking-widest text-sm">{e.codigo_registro}</span>
-                      <button
-                        type="button"
-                        title="Copiar"
-                        onClick={() => { navigator.clipboard.writeText(e.codigo_registro); toast.success('Código copiado'); }}
-                        className="text-indigo-400 hover:text-indigo-700 transition-colors"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                      </button>
-                      {esSuperAdmin && (
-                      <button
-                        type="button"
-                        title="Regenerar código"
-                        onClick={async () => { if (await confirmar('¿Regenerar código? El código anterior dejará de funcionar y los empleados deberán usar el nuevo.')) { regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código regenerado') }); } }}
-                        className="text-indigo-300 hover:text-red-500 transition-colors"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                      </button>
-                      )}
-                    </div>
-                  ) : (
-                    esSuperAdmin && (
-                    <button
-                      type="button"
-                      onClick={async (ev) => { ev.stopPropagation(); regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código generado') }); }}
-                      className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg font-medium transition-colors"
-                    >
-                      🔑 Generar código de registro
-                    </button>
-                    )
-                  )}
-                </div>
-                <div className="flex gap-2 items-center">
-                  {(e.limite_hora || e.modo_pedido === 'semanal' || e.modo_pedido === 'ambos') && (
-                    <button
-                      onClick={(ev) => { ev.stopPropagation(); setModalPlazo(e); }}
-                      className="text-xs text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg font-medium"
-                      title="Reabrir plazo de pedido"
-                    >
-                      🔓
-                    </button>
-                  )}
-                  <button onClick={(ev) => { ev.stopPropagation(); setModalEmpresa(e); }} className="text-gray-400 hover:text-gray-700 text-sm">✏️</button>
-                  {esSuperAdmin && (
-                  <button onClick={(ev) => { ev.stopPropagation(); handleEliminarEmpresa(e); }} className="text-gray-400 hover:text-red-600 text-sm">🗑️</button>
-                  )}
-                </div>
-              </div>
-              <div className={`mt-2 inline-block text-xs px-2 py-0.5 rounded-full font-medium ${e.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {e.activo ? 'Activa' : 'Inactiva'}
-              </div>
-            </div>
+              empresa={e}
+              activa={empresaActiva?.id === e.id}
+              esSuperAdmin={esSuperAdmin}
+              onSeleccionar={() => setEmpresaActiva(e)}
+              onEditar={() => setModalEmpresa(e)}
+              onEliminar={() => setModalEliminar(e)}
+              onCuentaCorriente={() => setCuentaCorriente({ tipo: 'empresa', id: e.id, nombre: e.nombre })}
+              onReabrirPlazo={() => setModalPlazo(e)}
+              onRegenerarCodigo={() => regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código regenerado') })}
+            />
           ))}
-          {empresas.length === 0 && <p className="text-gray-400 text-sm">No hay empresas cargadas.</p>}
+          {empresas.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-gray-700">
+                {hayBusquedaEmpresa
+                  ? `No se encontraron empresas para "${busquedaEmpresa.trim()}"`
+                  : 'Todavía no hay empresas cargadas.'}
+              </p>
+              {hayBusquedaEmpresa && (
+                <p className="mt-1 text-xs text-gray-400">Probá con otro nombre, slug o email.</p>
+              )}
+            </div>
+          )}
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </div>
-
         {/* Panel de empleados */}
         {empresaActiva && (
-          <EmpleadosPanel empresa={empresaActiva} esSuperAdmin={esSuperAdmin} />
+          <EmpleadosPanel
+            empresa={empresaActiva}
+            esSuperAdmin={esSuperAdmin}
+            onAbrirCuenta={(empleado) => setCuentaCorriente({
+              tipo: 'empleado',
+              id: empleado.id,
+              nombre: `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim() || empleado.email,
+            })}
+          />
         )}
       </div>
+
+      <PlanesPanel
+        planes={planes}
+        onNuevo={() => setModalPlan('nuevo')}
+        onEditar={setModalPlan}
+      />
 
       {/* Modal empresa */}
       {modalEmpresa && (
         <ModalEmpresa
           empresa={modalEmpresa === 'nueva' ? null : modalEmpresa}
+          planes={planes}
           onGuardar={handleGuardarEmpresa}
           onCerrar={() => setModalEmpresa(null)}
           loading={createEmpresa.isPending || updateEmpresa.isPending}
+        />
+      )}
+
+      {modalPlan && (
+        <ModalPlan
+          plan={modalPlan === 'nuevo' ? null : modalPlan}
+          onCerrar={() => setModalPlan(null)}
         />
       )}
 
@@ -200,42 +283,579 @@ export default function Empresas() {
         />
       )}
 
+      {modalEliminar && (
+        <ConfirmDeleteModal
+          key={modalEliminar.id}
+          empresa={modalEliminar}
+          onCerrar={() => setModalEliminar(null)}
+          onConfirmar={() => handleEliminarEmpresa(modalEliminar)}
+          loading={deleteEmpresa.isPending}
+        />
+      )}
+
+      {cuentaCorriente && (
+        <CuentaCorrienteFicha
+          tipo={cuentaCorriente.tipo}
+          id={cuentaCorriente.id}
+          nombre={cuentaCorriente.nombre}
+          onClose={() => setCuentaCorriente(null)}
+        />
+      )}
+
     </div>
   );
 }
 
-function EmpleadosPanel({ empresa, esSuperAdmin }) {
+function EstadoFiltroChips({ value, onChange }) {
+  const opciones = [
+    ['todas', 'Todas'],
+    ['activa', 'Activas'],
+    ['inactiva', 'Inactivas'],
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {opciones.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+            value === id
+              ? 'border-green-700 bg-green-700 text-white'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:text-green-800'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onChange(Math.max(1, page - 1))}
+        className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Anterior
+      </button>
+      <span className="text-xs font-semibold text-gray-500">Página {page} de {totalPages}</span>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onChange(Math.min(totalPages, page + 1))}
+        className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Siguiente
+      </button>
+    </div>
+  );
+}
+
+function EmpresaCard({
+  empresa,
+  activa,
+  esSuperAdmin,
+  onSeleccionar,
+  onEditar,
+  onEliminar,
+  onCuentaCorriente,
+  onReabrirPlazo,
+  onRegenerarCodigo,
+}) {
+  const plazoActivo = empresa.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta);
+  const puedeReabrir = empresa.limite_hora || empresa.modo_pedido === 'semanal' || empresa.modo_pedido === 'ambos';
+
+  return (
+    <div
+      onClick={onSeleccionar}
+      className={`cursor-pointer rounded-lg border-2 bg-white p-4 transition-colors ${
+        activa ? 'border-green-600' : 'border-gray-100 hover:border-gray-300'
+      } ${empresa.activo ? '' : 'opacity-60 grayscale-[30%]'}`}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-bold text-gray-900">{empresa.nombre}</p>
+            <EstadoEmpresaBadge activa={empresa.activo} />
+          </div>
+          <p className="mt-0.5 text-xs text-gray-500">
+            @{empresa.slug} · {empresa.plan_nombre || PLANES[empresa.plan]} · {MODOS[empresa.modo_pedido]}
+          </p>
+          <PlanDetalleChip plan={empresa.plan_detalle} />
+          {empresa.limite_hora && (
+            <p className="mt-1 text-xs text-amber-600">
+              {empresa.modo_pedido === 'semanal'
+                ? `Límite: ${empresa.limite_dia_semana || 'lunes'} ${empresa.limite_hora}hs`
+                : empresa.limite_anticipacion_dias > 0
+                  ? `Límite: día anterior ${empresa.limite_hora}hs`
+                  : `Límite: mismo día ${empresa.limite_hora}hs`}
+            </p>
+          )}
+          {plazoActivo && (
+            <p className="mt-1 text-xs font-medium text-green-700">
+              Plazo reabierto hasta {new Date(empresa.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
+            </p>
+          )}
+          <CodigoBadge
+            empresa={empresa}
+            esSuperAdmin={esSuperAdmin}
+            puedeReabrir={puedeReabrir}
+            onRegenerarCodigo={onRegenerarCodigo}
+            onReabrirPlazo={onReabrirPlazo}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <button
+            type="button"
+            onClick={(ev) => { ev.stopPropagation(); onEditar(); }}
+            className={iconButtonClass}
+            aria-label={`Editar ${empresa.nombre}`}
+            title="Editar"
+          >
+            <EditarIcon />
+          </button>
+          <button
+            type="button"
+            onClick={(ev) => { ev.stopPropagation(); onCuentaCorriente(); }}
+            className={iconButtonClass}
+            aria-label={`Cuenta corriente de ${empresa.nombre}`}
+            title="Cuenta corriente"
+          >
+            <CuentaCorrienteIcon />
+          </button>
+          {esSuperAdmin && (
+            <button
+              type="button"
+              onClick={(ev) => { ev.stopPropagation(); onEliminar(); }}
+              className={dangerIconButtonClass}
+              aria-label={`Eliminar ${empresa.nombre}`}
+              title="Eliminar"
+            >
+              <EliminarIcon />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EstadoEmpresaBadge({ activa }) {
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+      activa
+        ? 'border-green-200 bg-green-100 text-green-800'
+        : 'border-red-100 bg-red-50 text-red-700'
+    }`}
+    >
+      {activa ? 'Activa' : 'Inactiva'}
+    </span>
+  );
+}
+
+function PlanDetalleChip({ plan }) {
+  if (!plan) return null;
+  const gramaje = plan.gramaje_max ? `${plan.gramaje_min}-${plan.gramaje_max} g` : `${plan.gramaje_min} g`;
+
+  return (
+    <details className="mt-2 w-fit" onClick={(event) => event.stopPropagation()}>
+      <summary className="cursor-pointer rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
+        Ver detalles del plan
+      </summary>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{gramaje}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_postre ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+          {plan.incluye_postre ? 'Con postre' : 'Sin postre'}
+        </span>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_bebida ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+          {plan.incluye_bebida ? 'Con bebida' : 'Sin bebida'}
+        </span>
+      </div>
+    </details>
+  );
+}
+
+function CodigoBadge({ empresa, esSuperAdmin, puedeReabrir, onRegenerarCodigo, onReabrirPlazo }) {
+  const [abierto, setAbierto] = useState(false);
+
+  const copiarCodigo = async () => {
+    if (!empresa.codigo_registro) return;
+    await navigator.clipboard.writeText(empresa.codigo_registro);
+    toast.success('Código copiado');
+    setAbierto(false);
+  };
+
+  const regenerar = async () => {
+    if (!esSuperAdmin) return;
+    const ok = await confirmar({
+      titulo: 'Regenerar código',
+      texto: 'El código anterior dejará de funcionar para nuevos registros.',
+      botonConfirmar: 'Regenerar',
+    });
+    if (!ok) return;
+    onRegenerarCodigo();
+    setAbierto(false);
+  };
+
+  if (!empresa.codigo_registro) {
+    if (!esSuperAdmin) return null;
+    return (
+      <button
+        type="button"
+        onClick={(ev) => { ev.stopPropagation(); onRegenerarCodigo(); }}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-100"
+        aria-label={`Generar código de registro de ${empresa.nombre}`}
+        title="Generar código de registro"
+      >
+        <LlaveIcon />
+        Generar código
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative mt-3 flex w-fit items-center gap-2 rounded-lg border-[1.5px] border-indigo-400 bg-indigo-100 px-2.5 py-1.5" onClick={ev => ev.stopPropagation()}>
+      <span className="text-xs font-bold text-indigo-600">Código</span>
+      <span className="font-mono text-sm font-black tracking-widest text-indigo-950">{empresa.codigo_registro}</span>
+      <button
+        type="button"
+        title="Copiar código"
+        aria-label={`Copiar código de registro de ${empresa.nombre}`}
+        onClick={copiarCodigo}
+        className="text-indigo-600 transition-colors hover:text-indigo-900"
+      >
+        <CopyIcon />
+      </button>
+      <button
+        type="button"
+        title="Más acciones"
+        aria-label={`Más acciones para el código de ${empresa.nombre}`}
+        onClick={() => setAbierto(v => !v)}
+        className="text-indigo-600 transition-colors hover:text-indigo-900"
+      >
+        <MoreIcon />
+      </button>
+      {abierto && (
+        <div className="absolute left-0 top-full z-10 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
+          <MenuCodigoButton onClick={copiarCodigo} label="Copiar código" icon={<CopyIcon />} />
+          {esSuperAdmin && <MenuCodigoButton onClick={regenerar} label="Regenerar código" icon={<RefreshIcon />} danger />}
+          {puedeReabrir && <MenuCodigoButton onClick={() => { onReabrirPlazo(); setAbierto(false); }} label="Reabrir plazo de pedido" icon={<ReabrirPlazoIcon />} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuCodigoButton({ onClick, label, icon, danger = false }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold ${
+        danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+      <circle cx="5" cy="12" r="1" />
+    </svg>
+  );
+}
+
+function ConfirmDeleteModal({ empresa, onCerrar, onConfirmar, loading }) {
+  const [dependencias, setDependencias] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let activa = true;
+    getDependenciasEmpresa(empresa.id)
+      .then((data) => {
+        if (activa) setDependencias(data);
+      })
+      .catch((err) => {
+        if (activa) setError(err?.message || 'No se pudieron consultar dependencias');
+      })
+      .finally(() => {
+        if (activa) setCargando(false);
+      });
+    return () => { activa = false; };
+  }, [empresa.id]);
+
+  const bloqueada = dependencias && !dependencias.puedeEliminarse;
+
+  return (
+    <Modal onCerrar={onCerrar} titulo={`Eliminar ${empresa.nombre}`}>
+      <div className="space-y-4">
+        {cargando && <p className="text-sm text-gray-500">Revisando pedidos activos y cuenta corriente...</p>}
+        {error && <p className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {bloqueada && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm font-semibold text-amber-900">No se puede eliminar esta empresa.</p>
+            <p className="mt-2 text-sm text-amber-800">
+              Pedidos activos: {dependencias.pedidosActivos}. Saldo de cuenta corriente: {dependencias.saldoCuentaCorriente}.
+            </p>
+          </div>
+        )}
+        {dependencias?.puedeEliminarse && (
+          <div className="rounded-lg border border-red-100 bg-red-50 p-3">
+            <p className="text-sm font-semibold text-red-800">La empresa se marcará como inactiva y eliminada.</p>
+            <p className="mt-1 text-sm text-red-700">No hay pedidos activos ni saldo pendiente.</p>
+          </div>
+        )}
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
+            {bloqueada ? 'Cerrar' : 'Cancelar'}
+          </button>
+          {dependencias?.puedeEliminarse && (
+            <button
+              type="button"
+              onClick={onConfirmar}
+              disabled={loading}
+              className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {loading ? 'Eliminando...' : 'Eliminar definitivamente'}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function PlanesPanel({ planes, onNuevo, onEditar }) {
+  const deletePlan = useDeletePlan();
+
+  return (
+    <section className="mt-6 rounded-xl border border-gray-100 bg-white p-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-bold text-gray-900">Planes de vianda</h2>
+          <p className="text-sm text-gray-500">Combinaciones de tamaÃ±o, postre y bebida para empresas y cocina.</p>
+        </div>
+        <button onClick={onNuevo} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800">
+          + Nuevo plan
+        </button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        {planes.map((plan) => (
+          <div key={plan.id} className={`rounded-lg border p-3 ${plan.activo ? 'border-gray-100' : 'border-gray-100 bg-gray-50 opacity-70'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-gray-900">{plan.nombre}</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {plan.gramaje_min}-{plan.gramaje_max || plan.gramaje_min} g
+                </p>
+              </div>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${plan.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                {plan.activo ? 'Activo' : 'Inactivo'}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_postre ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                {plan.incluye_postre ? 'Con postre' : 'Sin postre'}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_bebida ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                {plan.incluye_bebida ? 'Con bebida' : 'Sin bebida'}
+              </span>
+            </div>
+            {plan.descripcion && <p className="mt-2 text-xs text-gray-400">{plan.descripcion}</p>}
+            <div className="mt-3 flex justify-end gap-2">
+              <button onClick={() => onEditar(plan)} className="text-xs font-semibold text-gray-500 hover:text-gray-900">Editar</button>
+              {plan.activo && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await deletePlan.mutateAsync(plan.id);
+                      toast.success('Plan desactivado');
+                    } catch (e) {
+                      toast.error(e?.message || 'No se pudo desactivar');
+                    }
+                  }}
+                  className="text-xs font-semibold text-red-500 hover:text-red-700"
+                >
+                  Desactivar
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModalPlan({ plan, onCerrar }) {
+  const createPlan = useCreatePlan();
+  const updatePlan = useUpdatePlan();
+  const [form, setForm] = useState({
+    nombre: plan?.nombre || '',
+    codigo: plan?.codigo || '',
+    descripcion: plan?.descripcion || '',
+    gramaje_min: plan?.gramaje_min || 450,
+    gramaje_max: plan?.gramaje_max || 500,
+    incluye_postre: Boolean(plan?.incluye_postre),
+    incluye_bebida: Boolean(plan?.incluye_bebida),
+    activo: plan?.activo ?? true,
+    orden: plan?.orden || 0,
+  });
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const payload = {
+      ...form,
+      gramaje_min: Number(form.gramaje_min),
+      gramaje_max: form.gramaje_max ? Number(form.gramaje_max) : null,
+      orden: Number(form.orden || 0),
+    };
+    try {
+      if (plan) {
+        await updatePlan.mutateAsync({ id: plan.id, data: payload });
+        toast.success('Plan actualizado');
+      } else {
+        await createPlan.mutateAsync(payload);
+        toast.success('Plan creado');
+      }
+      onCerrar();
+    } catch (e) {
+      toast.error(e?.message || 'No se pudo guardar el plan');
+    }
+  };
+
+  return (
+    <Modal onCerrar={onCerrar} titulo={plan ? 'Editar plan' : 'Nuevo plan'}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Campo label="Nombre">
+          <input className={input} required value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Plan Clasico 450" />
+        </Campo>
+        <Campo label="Codigo">
+          <input className={input} value={form.codigo} onChange={e => set('codigo', e.target.value)} placeholder="Se genera desde el nombre si queda vacio" />
+        </Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="Gramaje minimo">
+            <input className={input} type="number" min="1" required value={form.gramaje_min} onChange={e => set('gramaje_min', e.target.value)} />
+          </Campo>
+          <Campo label="Gramaje maximo">
+            <input className={input} type="number" min="1" value={form.gramaje_max} onChange={e => set('gramaje_max', e.target.value)} />
+          </Campo>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <input type="checkbox" checked={form.incluye_postre} onChange={e => set('incluye_postre', e.target.checked)} />
+            Incluye postre
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <input type="checkbox" checked={form.incluye_bebida} onChange={e => set('incluye_bebida', e.target.checked)} />
+            Incluye bebida
+          </label>
+        </div>
+        <Campo label="Descripcion">
+          <textarea className={input} rows={3} value={form.descripcion} onChange={e => set('descripcion', e.target.value)} />
+        </Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="Orden">
+            <input className={input} type="number" value={form.orden} onChange={e => set('orden', e.target.value)} />
+          </Campo>
+          <label className="mt-6 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.activo} onChange={e => set('activo', e.target.checked)} />
+            Activo
+          </label>
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cancelar</button>
+          <button type="submit" disabled={createPlan.isPending || updatePlan.isPending} className="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            {createPlan.isPending || updatePlan.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
   const { data: todosEmpleados = [] } = useEmpleados(empresa.id);
   const empleados = todosEmpleados.filter(e => e.rol !== 'admin');
   const updateEmpleado = useUpdateEmpleado();
   const deleteEmpleado = useDeleteEmpleado();
   const generarReset = useGenerarResetCode();
   const [modalEmpleado, setModalEmpleado] = useState(null);
+  const [modalImportar, setModalImportar] = useState(false);
   const [modalReset, setModalReset] = useState(null); // { codigo, expira, empleado }
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="font-bold text-gray-800">Empleados — {empresa.nombre}</h2>
-        <button onClick={() => setModalEmpleado({ empresa_id: empresa.id })} className="text-green-700 text-sm font-semibold hover:underline">
-          + Agregar
-        </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <h2 className="font-bold text-gray-800">Empleados â€” {empresa.nombre}</h2>
+        <div className="flex gap-2">
+          <button onClick={() => setModalImportar(true)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+            Importar CSV
+          </button>
+          <button onClick={() => setModalEmpleado({ empresa_id: empresa.id })} className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-800">
+            + Agregar
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">
         {empleados.map(emp => (
-          <div key={emp.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
-            <div>
+          <div key={emp.id} className="flex flex-col gap-3 py-2 border-b border-gray-50 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="font-medium text-sm">{emp.nombre} {emp.apellido}</p>
-              <p className="text-xs text-gray-400">{emp.email} · {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
+              <p className="text-xs text-gray-400">{emp.email} Â· {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
               {(emp.telefono || emp.fecha_nacimiento) && (
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {emp.telefono || 'Sin teléfono'}
-                  {emp.fecha_nacimiento ? ` · Nac. ${formatearFechaCorta(emp.fecha_nacimiento)}` : ''}
+                  {emp.telefono || 'Sin telÃ©fono'}
+                  {emp.fecha_nacimiento ? ` Â· Nac. ${formatearFechaCorta(emp.fecha_nacimiento)}` : ''}
                 </p>
               )}
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => onAbrirCuenta(emp)}
+                className={iconButtonClass}
+                aria-label={`Cuenta corriente de ${emp.nombre} ${emp.apellido}`}
+                title="Cuenta corriente"
+              >
+                <CuentaCorrienteIcon />
+              </button>
               <button
                 onClick={() => updateEmpleado.mutate({ id: emp.id, data: { activo: !emp.activo } })}
                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${emp.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
@@ -243,32 +863,48 @@ function EmpleadosPanel({ empresa, esSuperAdmin }) {
                 {emp.activo ? 'Activo' : 'Inactivo'}
               </button>
               <button
+                type="button"
                 onClick={async () => {
                   try {
                     const data = await generarReset.mutateAsync(emp.id);
                     setModalReset(data);
-                  } catch (e) { toast.error(e?.message || 'Error generando código'); }
+                  } catch (e) { toast.error(e?.message || 'Error generando cÃ³digo'); }
                 }}
-                title="Generar código de recuperación de contraseña"
-                className="text-gray-400 hover:text-amber-600 text-sm"
-              >🔑</button>
-              <button onClick={() => setModalEmpleado(emp)} className="text-gray-400 hover:text-gray-700 text-sm">✏️</button>
+                aria-label={`Generar cÃ³digo de recuperaciÃ³n de contraseÃ±a para ${emp.nombre} ${emp.apellido}`}
+                title="Generar cÃ³digo de recuperaciÃ³n de contraseÃ±a"
+                className={iconButtonClass}
+              >
+                <LlaveIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalEmpleado(emp)}
+                className={iconButtonClass}
+                aria-label={`Editar ${emp.nombre} ${emp.apellido}`}
+                title="Editar"
+              >
+                <EditarIcon />
+              </button>
               {esSuperAdmin && (
               <button
+                type="button"
                 onClick={async () => {
-                  if (!await confirmar({ titulo: `¿Eliminar a ${emp.nombre} ${emp.apellido}?`, texto: 'Esta acción no se puede deshacer.', botonConfirmar: 'Sí, eliminar' })) return;
                   try {
                     await deleteEmpleado.mutateAsync(emp.id);
                     toast.success('Empleado eliminado');
                   } catch (e) { toast.error(e?.message || 'Error'); }
                 }}
-                className="text-gray-400 hover:text-red-600 text-sm"
-              >🗑️</button>
+                className={dangerIconButtonClass}
+                aria-label={`Eliminar ${emp.nombre} ${emp.apellido}`}
+                title="Eliminar"
+              >
+                <EliminarIcon />
+              </button>
               )}
             </div>
           </div>
         ))}
-        {empleados.length === 0 && <p className="text-gray-400 text-sm">Sin empleados aún.</p>}
+        {empleados.length === 0 && <p className="text-gray-400 text-sm">Sin empleados aÃºn.</p>}
       </div>
 
       {modalEmpleado && (
@@ -279,21 +915,25 @@ function EmpleadosPanel({ empresa, esSuperAdmin }) {
         />
       )}
 
-      {/* Modal código de recuperación */}
+      {modalImportar && (
+        <ModalImportarEmpleados empresa={empresa} onCerrar={() => setModalImportar(false)} />
+      )}
+
+      {/* Modal cÃ³digo de recuperaciÃ³n */}
       {modalReset && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <div className="text-4xl mb-3">🔑</div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Código de recuperación</h3>
+            <div className="text-4xl mb-3">ðŸ”‘</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">CÃ³digo de recuperaciÃ³n</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Para <strong>{modalReset.empleado}</strong>. Compartíselo por WhatsApp o mensaje. Expira el <strong>{modalReset.expira}</strong>.
+              Para <strong>{modalReset.empleado}</strong>. CompartÃ­selo por WhatsApp o mensaje. Expira el <strong>{modalReset.expira}</strong>.
             </p>
             <div className="bg-amber-50 border-2 border-amber-300 rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
               <span className="font-mono font-bold text-2xl tracking-widest text-amber-800 flex-1 text-center">
                 {modalReset.codigo}
               </span>
               <button
-                onClick={() => { navigator.clipboard.writeText(modalReset.codigo); toast.success('Código copiado'); }}
+                onClick={() => { navigator.clipboard.writeText(modalReset.codigo); toast.success('CÃ³digo copiado'); }}
                 className="text-amber-500 hover:text-amber-700 flex-shrink-0"
                 title="Copiar"
               >
@@ -301,7 +941,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin }) {
               </button>
             </div>
             <p className="text-xs text-gray-400 mb-5">
-              El empleado debe ir a "¿Olvidaste tu contraseña?" en la app e ingresar este código.
+              El empleado debe ir a "Â¿Olvidaste tu contraseÃ±a?" en la app e ingresar este cÃ³digo.
             </p>
             <button
               onClick={() => setModalReset(null)}
@@ -316,14 +956,146 @@ function EmpleadosPanel({ empresa, esSuperAdmin }) {
   );
 }
 
-const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
-const DIAS_LABEL = { lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes' };
+function parseCsvLine(line) {
+  const values = [];
+  let current = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      values.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  values.push(current.trim());
+  return values;
+}
 
-function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
+function normalizarHeader(header) {
+  return header
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function parseEmpleadosCsv(texto) {
+  const lines = texto.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = parseCsvLine(lines[0]).map(normalizarHeader);
+  return lines.slice(1).map((line) => {
+    const cols = parseCsvLine(line);
+    const row = {};
+    headers.forEach((header, index) => {
+      row[header] = cols[index] || '';
+    });
+    return {
+      nombre: row.nombre || '',
+      apellido: row.apellido || '',
+      email: row.email || row.correo || '',
+      telefono: row.telefono || row.celular || '',
+      fecha_nacimiento: row.fecha_nacimiento || row.nacimiento || '',
+      password: row.password || row.contrasena || '',
+      rol: row.rol || 'cliente',
+    };
+  });
+}
+
+function ModalImportarEmpleados({ empresa, onCerrar }) {
+  const importar = useImportarEmpleados();
+  const [texto, setTexto] = useState('nombre,apellido,email,telefono,fecha_nacimiento,password\n');
+  const [resultado, setResultado] = useState(null);
+  const filas = parseEmpleadosCsv(texto);
+
+  const cargarArchivo = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setTexto(await file.text());
+    setResultado(null);
+  };
+
+  const enviar = async (event) => {
+    event.preventDefault();
+    if (filas.length === 0) {
+      toast.warning('PegÃ¡ un CSV con encabezados y al menos una fila');
+      return;
+    }
+    try {
+      const data = await importar.mutateAsync({ empresa_id: empresa.id, empleados: filas });
+      setResultado(data);
+      toast.success(`ImportaciÃ³n procesada: ${data.creados?.length || 0} creados`);
+    } catch (e) {
+      toast.error(e?.message || 'No se pudo importar el CSV');
+    }
+  };
+
+  return (
+    <Modal onCerrar={onCerrar} titulo={`Importar empleados â€” ${empresa.nombre}`}>
+      <form onSubmit={enviar} className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Encabezados aceptados: nombre, apellido, email, telefono, fecha_nacimiento, password y rol.
+        </p>
+        <input type="file" accept=".csv,text/csv" onChange={cargarArchivo} className="block w-full text-sm text-gray-600" />
+        <textarea
+          value={texto}
+          onChange={(event) => { setTexto(event.target.value); setResultado(null); }}
+          rows={8}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs focus:border-green-500 focus:outline-none"
+        />
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview: {filas.length} fila{filas.length !== 1 ? 's' : ''}</p>
+          <div className="mt-2 space-y-1">
+            {filas.slice(0, 5).map((fila, index) => (
+              <p key={`${fila.email}-${index}`} className="truncate text-xs text-gray-600">
+                {index + 1}. {fila.apellido}, {fila.nombre} Â· {fila.email || 'sin email'}
+              </p>
+            ))}
+            {filas.length > 5 && <p className="text-xs text-gray-400">+{filas.length - 5} filas mÃ¡s</p>}
+          </div>
+        </div>
+        {resultado && (
+          <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-sm text-green-800">
+            <p className="font-semibold">
+              {resultado.creados?.length || 0} creados Â· {resultado.omitidos?.length || 0} omitidos Â· {resultado.errores?.length || 0} errores
+            </p>
+            {(resultado.errores || []).slice(0, 4).map((error) => (
+              <p key={`${error.fila}-${error.email}`} className="mt-1 text-xs text-red-600">
+                Fila {error.fila}: {error.email || 'sin email'} Â· {error.error}
+              </p>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end gap-3">
+          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cerrar</button>
+          <button type="submit" disabled={importar.isPending} className="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            {importar.isPending ? 'Importando...' : 'Importar'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
+const DIAS_LABEL = { lunes: 'Lunes', martes: 'Martes', miercoles: 'MiÃ©rcoles', jueves: 'Jueves', viernes: 'Viernes' };
+
+function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
+  const esNueva = !empresa;
+  const nombreRef = useRef(null);
   const [form, setForm] = useState({
     nombre: empresa?.nombre || '',
     slug: empresa?.slug || '',
     plan: empresa?.plan || 'basico',
+    plan_id: empresa?.plan_id || planes.find(plan => plan.activo)?.id || '',
     modo_pedido: empresa?.modo_pedido || 'semanal',
     dias_laborales: empresa?.dias_laborales || 'lunes_viernes',
     activo: empresa?.activo ?? true,
@@ -333,13 +1105,60 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
     email: empresa?.email || '',
     telefono: empresa?.telefono || '',
   });
+  const [errores, setErrores] = useState({});
+  const [slugEditado, setSlugEditado] = useState(!esNueva);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  useEffect(() => {
+    nombreRef.current?.focus();
+  }, []);
+
+  const set = (k, v) => {
+    setForm(f => {
+      const next = { ...f, [k]: v };
+      if (k === 'nombre' && esNueva && !slugEditado) {
+        next.slug = generarSlug(v);
+      }
+      return next;
+    });
+    setErrores(prev => ({ ...prev, [k]: '' }));
+  };
+
+  const setSlugManual = (value) => {
+    setSlugEditado(true);
+    set('slug', generarSlug(value));
+  };
+
+  const validar = () => {
+    const nuevosErrores = {};
+    const email = form.email.trim();
+
+    if (!form.nombre.trim()) nuevosErrores.nombre = 'IngresÃ¡ el nombre de la empresa.';
+    if (!form.slug.trim()) {
+      nuevosErrores.slug = 'IngresÃ¡ el slug.';
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug.trim())) {
+      nuevosErrores.slug = 'UsÃ¡ solo letras, nÃºmeros y guiones.';
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nuevosErrores.email = 'IngresÃ¡ un email vÃ¡lido.';
+    }
+
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const data = { ...form };
-    // Si no pusieron hora, limpiar los límites
+    if (!validar()) return;
+
+    const data = {
+      ...form,
+      nombre: form.nombre.trim(),
+      slug: form.slug.trim(),
+      email: form.email.trim(),
+      telefono: form.telefono.trim(),
+    };
+    if (!data.plan_id) delete data.plan_id;
+    // Si no pusieron hora, limpiar los lÃ­mites
     if (!data.limite_hora) {
       data.limite_hora = null;
       data.limite_dia_semana = null;
@@ -352,17 +1171,49 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
   const tieneHora = !!form.limite_hora;
 
   return (
-    <Modal onCerrar={onCerrar} titulo={empresa ? 'Editar empresa' : 'Nueva empresa'}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      onCerrar={onCerrar}
+      titulo={empresa ? 'Editar empresa' : 'Nueva empresa'}
+      footer={(
+        <>
+          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancelar</button>
+          <button type="submit" form="empresa-form" disabled={loading} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
+            {loading ? 'Guardando...' : 'Guardar'}
+          </button>
+        </>
+      )}
+    >
+      <form id="empresa-form" onSubmit={handleSubmit} className="space-y-4" autoComplete="off" noValidate>
         <Campo label="Nombre">
-          <input className={input} required value={form.nombre} onChange={e => set('nombre', e.target.value)} />
+          <input
+            ref={nombreRef}
+            className={input}
+            value={form.nombre}
+            onChange={e => set('nombre', e.target.value)}
+            autoComplete="off"
+            aria-invalid={Boolean(errores.nombre)}
+            aria-describedby={errores.nombre ? 'empresa-nombre-error' : undefined}
+          />
+          {errores.nombre && <p id="empresa-nombre-error" className="mt-1 text-xs text-red-600">{errores.nombre}</p>}
         </Campo>
-        <Campo label="Slug (identificador único, sin espacios)">
-          <input className={input} required value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="ej: universidad-mendoza" />
+        <Campo label="Slug (identificador Ãºnico, sin espacios)">
+          <input
+            className={input}
+            value={form.slug}
+            onChange={e => setSlugManual(e.target.value)}
+            placeholder="ej: universidad-mendoza"
+            autoComplete="off"
+            aria-invalid={Boolean(errores.slug)}
+            aria-describedby={errores.slug ? 'empresa-slug-error' : undefined}
+          />
+          {errores.slug && <p id="empresa-slug-error" className="mt-1 text-xs text-red-600">{errores.slug}</p>}
         </Campo>
         <Campo label="Plan">
-          <select className={input} value={form.plan} onChange={e => set('plan', e.target.value)}>
-            {Object.entries(PLANES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <select className={input} value={form.plan_id} onChange={e => set('plan_id', e.target.value ? Number(e.target.value) : '')}>
+            <option value="">Seleccionar plan</option>
+            {planes.filter(plan => plan.activo || Number(plan.id) === Number(form.plan_id)).map(plan => (
+              <option key={plan.id} value={plan.id}>{etiquetaPlan(plan)}</option>
+            ))}
           </select>
         </Campo>
         <Campo label="Modo de pedido">
@@ -370,17 +1221,17 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
             {Object.entries(MODOS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Campo>
-        <Campo label="Días laborales">
+        <Campo label="DÃ­as laborales">
           <select className={input} value={form.dias_laborales} onChange={e => set('dias_laborales', e.target.value)}>
             {Object.entries(DIAS_LAB).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Campo>
 
-        {/* ── Configuración de límite ─────────────────────────── */}
+        {/* â”€â”€ ConfiguraciÃ³n de lÃ­mite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Límite de pedidos</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">LÃ­mite de pedidos</p>
 
-          <Campo label="Hora de corte (dejar vacío = sin límite)">
+          <Campo label="Hora de corte (dejar vacÃ­o = sin lÃ­mite)">
             <input
               className={input}
               type="time"
@@ -391,35 +1242,45 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
           </Campo>
 
           {tieneHora && (modo === 'semanal' || modo === 'ambos') && (
-            <Campo label="Día límite (para pedido semanal)">
+            <Campo label="DÃ­a lÃ­mite (para pedido semanal)">
               <select className={input} value={form.limite_dia_semana} onChange={e => set('limite_dia_semana', e.target.value)}>
                 {DIAS_SEMANA.map(d => <option key={d} value={d}>{DIAS_LABEL[d]}</option>)}
               </select>
               <p className="text-xs text-gray-400 mt-1">
-                Los empleados deben pedir antes del {DIAS_LABEL[form.limite_dia_semana] || '—'} a las {form.limite_hora}hs.
+                Los empleados deben pedir antes del {DIAS_LABEL[form.limite_dia_semana] || 'â€”'} a las {form.limite_hora}hs.
               </p>
             </Campo>
           )}
 
           {tieneHora && (modo === 'diario' || modo === 'ambos') && (
-            <Campo label="Anticipación requerida (para pedido diario)">
+            <Campo label="AnticipaciÃ³n requerida (para pedido diario)">
               <select className={input} value={form.limite_anticipacion_dias} onChange={e => set('limite_anticipacion_dias', parseInt(e.target.value))}>
-                <option value={0}>Mismo día hasta las {form.limite_hora}hs</option>
-                <option value={1}>Día anterior hasta las {form.limite_hora}hs</option>
+                <option value={0}>Mismo dÃ­a hasta las {form.limite_hora}hs</option>
+                <option value={1}>DÃ­a anterior hasta las {form.limite_hora}hs</option>
               </select>
             </Campo>
           )}
 
           {!tieneHora && (
-            <p className="text-xs text-gray-400">Sin límite: los empleados pueden pedir hasta que cerrés el menú manualmente.</p>
+            <p className="text-xs text-gray-400">Sin lÃ­mite: los empleados pueden pedir hasta que cerrÃ©s el menÃº manualmente.</p>
           )}
         </div>
 
         <Campo label="Email de contacto (opcional)">
-          <input className={input} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="contacto@empresa.com" />
+          <input
+            className={input}
+            type="email"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
+            placeholder="contacto@empresa.com"
+            autoComplete="off"
+            aria-invalid={Boolean(errores.email)}
+            aria-describedby={errores.email ? 'empresa-email-error' : undefined}
+          />
+          {errores.email && <p id="empresa-email-error" className="mt-1 text-xs text-red-600">{errores.email}</p>}
         </Campo>
-        <Campo label="Teléfono de contacto (opcional)">
-          <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" />
+        <Campo label="TelÃ©fono de contacto (opcional)">
+          <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" autoComplete="off" />
         </Campo>
 
         {empresa && (
@@ -428,12 +1289,6 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
             Activa
           </label>
         )}
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancelar</button>
-          <button type="submit" disabled={loading} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
-            {loading ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
       </form>
     </Modal>
   );
@@ -442,27 +1297,62 @@ function ModalEmpresa({ empresa, onGuardar, onCerrar, loading }) {
 function ModalEmpleado({ empresas, empleado, onCerrar }) {
   const createEmpleado = useCreateEmpleado();
   const updateEmpleado = useUpdateEmpleado();
-  const esNuevo = !empleado?.email;
+  const esNuevo = !empleado?.id;
+  const nombreRef = useRef(null);
 
   const [form, setForm] = useState({
     empresa_id: empleado?.empresa_id || empresas[0]?.id || '',
-    nombre: empleado?.nombre || '',
-    apellido: empleado?.apellido || '',
-    email: empleado?.email || '',
-    telefono: empleado?.telefono || '',
-    fecha_nacimiento: normalizarFechaInput(empleado?.fecha_nacimiento),
+    nombre: esNuevo ? '' : empleado?.nombre || '',
+    apellido: esNuevo ? '' : empleado?.apellido || '',
+    email: esNuevo ? '' : empleado?.email || '',
+    telefono: esNuevo ? '' : empleado?.telefono || '',
+    fecha_nacimiento: esNuevo ? '' : normalizarFechaInput(empleado?.fecha_nacimiento),
     password: '',
-    rol: empleado?.rol || 'cliente',
+    rol: esNuevo ? 'cliente' : empleado?.rol || 'cliente',
   });
+  const [errores, setErrores] = useState({});
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  useEffect(() => {
+    nombreRef.current?.focus();
+  }, []);
+
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    setErrores(prev => ({ ...prev, [k]: '' }));
+  };
+
+  const validar = () => {
+    const nuevosErrores = {};
+    const email = form.email.trim();
+
+    if (!form.nombre.trim()) nuevosErrores.nombre = 'IngresÃ¡ el nombre.';
+    if (!form.apellido.trim()) nuevosErrores.apellido = 'IngresÃ¡ el apellido.';
+    if (!email) {
+      nuevosErrores.email = 'IngresÃ¡ el email.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nuevosErrores.email = 'IngresÃ¡ un email vÃ¡lido.';
+    }
+    if (esNuevo && !form.password.trim()) nuevosErrores.password = 'IngresÃ¡ una contraseÃ±a.';
+
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validar()) return;
+
+    const payload = {
+      ...form,
+      nombre: form.nombre.trim(),
+      apellido: form.apellido.trim(),
+      email: form.email.trim(),
+    };
+
     if (esNuevo) {
-      await createEmpleado.mutateAsync(form);
+      await createEmpleado.mutateAsync(payload);
     } else {
-      const { password, ...rest } = form;
+      const { password, ...rest } = payload;
       const data = password ? { ...rest, password } : rest;
       await updateEmpleado.mutateAsync({ id: empleado.id, data });
     }
@@ -470,8 +1360,19 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
   };
 
   return (
-    <Modal onCerrar={onCerrar} titulo={esNuevo ? 'Nuevo empleado' : 'Editar empleado'}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      onCerrar={onCerrar}
+      titulo={esNuevo ? 'Nuevo empleado' : 'Editar empleado'}
+      footer={(
+        <>
+          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cancelar</button>
+          <button type="submit" form="empleado-form" disabled={createEmpleado.isPending || updateEmpleado.isPending} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
+            {createEmpleado.isPending || updateEmpleado.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </>
+      )}
+    >
+      <form id="empleado-form" onSubmit={handleSubmit} className="space-y-4" autoComplete="off" noValidate>
         <Campo label="Empresa">
           <select className={input} value={form.empresa_id} onChange={e => set('empresa_id', parseInt(e.target.value))}>
             {empresas.map(em => <option key={em.id} value={em.id}>{em.nombre}</option>)}
@@ -479,25 +1380,64 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo label="Nombre">
-            <input className={input} required value={form.nombre} onChange={e => set('nombre', e.target.value)} />
+            <input
+              ref={nombreRef}
+              className={input}
+              value={form.nombre}
+              onChange={e => set('nombre', e.target.value)}
+              autoComplete="off"
+              aria-invalid={Boolean(errores.nombre)}
+              aria-describedby={errores.nombre ? 'empleado-nombre-error' : undefined}
+            />
+            {errores.nombre && <p id="empleado-nombre-error" className="mt-1 text-xs text-red-600">{errores.nombre}</p>}
           </Campo>
           <Campo label="Apellido">
-            <input className={input} required value={form.apellido} onChange={e => set('apellido', e.target.value)} />
+            <input
+              className={input}
+              value={form.apellido}
+              onChange={e => set('apellido', e.target.value)}
+              autoComplete="off"
+              aria-invalid={Boolean(errores.apellido)}
+              aria-describedby={errores.apellido ? 'empleado-apellido-error' : undefined}
+            />
+            {errores.apellido && <p id="empleado-apellido-error" className="mt-1 text-xs text-red-600">{errores.apellido}</p>}
           </Campo>
         </div>
         <Campo label="Email">
-          <input className={input} type="email" required value={form.email} onChange={e => set('email', e.target.value)} placeholder="martin@empresa.com" />
+          <input
+            className={input}
+            type="email"
+            name="empleado-email"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
+            placeholder="martin@empresa.com"
+            autoComplete="off"
+            aria-invalid={Boolean(errores.email)}
+            aria-describedby={errores.email ? 'empleado-email-error' : undefined}
+          />
+          {errores.email && <p id="empleado-email-error" className="mt-1 text-xs text-red-600">{errores.email}</p>}
         </Campo>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo label="Teléfono">
-            <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" />
+          <Campo label="TelÃ©fono">
+            <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" autoComplete="off" />
           </Campo>
           <Campo label="Fecha de nacimiento">
             <input className={input} type="date" value={form.fecha_nacimiento} onChange={e => set('fecha_nacimiento', e.target.value)} />
           </Campo>
         </div>
-        <Campo label={esNuevo ? 'Contraseña' : 'Nueva contraseña (dejar vacío para no cambiar)'}>
-          <input className={input} type="password" required={esNuevo} value={form.password} onChange={e => set('password', e.target.value)} placeholder={esNuevo ? '' : '••••••••'} />
+        <Campo label={esNuevo ? 'ContraseÃ±a' : 'Nueva contraseÃ±a (dejar vacÃ­o para no cambiar)'}>
+          <input
+            className={input}
+            type="password"
+            name="empleado-password"
+            value={form.password}
+            onChange={e => set('password', e.target.value)}
+            placeholder={esNuevo ? '' : 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢'}
+            autoComplete="new-password"
+            aria-invalid={Boolean(errores.password)}
+            aria-describedby={errores.password ? 'empleado-password-error' : undefined}
+          />
+          {errores.password && <p id="empleado-password-error" className="mt-1 text-xs text-red-600">{errores.password}</p>}
         </Campo>
         <Campo label="Rol">
           <select className={input} value={form.rol} onChange={e => set('rol', e.target.value)}>
@@ -505,26 +1445,43 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
             <option value="admin">Administrador</option>
           </select>
         </Campo>
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cancelar</button>
-          <button type="submit" disabled={createEmpleado.isPending || updateEmpleado.isPending} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
-            {createEmpleado.isPending || updateEmpleado.isPending ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
       </form>
     </Modal>
   );
 }
 
-function Modal({ titulo, onCerrar, children }) {
+function Modal({ titulo, onCerrar, children, footer }) {
+  const modalRef = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const modals = document.querySelectorAll('[data-admin-modal="true"]');
+      if (modals[modals.length - 1] !== modalRef.current) return;
+      if (event.key === 'Escape') onCerrar();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCerrar]);
+
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl flex flex-col max-h-[90vh]">
+    <div
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-0 md:p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCerrar();
+      }}
+    >
+      <div ref={modalRef} data-admin-modal="true" className="flex h-full max-h-none w-full flex-col bg-white shadow-xl md:h-auto md:max-h-[90vh] md:max-w-md md:rounded-2xl">
         <div className="flex justify-between items-center p-5 border-b flex-shrink-0">
           <h3 className="font-bold text-lg">{titulo}</h3>
-          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+          <button type="button" onClick={onCerrar} className="text-gray-400 hover:text-gray-700 text-xl" aria-label="Cerrar">âœ•</button>
         </div>
         <div className="p-5 overflow-y-auto">{children}</div>
+        {footer && (
+          <div className="flex flex-shrink-0 justify-end gap-3 border-t border-gray-100 bg-white p-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -539,12 +1496,12 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
   const tieneOverrideActivo = empresa.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta);
 
   return (
-    <Modal onCerrar={onCerrar} titulo={`Reabrir plazo — ${empresa.nombre}`}>
+    <Modal onCerrar={onCerrar} titulo={`Reabrir plazo â€” ${empresa.nombre}`}>
       <div className="space-y-4">
         {tieneOverrideActivo && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-sm text-green-800 font-medium">
-              🔓 Plazo actualmente abierto hasta las{' '}
+              ðŸ”“ Plazo actualmente abierto hasta las{' '}
               {new Date(empresa.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
             </p>
             <button
@@ -558,10 +1515,10 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
         )}
 
         <p className="text-sm text-gray-600">
-          Esto permite que los empleados de <strong>{empresa.nombre}</strong> hagan o modifiquen su pedido aunque haya pasado el límite habitual.
+          Esto permite que los empleados de <strong>{empresa.nombre}</strong> hagan o modifiquen su pedido aunque haya pasado el lÃ­mite habitual.
         </p>
 
-        <Campo label="Abrir por cuántas horas">
+        <Campo label="Abrir por cuÃ¡ntas horas">
           <select
             className={input}
             value={horas}
@@ -570,7 +1527,7 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
             <option value={1}>1 hora</option>
             <option value={2}>2 horas</option>
             <option value={4}>4 horas</option>
-            <option value={8}>8 horas (hasta mañana)</option>
+            <option value={8}>8 horas (hasta maÃ±ana)</option>
             <option value={24}>24 horas</option>
           </select>
         </Campo>

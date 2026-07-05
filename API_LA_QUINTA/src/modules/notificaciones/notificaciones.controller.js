@@ -67,6 +67,11 @@ export const getConfigWhatsapp = asyncHandler(async (_req, res) => {
   res.json({ data: config });
 });
 
+export const revelarConfigWhatsapp = asyncHandler(async (req, res) => {
+  const config = await service.revelarConfigWhatsapp(req.adminUser);
+  res.json({ data: config });
+});
+
 export const actualizarConfigWhatsapp = asyncHandler(async (req, res) => {
   const config = await service.actualizarConfigWhatsapp(req.body);
   res.json({ success: true, message: 'Configuracion de WhatsApp actualizada', data: config });
@@ -101,11 +106,30 @@ export const listarEnviosWhatsapp = asyncHandler(async (req, res) => {
   res.json({ data: envios });
 });
 
-export const probarWebhookWhatsapp = asyncHandler(async (req, res) => {
-  const resultado = await service.probarWebhookWhatsapp(req.body);
-  res.status(resultado.enviado ? 201 : 502).json({
-    success: resultado.enviado,
-    message: resultado.enviado ? 'Webhook probado correctamente' : 'El webhook respondio con error',
-    data: resultado,
-  });
+export const listarWhatsappTestLogs = asyncHandler(async (req, res) => {
+  const logs = await service.listarWhatsappTestLogs(req.query);
+  res.json({ data: logs });
 });
+
+export const probarWebhookWhatsapp = async (req, res, next) => {
+  try {
+    const resultado = await service.probarWebhookWhatsapp(req.body, req.adminUser);
+    const status = resultado.enviado ? 201 : resultado.httpStatus || 502;
+    return res.status(status).json({
+      success: resultado.enviado,
+      errorCode: resultado.enviado ? null : resultado.errorCode,
+      message: resultado.enviado ? 'Webhook probado correctamente' : resultado.message || 'El webhook respondio con error',
+      data: resultado,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        errorCode: error.errorCode || 'VALIDATION_ERROR',
+        message: error.message,
+        errors: error.errors,
+      });
+    }
+    return next(error);
+  }
+};

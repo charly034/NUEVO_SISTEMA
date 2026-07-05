@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   useMenuSemanal,
   useAgregarPlato,
@@ -170,10 +170,12 @@ function PlatosLista({ platos, onQuitar, loadingDia, compact = false }) {
             {p.plato_nombre}
           </p>
           <button
+            type="button"
             onClick={() => onQuitar(p.opcion)}
             disabled={loadingDia}
-            className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400 transition-all text-sm rounded"
-            title="Quitar"
+            aria-label={`Quitar opcion ${p.opcion} de ${p.plato_nombre}`}
+            className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400 focus:text-red-500 transition-all text-sm rounded focus:outline-none focus:ring-2 focus:ring-red-200"
+            title={`Quitar ${p.plato_nombre}`}
           >
             ×
           </button>
@@ -195,7 +197,14 @@ function DiaFila({ dia, fecha, platos = [], sinServicio, onAgregar, onQuitar, on
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium text-red-500">Sin servicio{sinServicio.motivo ? ` · ${sinServicio.motivo}` : ''}</span>
-            <button onClick={onQuitarFeriado} disabled={loadingDia} className="text-xs text-red-400 hover:text-red-600 underline">
+            <button
+              type="button"
+              onClick={onQuitarFeriado}
+              disabled={loadingDia}
+              aria-label={`Quitar feriado de ${DIA_LABEL[dia]}`}
+              title={`Quitar feriado de ${DIA_LABEL[dia]}`}
+              className="text-xs text-red-400 hover:text-red-600 underline focus:outline-none focus:ring-2 focus:ring-red-200 rounded"
+            >
               Quitar
             </button>
           </div>
@@ -213,16 +222,22 @@ function DiaFila({ dia, fecha, platos = [], sinServicio, onAgregar, onQuitar, on
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
+            type="button"
             onClick={onAgregar}
             disabled={loadingDia}
-            className="text-xs font-medium text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors border border-brand-200"
+            aria-label={`Agregar plato al ${DIA_LABEL[dia]}`}
+            title={`Agregar plato al ${DIA_LABEL[dia]}`}
+            className="text-xs font-medium text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors border border-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             + Agregar
           </button>
           <button
+            type="button"
             onClick={onMarcarFeriado}
             disabled={loadingDia}
-            className="text-xs text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
+            aria-label={`Marcar ${DIA_LABEL[dia]} como feriado`}
+            title={`Marcar ${DIA_LABEL[dia]} como feriado`}
+            className="text-xs text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-200"
           >
             Feriado
           </button>
@@ -246,7 +261,14 @@ function DiaColumna({ dia, fecha, platos = [], sinServicio, onAgregar, onQuitar,
           <p className="text-xs font-medium text-red-500 text-center">Sin servicio</p>
           {sinServicio.motivo && <p className="text-[10px] text-red-400 text-center">{sinServicio.motivo}</p>}
         </div>
-        <button onClick={onQuitarFeriado} disabled={loadingDia} className="mt-2 text-[10px] text-red-400 hover:text-red-600 underline text-center w-full">
+        <button
+          type="button"
+          onClick={onQuitarFeriado}
+          disabled={loadingDia}
+          aria-label={`Quitar feriado de ${DIA_LABEL[dia]}`}
+          title={`Quitar feriado de ${DIA_LABEL[dia]}`}
+          className="mt-2 text-[10px] text-red-400 hover:text-red-600 underline text-center w-full rounded focus:outline-none focus:ring-2 focus:ring-red-200"
+        >
           Quitar feriado
         </button>
       </div>
@@ -265,10 +287,24 @@ function DiaColumna({ dia, fecha, platos = [], sinServicio, onAgregar, onQuitar,
         <PlatosLista platos={platos} onQuitar={onQuitar} loadingDia={loadingDia} compact />
       </div>
       <div className="mt-2 flex flex-col gap-1">
-        <button onClick={onAgregar} disabled={loadingDia} className="w-full text-[11px] font-medium text-brand-600 hover:text-brand-800 hover:bg-brand-50 rounded-lg py-1 transition-colors border border-dashed border-brand-200 hover:border-brand-400">
+        <button
+          type="button"
+          onClick={onAgregar}
+          disabled={loadingDia}
+          aria-label={`Agregar plato al ${DIA_LABEL[dia]}`}
+          title={`Agregar plato al ${DIA_LABEL[dia]}`}
+          className="w-full text-[11px] font-medium text-brand-600 hover:text-brand-800 hover:bg-brand-50 rounded-lg py-1 transition-colors border border-dashed border-brand-200 hover:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+        >
           + Agregar plato
         </button>
-        <button onClick={onMarcarFeriado} disabled={loadingDia} className="w-full text-[10px] text-gray-400 hover:text-red-500 py-0.5 transition-colors">
+        <button
+          type="button"
+          onClick={onMarcarFeriado}
+          disabled={loadingDia}
+          aria-label={`Marcar ${DIA_LABEL[dia]} como feriado`}
+          title={`Marcar ${DIA_LABEL[dia]} como feriado`}
+          className="w-full text-[10px] text-gray-400 hover:text-red-500 py-0.5 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-red-200"
+        >
           Marcar feriado
         </button>
       </div>
@@ -311,6 +347,9 @@ function SinServicioModal({ dia, onSubmit, onCancel, loading }) {
 // ── Página principal ─────────────────────────────────────────────
 export default function SemanaDetalle() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const diaQuery = searchParams.get('dia');
+  const diaQueryProcesado = useRef(null);
 
   const menuQuery        = useMenuSemanal(id);
   const agregarMut       = useAgregarPlato(id);
@@ -323,6 +362,14 @@ export default function SemanaDetalle() {
   const [loadingDias, setLoadingDias]       = useState({});   // { dia: bool }
 
   const menu = menuQuery.data;
+
+  useEffect(() => {
+    if (!menu || !DIAS.includes(diaQuery)) return;
+    const key = `${id}:${diaQuery}`;
+    if (diaQueryProcesado.current === key) return;
+    diaQueryProcesado.current = key;
+    setModalAgregar(diaQuery);
+  }, [diaQuery, id, menu]);
 
   if (menuQuery.isLoading) {
     return <div className="flex justify-center items-center h-64"><Spinner size="lg" /></div>;
@@ -350,6 +397,10 @@ export default function SemanaDetalle() {
   };
 
   const handleQuitar = async (dia, opcion) => {
+    if (menu.estado === 'publicado') {
+      const ok = window.confirm(`Este menú está publicado. ¿Quitar la opción ${opcion} del ${DIA_LABEL[dia]} de todos modos?`);
+      if (!ok) return;
+    }
     setLoading(dia, true);
     try {
       await quitarMut.mutateAsync({ dia, opcion });
@@ -400,6 +451,12 @@ export default function SemanaDetalle() {
         <h1 className="text-xl md:text-2xl font-bold text-gray-900 mt-1">{menu.nombre}</h1>
         <p className="text-xs text-gray-400 mt-0.5 flex flex-wrap gap-x-2">
           <span>{formatCorto(menu.fecha_inicio)} → {formatCorto(menu.fecha_fin)}</span>
+          {menu.estado && (
+            <>
+              <span>·</span>
+              <span className={menu.estado === 'publicado' ? 'text-green-700 font-semibold' : 'text-gray-500'}>{menu.estado}</span>
+            </>
+          )}
           <span>·</span>
           <span>{diasCubiertos}/7 días con platos</span>
           <span>·</span>
@@ -460,7 +517,7 @@ export default function SemanaDetalle() {
           <span className="w-2.5 h-2.5 rounded-full bg-red-300 inline-block" /> Sin servicio
         </span>
         <span className="hidden md:inline ml-auto">
-          Pasá el mouse sobre un plato para ver la opción de quitarlo
+          La X de cada plato permite quitarlo; si el menú está publicado se pedirá confirmación.
         </span>
       </div>
 

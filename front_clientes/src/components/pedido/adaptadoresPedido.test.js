@@ -37,6 +37,20 @@ describe("adaptarSemanasPedido", () => {
               sin_servicio: [],
             },
           },
+          {
+            disponible: false,
+            dias_laborales: "lunes_domingo",
+            semana_inicio: "2026-07-06",
+            opcionesSugerencia: [
+              { plato_id: 101, plato_nombre: "Tarta de verduras" },
+              { plato_id: 102, plato_nombre: "Ravioles caseros" },
+            ],
+            menu: {
+              fecha_inicio: "2026-07-06",
+              fecha_fin: "2026-07-12",
+              sin_servicio: [],
+            },
+          },
         ],
       },
       historial: [],
@@ -46,12 +60,14 @@ describe("adaptarSemanasPedido", () => {
       "2026-06-22",
       "2026-06-29",
       "2026-07-06",
+      "2026-07-13",
     ]);
-    expect(semanas.at(-1)).toMatchObject({
+    const semanaSugerencias = semanas.find((semana) => semana.id === "2026-07-06");
+    expect(semanaSugerencias).toMatchObject({
       estado: "sin_menu",
       metadata: { esSemanaSugerencias: true },
     });
-    expect(semanas.at(-1).sugerencias.length).toBeGreaterThan(0);
+    expect(semanaSugerencias.sugerencias.length).toBeGreaterThan(0);
     expect(obtenerIndiceSemanaInicial(semanas)).toBe(0);
   });
 

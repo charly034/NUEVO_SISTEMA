@@ -3,11 +3,12 @@ import { menusService } from '../services/menus.service.js';
 
 export const MENUS_KEY = 'menus-semanales';
 
-export const useMenusSemanales = (params) =>
+export const useMenusSemanales = (params, options = {}) =>
   useQuery({
     queryKey: [MENUS_KEY, params],
     queryFn: () => menusService.getAll(params),
     select: (res) => res.data,
+    ...options,
   });
 
 export const useMenuSemanal = (id) =>
@@ -22,6 +23,14 @@ export const useCreateMenu = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: menusService.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: [MENUS_KEY] }),
+  });
+};
+
+export const useDuplicarMenu = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => menusService.duplicar(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: [MENUS_KEY] }),
   });
 };

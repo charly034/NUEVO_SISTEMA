@@ -1,103 +1,522 @@
-import { useState } from 'react';
-import { useGuarniciones, useCreateGuarnicion, useUpdateGuarnicion, useDeleteGuarnicion } from '../hooks/useGuarniciones.js';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useDeleteGuarnicion, useGuarniciones, useUpdateGuarnicion } from '../hooks/useGuarniciones.js';
+import GuarnicionesPanel from '../components/platos/GuarnicionesPanel.jsx';
+import Spinner from '../components/ui/Spinner.jsx';
+import { IconActionButton, PencilIcon, TrashIcon } from '../components/ui/IconActionButton.jsx';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 
+const ESTADO_FILTROS = [
+  { label: 'Activos', value: 'true' },
+  { label: 'Todos', value: undefined },
+  { label: 'Inactivos', value: 'false' },
+];
+
+const TIPO_FILTROS = [
+  { label: 'Todas', value: undefined },
+  { label: 'Calientes', value: 'caliente' },
+  { label: 'Frias', value: 'fria' },
+];
+
+const SORT_OPTIONS = [
+  { label: 'Nombre A-Z', sortBy: 'nombre', sortDir: 'asc' },
+  { label: 'Nombre Z-A', sortBy: 'nombre', sortDir: 'desc' },
+  { label: 'Tipo A-Z', sortBy: 'tipo', sortDir: 'asc' },
+  { label: 'Tipo Z-A', sortBy: 'tipo', sortDir: 'desc' },
+  { label: 'Estado activas primero', sortBy: 'activo', sortDir: 'desc' },
+  { label: 'Estado inactivas primero', sortBy: 'activo', sortDir: 'asc' },
+];
+
+const PAGE_SIZE = 15;
+
+function leerEnteroPositivo(value, fallback = 1) {
+  const numero = Number(value);
+  return Number.isInteger(numero) && numero > 0 ? numero : fallback;
+}
+
+function leerActivo(value) {
+  if (value === 'todos') return undefined;
+  if (value === 'false') return 'false';
+  return 'true';
+}
+
+function escribirActivo(value) {
+  return value === undefined ? 'todos' : value;
+}
+
+function hayFiltroActivo({ search, activoFilter, tipoFilter }) {
+  return Boolean(search || activoFilter !== 'true' || tipoFilter);
+}
+
+function textoEstadoGuarniciones({ search, activoFilter, tipoFilter, totalBase }) {
+  if (totalBase === 0) {
+    return {
+      titulo: 'No hay guarniciones cargadas aun.',
+      detalle: 'Cuando crees la primera guarnicion, va a aparecer en este listado.',
+    };
+  }
+  if (search) {
+    return {
+      titulo: `No se encontraron guarniciones para "${search}".`,
+      detalle: 'Probá con otro nombre o limpiá los filtros activos.',
+    };
+  }
+  if (activoFilter === 'false') {
+    return {
+      titulo: 'No hay guarniciones inactivas.',
+      detalle: 'Todas las guarniciones visibles estan activas.',
+    };
+  }
+  if (activoFilter === 'true' && tipoFilter) {
+    return {
+      titulo: 'No hay guarniciones activas para este tipo.',
+      detalle: 'Probá cambiando el tipo o el estado.',
+    };
+  }
+  if (tipoFilter === 'caliente') {
+    return {
+      titulo: 'No hay guarniciones calientes.',
+      detalle: 'Probá con guarniciones frias o limpiá los filtros.',
+    };
+  }
+  if (tipoFilter === 'fria') {
+    return {
+      titulo: 'No hay guarniciones frias.',
+      detalle: 'Probá con guarniciones calientes o limpiá los filtros.',
+    };
+  }
+  return {
+    titulo: 'No se encontraron guarniciones para este filtro.',
+    detalle: 'Probá limpiando los filtros activos.',
+  };
+}
+
+function EmptyState({ titulo, detalle, mostrarLimpiar, onLimpiar }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+      <div>
+        <p className="text-sm font-medium text-gray-600">{titulo}</p>
+        {detalle ? <p className="mt-1 text-xs text-gray-400">{detalle}</p> : null}
+      </div>
+      {mostrarLimpiar ? (
+        <button type="button" onClick={onLimpiar} className="btn-secondary text-xs">
+          Limpiar filtros
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SortSelect({ value, onChange }) {
+  return (
+    <label className="flex flex-col gap-1 md:hidden">
+      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ordenar por</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+      >
+        {SORT_OPTIONS.map((option) => (
+          <option key={`${option.sortBy}:${option.sortDir}`} value={`${option.sortBy}:${option.sortDir}`}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function tipoBadge(tipo) {
+  if (tipo === 'caliente') return { label: 'Caliente', cls: 'bg-orange-50 text-orange-700' };
+  if (tipo === 'fria') return { label: 'Fria', cls: 'bg-blue-50 text-blue-700' };
+  return null;
+}
+
+function EstadoBadge({ activo, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`badge cursor-pointer transition-colors ${
+        activo ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+      }`}
+    >
+      {activo ? 'Activa' : 'Inactiva'}
+    </button>
+  );
+}
+
+function TipoBadge({ tipo }) {
+  const tipoCfg = tipoBadge(tipo);
+  return tipoCfg ? (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${tipoCfg.cls}`}>
+      {tipoCfg.label}
+    </span>
+  ) : (
+    <span className="text-xs text-gray-300">-</span>
+  );
+}
+
+function GuarnicionMobileCard({ guarnicion, loading, onToggleActivo, onEdit, onDelete }) {
+  return (
+    <div className="bg-white px-4 py-3.5">
+      <div className="flex w-full items-start gap-3 text-left">
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-100">
+          <span className="text-xs text-gray-400">Tipo</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-snug text-gray-900">{guarnicion.nombre}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <TipoBadge tipo={guarnicion.tipo} />
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <EstadoBadge
+          activo={guarnicion.activo}
+          disabled={loading}
+          onClick={() => onToggleActivo(guarnicion)}
+        />
+        <div className="flex items-center gap-1">
+          <IconActionButton label={`Editar guarnicion ${guarnicion.nombre}`} tooltip="Editar guarnicion" tone="brand" onClick={() => onEdit(guarnicion)}>
+            <PencilIcon />
+          </IconActionButton>
+          <IconActionButton label={`Eliminar guarnicion ${guarnicion.nombre}`} tooltip="Eliminar guarnicion" tone="danger" onClick={() => onDelete(guarnicion)}>
+            <TrashIcon />
+          </IconActionButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Guarniciones() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('search') ?? '';
+  const activoFilter = leerActivo(searchParams.get('activo'));
+  const tipoFilter = searchParams.get('tipo') || undefined;
+  const sortBy = searchParams.get('sort_by') || 'nombre';
+  const sortDir = searchParams.get('sort_dir') === 'desc' ? 'desc' : 'asc';
+  const page = leerEnteroPositivo(searchParams.get('page'), 1);
+
   const { data: guarniciones = [], isLoading } = useGuarniciones();
-  const crear = useCreateGuarnicion();
   const actualizar = useUpdateGuarnicion();
   const eliminar = useDeleteGuarnicion();
 
-  const [nueva, setNueva] = useState('');
-  const [editando, setEditando] = useState(null); // { id, nombre }
+  const [modalCreate, setModalCreate] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [editError, setEditError] = useState('');
+  const editNombreRef = useRef(null);
 
-  const handleAgregar = async (e) => {
-    e.preventDefault();
-    if (!nueva.trim()) return;
+  const updateParams = useCallback((changes) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') next.delete(key);
+      else next.set(key, String(value));
+    });
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const filtradas = useMemo(() => {
+    let list = guarniciones.filter((g) => {
+      const coincideTexto = !search || g.nombre.toLowerCase().includes(search.toLowerCase());
+      const coincideTipo = tipoFilter === undefined || g.tipo === tipoFilter;
+      const coincideEstado =
+        activoFilter === undefined ||
+        (activoFilter === 'true' ? g.activo : !g.activo);
+      return coincideTexto && coincideTipo && coincideEstado;
+    });
+
+    list = [...list].sort((a, b) => {
+      let va;
+      let vb;
+      if (sortBy === 'tipo') {
+        va = a.tipo ?? 'zzz';
+        vb = b.tipo ?? 'zzz';
+      } else if (sortBy === 'activo') {
+        va = a.activo ? 1 : 0;
+        vb = b.activo ? 1 : 0;
+      } else {
+        va = a.nombre.toLowerCase();
+        vb = b.nombre.toLowerCase();
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [activoFilter, guarniciones, search, sortBy, sortDir, tipoFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtradas.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginadas = filtradas.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const filtrosActivos = hayFiltroActivo({ search, activoFilter, tipoFilter });
+  const emptyState = textoEstadoGuarniciones({
+    search,
+    activoFilter,
+    tipoFilter,
+    totalBase: guarniciones.length,
+  });
+
+  const handleSort = (col) => {
+    updateParams({
+      sort_by: col,
+      sort_dir: sortBy === col && sortDir === 'asc' ? 'desc' : 'asc',
+      page: null,
+    });
+  };
+  const handleMobileSort = (value) => {
+    const [nextSortBy, nextSortDir] = value.split(':');
+    updateParams({
+      sort_by: nextSortBy,
+      sort_dir: nextSortDir,
+      page: null,
+    });
+  };
+
+  const startEdit = (guarnicion) => {
+    setEditError('');
+    setEditando({ id: guarnicion.id, nombre: guarnicion.nombre, tipo: guarnicion.tipo });
+  };
+  const limpiarFiltros = () => setSearchParams(new URLSearchParams(), { replace: true });
+
+  const handleToggleActivo = async (guarnicion) => {
     try {
-      await crear.mutateAsync(nueva.trim());
-      setNueva('');
-      toast.success('Guarnición agregada');
-    } catch (err) { toast.error(err?.message || 'Error'); }
+      await actualizar.mutateAsync({ id: guarnicion.id, data: { activo: !guarnicion.activo } });
+      toast.success(guarnicion.activo ? 'Guarnicion desactivada' : 'Guarnicion activada');
+    } catch (err) {
+      toast.error(err?.message || 'Error');
+    }
+  };
+
+  const handleDelete = async (guarnicion) => {
+    if (!await confirmar({ titulo: `Eliminar "${guarnicion.nombre}"?`, texto: 'Esta accion no se puede deshacer.', botonConfirmar: 'Si, eliminar' })) return;
+    try {
+      await eliminar.mutateAsync(guarnicion.id);
+      toast.success('Guarnicion eliminada');
+    } catch (err) {
+      toast.error(err?.message || 'Error');
+    }
   };
 
   const handleGuardarEdit = async (e) => {
     e.preventDefault();
+    if (!editando.nombre.trim()) {
+      setEditError('El nombre es obligatorio');
+      requestAnimationFrame(() => {
+        editNombreRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        editNombreRef.current?.focus({ preventScroll: true });
+      });
+      return;
+    }
     try {
-      await actualizar.mutateAsync({ id: editando.id, data: { nombre: editando.nombre } });
+      await actualizar.mutateAsync({
+        id: editando.id,
+        data: { nombre: editando.nombre.trim(), tipo: editando.tipo || null },
+      });
       setEditando(null);
-      toast.success('Guarnición actualizada');
-    } catch (err) { toast.error(err?.message || 'Error'); }
+      setEditError('');
+      toast.success('Guarnicion actualizada');
+    } catch (err) {
+      toast.error(err?.message || 'Error');
+    }
   };
 
-  if (isLoading) return <p className="p-6 text-gray-500">Cargando...</p>;
-
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Guarniciones</h1>
+    <div className="mx-auto max-w-7xl space-y-4 p-4 md:space-y-5 md:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-h-[52px]">
+          <h1 className="text-2xl font-bold text-gray-900">Guarniciones</h1>
+          <p className="mt-0.5 h-5 text-sm text-gray-400">
+            {guarniciones.length} guarnicion{guarniciones.length !== 1 ? 'es' : ''}
+          </p>
+        </div>
+        <button type="button" onClick={() => setModalCreate(true)} className="btn-primary flex-shrink-0">+ Nueva guarnicion</button>
+      </div>
 
-      {/* Agregar */}
-      <form onSubmit={handleAgregar} className="flex gap-3 mb-6">
-        <input
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
-          value={nueva}
-          onChange={e => setNueva(e.target.value)}
-          placeholder="Nombre de la guarnición"
-        />
-        <button type="submit" disabled={crear.isPending} className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-          + Agregar
-        </button>
-      </form>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Buscar</span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => updateParams({ search: e.target.value, page: null })}
+            placeholder="Buscar guarnicion..."
+            className="w-full rounded-lg border border-gray-300 py-2 pl-16 pr-4 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
+          {ESTADO_FILTROS.map((f) => (
+            <button
+              key={String(f.value)}
+              type="button"
+              onClick={() => updateParams({ activo: escribirActivo(f.value), page: null })}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                activoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Lista */}
-      <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-50">
-        {guarniciones.map(g => (
-          <div key={g.id} className="flex items-center justify-between px-4 py-3">
-            {editando?.id === g.id ? (
-              <form onSubmit={handleGuardarEdit} className="flex gap-2 flex-1">
-                <input
-                  autoFocus
-                  className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm"
-                  value={editando.nombre}
-                  onChange={e => setEditando(ed => ({ ...ed, nombre: e.target.value }))}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
+          {TIPO_FILTROS.map((f) => (
+            <button
+              key={String(f.value)}
+              type="button"
+              onClick={() => updateParams({ tipo: f.value, page: null })}
+              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                tipoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <SortSelect value={`${sortBy}:${sortDir}`} onChange={handleMobileSort} />
+
+      <div className="card overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+        ) : (
+          <>
+            <div className="divide-y divide-gray-100 md:hidden">
+              {paginadas.length === 0 ? (
+                <EmptyState
+                  titulo={emptyState.titulo}
+                  detalle={emptyState.detalle}
+                  mostrarLimpiar={filtrosActivos}
+                  onLimpiar={limpiarFiltros}
                 />
-                <button type="submit" className="text-green-700 text-sm font-semibold">Guardar</button>
-                <button type="button" onClick={() => setEditando(null)} className="text-gray-400 text-sm">Cancelar</button>
-              </form>
-            ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <span className={`w-2 h-2 rounded-full ${g.activo ? 'bg-green-500' : 'bg-gray-300'}`} />
-                  <span className="text-sm font-medium text-gray-800">{g.nombre}</span>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => actualizar.mutate({ id: g.id, data: { activo: !g.activo } })}
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${g.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                  >
-                    {g.activo ? 'Activa' : 'Inactiva'}
-                  </button>
-                  <button onClick={() => setEditando({ id: g.id, nombre: g.nombre })} className="text-gray-400 hover:text-gray-700 text-sm">✏️</button>
-                  <button
-                    onClick={async () => {
-                      if (!await confirmar({ titulo: `¿Eliminar "${g.nombre}"?`, texto: 'Esta acción no se puede deshacer.', botonConfirmar: 'Sí, eliminar' })) return;
-                      try {
-                        await eliminar.mutateAsync(g.id);
-                        toast.success('Guarnición eliminada');
-                      } catch (err) { toast.error(err?.message || 'Error'); }
-                    }}
-                    className="text-gray-400 hover:text-red-600 text-sm"
-                  >🗑️</button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-        {guarniciones.length === 0 && (
-          <p className="text-gray-400 text-sm p-4">No hay guarniciones cargadas.</p>
+              ) : paginadas.map((guarnicion) => (
+                <GuarnicionMobileCard
+                  key={guarnicion.id}
+                  guarnicion={guarnicion}
+                  loading={actualizar.isPending}
+                  onToggleActivo={handleToggleActivo}
+                  onEdit={startEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+
+            <div className="max-h-[520px] overflow-y-auto">
+              <table className="hidden w-full text-sm md:table">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {[
+                      { col: 'nombre', label: 'Nombre' },
+                      { col: 'tipo', label: 'Tipo' },
+                      { col: 'activo', label: 'Estado' },
+                    ].map(({ col, label }) => (
+                      <th key={col} className="px-5 py-3 text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort(col)}
+                          className="flex items-center gap-1 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-gray-500 transition-colors hover:text-gray-800"
+                        >
+                          {label} <span className="text-gray-300">{sortBy === col ? (sortDir === 'asc' ? 'up' : 'down') : '-'}</span>
+                        </button>
+                      </th>
+                    ))}
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {paginadas.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>
+                        <EmptyState
+                          titulo={emptyState.titulo}
+                          detalle={emptyState.detalle}
+                          mostrarLimpiar={filtrosActivos}
+                          onLimpiar={limpiarFiltros}
+                        />
+                      </td>
+                    </tr>
+                  ) : paginadas.map((g) => (
+                    <tr key={g.id} className="group transition-colors hover:bg-gray-50/80">
+                      <td className="px-5 py-3.5">
+                        {editando?.id === g.id ? (
+                          <form onSubmit={handleGuardarEdit} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <div>
+                              <input
+                                ref={editNombreRef}
+                                autoFocus
+                                value={editando.nombre}
+                                onChange={(e) => {
+                                  setEditando((ed) => ({ ...ed, nombre: e.target.value }));
+                                  setEditError('');
+                                }}
+                                aria-invalid={Boolean(editError)}
+                                className={`w-full rounded-lg border px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-brand-500 sm:w-56 ${
+                                  editError ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                                }`}
+                              />
+                              {editError && <p className="mt-1 text-xs text-red-500">{editError}</p>}
+                            </div>
+                            <select
+                              value={editando.tipo ?? ''}
+                              onChange={(e) => setEditando((ed) => ({ ...ed, tipo: e.target.value || null }))}
+                              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-500"
+                            >
+                              <option value="">Sin tipo</option>
+                              <option value="caliente">Caliente</option>
+                              <option value="fria">Fria</option>
+                            </select>
+                            <button type="submit" className="text-xs font-semibold text-brand-700">Guardar</button>
+                            <button type="button" onClick={() => { setEditando(null); setEditError(''); }} className="text-xs text-gray-400">Cancelar</button>
+                          </form>
+                        ) : <span className="font-medium text-gray-900">{g.nombre}</span>}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <TipoBadge tipo={g.tipo} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <EstadoBadge
+                          activo={g.activo}
+                          disabled={actualizar.isPending}
+                          onClick={() => handleToggleActivo(g)}
+                        />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <IconActionButton label={`Editar guarnicion ${g.nombre}`} tooltip="Editar guarnicion" tone="brand" onClick={() => startEdit(g)}>
+                            <PencilIcon />
+                          </IconActionButton>
+                          <IconActionButton label={`Eliminar guarnicion ${g.nombre}`} tooltip="Eliminar guarnicion" tone="danger" onClick={() => handleDelete(g)}>
+                            <TrashIcon />
+                          </IconActionButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
+
+      {totalPages > 1 ? (
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-gray-400">Pagina {safePage} de {totalPages}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => updateParams({ page: safePage - 1 > 1 ? safePage - 1 : null })} disabled={safePage <= 1} className="btn-secondary text-xs disabled:opacity-40">Anterior</button>
+            <button type="button" onClick={() => updateParams({ page: safePage + 1 })} disabled={safePage >= totalPages} className="btn-secondary text-xs disabled:opacity-40">Siguiente</button>
+          </div>
+        </div>
+      ) : null}
+
+      <GuarnicionesPanel modalOpen={modalCreate} onModalClose={() => setModalCreate(false)} />
     </div>
   );
 }

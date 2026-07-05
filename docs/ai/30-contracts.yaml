@@ -1,5 +1,5 @@
 schema: la_quinta_contracts_v2
-updated_at: "2026-07-02"
+updated_at: "2026-07-04"
 
 api_base:
   verified_in_repo: "/api/v1"
@@ -68,6 +68,20 @@ endpoints:
       - "POST /api/v1/admin/auth/usuarios"
       - "PATCH /api/v1/admin/auth/usuarios/:id"
       - "DELETE /api/v1/admin/auth/usuarios/:id"
+    admin_auditoria:
+      - "GET /api/v1/admin/auditoria?entidad_tipo=&accion=&admin_id=&limit=&page="
+    finanzas:
+      - "GET /api/v1/finanzas/mi-historial"
+      - "GET /api/v1/finanzas/resumen"
+      - "GET /api/v1/finanzas/pedidos-pagos?empresa_id=&empleado_id=&semana_inicio=&estado=&estado_financiero=&desde=&hasta=&limit=&offset="
+      - "GET /api/v1/finanzas/cuenta-corriente/empresas/:empresaId"
+      - "GET /api/v1/finanzas/cuenta-corriente/empleados/:empleadoId"
+      - "POST /api/v1/finanzas/pagos"
+      - "PATCH /api/v1/finanzas/pagos/:id"
+      - "POST /api/v1/finanzas/pagos/:id/anular"
+      - "POST /api/v1/finanzas/pagos/:id/aplicar"
+      - "DELETE /api/v1/finanzas/pagos/:id/aplicaciones/:aplicacionId"
+      - "POST /api/v1/finanzas/ajustes"
     pedidos:
       - "GET /api/v1/pedidos/menu-hoy"
       - "GET /api/v1/pedidos/menu-semana?fecha_inicio=YYYY-MM-DD"
@@ -78,6 +92,9 @@ endpoints:
       - "POST /api/v1/pedidos"
       - "PUT /api/v1/pedidos/:id"
       - "PATCH /api/v1/pedidos/:id/confirmar"
+      - "DELETE /api/v1/pedidos/:id/dias/:dia"
+      - "GET /api/v1/pedidos/sugerencias/opciones?semana_inicio=YYYY-MM-DD"
+      - "PUT /api/v1/pedidos/sugerencias/opciones"
       - "POST /api/v1/pedidos/sugerencias"
       - "GET /api/v1/pedidos/sugerencias"
       - "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
@@ -91,6 +108,7 @@ endpoints:
       - "GET /api/v1/menus-semanales"
       - "GET /api/v1/menus-semanales/:id"
       - "POST /api/v1/menus-semanales"
+      - "POST /api/v1/menus-semanales/:id/duplicar"
       - "PUT /api/v1/menus-semanales/:id"
       - "DELETE /api/v1/menus-semanales/:id"
       - "PATCH /api/v1/menus-semanales/:id/estado"
@@ -117,18 +135,25 @@ endpoints:
       - "PATCH /api/v1/guarniciones/:id"
       - "DELETE /api/v1/guarniciones/:id"
     empresas:
-      - "GET /api/v1/empresas"
+      - "GET /api/v1/empresas?page=&pageSize=&search=&estado=activa|inactiva|todas"
       - "GET /api/v1/empresas/:id"
+      - "GET /api/v1/empresas/:id/dependencias"
       - "POST /api/v1/empresas"
       - "PATCH /api/v1/empresas/:id"
-      - "DELETE /api/v1/empresas/:id"
+      - "DELETE /api/v1/empresas/:id -> soft delete si no hay pedidos activos ni saldo de cuenta corriente"
       - "POST /api/v1/empresas/:id/reabrir-plazo"
       - "DELETE /api/v1/empresas/:id/reabrir-plazo"
       - "POST /api/v1/empresas/:id/regenerar-codigo"
+    planes:
+      - "GET /api/v1/planes"
+      - "POST /api/v1/planes"
+      - "PATCH /api/v1/planes/:id"
+      - "DELETE /api/v1/planes/:id -> desactiva plan"
     empleados:
       - "GET /api/v1/empleados"
       - "GET /api/v1/empleados/:id"
       - "POST /api/v1/empleados"
+      - "POST /api/v1/empleados/importar"
       - "PATCH /api/v1/empleados/:id"
       - "DELETE /api/v1/empleados/:id"
       - "POST /api/v1/empleados/:id/reset-code"
@@ -149,12 +174,14 @@ endpoints:
       - "PATCH /api/v1/notificaciones/admin/reglas/:id"
       - "DELETE /api/v1/notificaciones/admin/reglas/:id"
       - "GET /api/v1/notificaciones/admin/whatsapp/config"
+      - "GET /api/v1/notificaciones/admin/whatsapp/config/reveal"
       - "PATCH /api/v1/notificaciones/admin/whatsapp/config"
       - "GET /api/v1/notificaciones/admin/whatsapp/destinatarios"
       - "POST /api/v1/notificaciones/admin/whatsapp/destinatarios"
       - "PATCH /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
       - "DELETE /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
       - "GET /api/v1/notificaciones/admin/whatsapp/envios"
+      - "GET /api/v1/notificaciones/admin/whatsapp/test-logs?limit=10"
       - "POST /api/v1/notificaciones/admin/whatsapp/probar"
       - "GET /api/v1/notificaciones"
       - "GET /api/v1/notificaciones/no-leidas/count"
@@ -201,16 +228,22 @@ payload_formats:
         - "menu_semanal_sin_servicio cuenta por existencia de fila aunque motivo sea null; el cliente debe mostrarlo como Sin servicio"
         - "GET /api/v1/pedidos/semanas marca estado=cerrado cuando una empresa diaria/mixta ya tiene todos los dias laborales bloqueados por limiteEmpresa.diasCerrados"
         - "En PUT de un pedido existente, los items previos de dias ya vencidos se conservan aunque el frontend solo reenvie dias todavia editables; esos dias vencidos no pueden modificarse"
+        - "POST/PUT guarda snapshot del plan vigente de la empresa en pedidos: plan_id, plan_codigo, plan_nombre, plan_gramaje_min/max, plan_incluye_postre y plan_incluye_bebida."
     pedido_estado_admin:
       endpoint: "PATCH /api/v1/pedidos/:id/estado"
       body: "{ estado: pendiente|en_proceso|listo|entregado|cancelado }"
     pedido_cancelar_cliente:
-      endpoint: "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
+      endpoints:
+        - "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
+        - "DELETE /api/v1/pedidos/:id/dias/:dia"
       invariants:
         - "requiere Authorization Bearer cliente"
-        - "identifica el pedido por req.empleado.sub + semana_inicio"
+        - "identifica el pedido por req.empleado.sub + semana_inicio o por :id validando empleado/empresa del token"
         - "cancela solo estados pendiente/en_proceso"
-        - "borra pedido_items y registra pedido_eventos tipo pedido_cancelado"
+        - "DELETE /mi-pedido cancela completo solo si todos los dias activos estan dentro de plazo; si hay dias vencidos, conserva esos items y marca como sin_pedido solo los dias pendientes cancelables"
+        - "DELETE /:id/dias/:dia marca ese item como sin_pedido si el dia todavia esta dentro del plazo de empresa; rechaza dias vencidos o ya sin_pedido"
+        - "registra pedido_eventos tipo pedido_cancelado, pedido_cancelado_parcial o pedido_dia_cancelado segun corresponda"
+        - "GET /api/v1/pedidos/mi-historial expone item.puede_cancelar y pedido.puede_cancelar para que la UI no ofrezca cancelar dias ya vencidos"
     pedido_sugerencia_cliente:
       endpoint: "POST /api/v1/pedidos/sugerencias"
       body: "{ semana_inicio: YYYY-MM-DD, ideas?: string[], comentario?: string }"
@@ -222,6 +255,19 @@ payload_formats:
         - "comentario <=500 caracteres"
         - "debe llegar al menos una idea o comentario"
         - "un registro por empleado y semana: UNIQUE (empleado_id, semana_inicio)"
+    pedido_sugerencia_opciones:
+      endpoints:
+        - "GET /api/v1/pedidos/sugerencias/opciones?semana_inicio=YYYY-MM-DD"
+        - "PUT /api/v1/pedidos/sugerencias/opciones"
+      body_put: "{ semana_inicio: YYYY-MM-DD lunes, plato_ids: integer[] }"
+      storage: "pedido_sugerencia_opciones"
+      invariants:
+        - "semana_inicio debe ser lunes y representa la semana lunes-domingo."
+        - "requiere Authorization Bearer admin para PUT."
+        - "GET devuelve platos activos configurados para que el cliente los vea como chips sugeridos."
+        - "PUT reemplaza la configuracion completa de esa semana, maximo 24 platos."
+        - "front_menu/src/pages/RecomendacionesMenu.jsx administra esta seleccion desde el catalogo de platos."
+        - "front_clientes/src/components/pedido/SuggestionSheet.jsx usa estas opciones; si no hay opciones configuradas, permite enviar solo comentario."
     menu_opciones_cliente:
       endpoints:
         - "GET /api/v1/pedidos/semanas"
@@ -274,6 +320,16 @@ payload_formats:
       body: "{ empresa_id?, nombre?, apellido?, email?, password?, activo?, rol?, telefono?, fecha_nacimiento? }"
       response_data: "id, nombre, apellido, email, activo, rol, empresa_id, telefono, fecha_nacimiento"
       note: "POST requiere empresa_id, nombre, apellido, email y password; front_menu/src/pages/Empresas.jsx expone telefono y fecha_nacimiento en ModalEmpleado."
+    empleado_import_csv_admin:
+      endpoint: "POST /api/v1/empleados/importar"
+      body: "{ empresa_id, empleados: [{ nombre, apellido, email, password, telefono?, fecha_nacimiento?, rol? }] }"
+      response_data: "{ creados: array, omitidos: array, errores: array }"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "maximo 300 filas por importacion"
+        - "password minimo 8 caracteres"
+        - "emails existentes se omiten y se devuelven en omitidos"
+        - "registra admin_auditoria accion=importar_csv si la tabla existe"
     notificaciones_cliente:
       endpoints:
         - "GET /api/v1/notificaciones"
@@ -322,26 +378,37 @@ payload_formats:
     notificaciones_whatsapp_n8n:
       endpoints:
         - "GET /api/v1/notificaciones/admin/whatsapp/config"
+        - "GET /api/v1/notificaciones/admin/whatsapp/config/reveal"
         - "PATCH /api/v1/notificaciones/admin/whatsapp/config"
         - "GET /api/v1/notificaciones/admin/whatsapp/destinatarios"
         - "POST /api/v1/notificaciones/admin/whatsapp/destinatarios"
         - "PATCH /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
         - "DELETE /api/v1/notificaciones/admin/whatsapp/destinatarios/:id"
         - "GET /api/v1/notificaciones/admin/whatsapp/envios"
+        - "GET /api/v1/notificaciones/admin/whatsapp/test-logs?limit=10"
         - "POST /api/v1/notificaciones/admin/whatsapp/probar"
-      config_body: "{ activo: boolean, webhook_url: string http/https }"
+      config_get_response_data: "{ activo: boolean, configured: boolean, masked_webhook_url: string fijo; no devuelve webhook_url real }"
+      config_reveal_response_data: "{ webhook_url: string real; requiere admin y registra admin_auditoria accion=revelar_webhook_whatsapp }"
+      config_body: "{ activo: boolean, webhook_url?: string https; si ya existe webhook, PATCH puede omitir URL para preservar la guardada }"
       destinatario_body: "{ nombre: string<=160, telefono: string<=40, email?: string<=255, empresa_id?: integer, activo?: boolean }"
       webhook_payload: "{ canal: whatsapp, evento, regla: { id, nombre }, destinatario, mensaje: { titulo, cuerpo }, contexto }"
       prueba_response:
         ok_201: "{ success: true, data: { enviado: true, envio_id, estado, status_code, respuesta, error } }"
-        webhook_error_502: "{ success: false, message: El webhook respondio con error, data: { enviado: false, envio_id, estado, status_code, respuesta, error } }"
+        webhook_error: "{ success: false, errorCode: N8N_HTTP_ERROR|N8N_NETWORK_ERROR|N8N_TIMEOUT|INVALID_WEBHOOK_URL|VALIDATION_ERROR, message, data: { enviado: false, envio_id?, estado?, status_code?, respuesta?, error?, errorCode } }"
+      test_logs_response_data: "array con id, created_at, destinatario, telefono, nombre, mensaje, status_code, success, response_body, error_code, requested_by"
       storage:
         - "notificacion_configuracion clave whatsapp_n8n"
         - "notificacion_destinatarios_whatsapp"
         - "notificacion_envios_whatsapp"
+        - "whatsapp_test_logs"
+        - "admin_auditoria para reveal de webhook"
       invariants:
         - "requiere Authorization Bearer admin"
-        - "el webhook_url se guarda en DB para administrarlo desde front_menu; no documentar valores reales"
+        - "el webhook_url se guarda en DB para administrarlo desde front_menu; no documentar valores reales y no devolverlo en GET config"
+        - "GET config/reveal es el unico endpoint que devuelve webhook_url real; registra auditoria admin sin guardar el secreto en metadata"
+        - "webhook_url debe ser https; se rechaza http en backend"
+        - "POST probar valida telefono E.164 con libphonenumber-js, mensaje no vacio y <=900 caracteres; sanitiza mensaje antes de reenviar a n8n"
+        - "POST probar registra cada intento en whatsapp_test_logs con requested_by"
         - "si WhatsApp esta inactivo o no tiene webhook_url, los eventos no llaman a n8n"
         - "cada intento de webhook registra estado pendiente/enviado/fallido, status_code, respuesta o error"
     notificaciones_eventos_automaticos:
@@ -375,6 +442,15 @@ payload_formats:
         - "debe declararse antes de GET /api/v1/pedidos/:id para no colisionar con parametro id"
     menu_semanal_create:
       body: "{ nombre, fecha_inicio: YYYY-MM-DD, fecha_fin: YYYY-MM-DD }"
+    menu_semanal_duplicar:
+      endpoint: "POST /api/v1/menus-semanales/:id/duplicar"
+      body: "{ nombre, fecha_inicio: YYYY-MM-DD, fecha_fin: YYYY-MM-DD }"
+      response_data: "menu nuevo en estado borrador"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "falla con 409 si ya existe menu para fecha_inicio destino"
+        - "copia menu_semanal_dias y menu_semanal_sin_servicio desde el menu origen"
+        - "registra historial_uso_platos para las opciones copiadas y admin_auditoria accion=duplicar si la tabla existe"
     menu_dia_add:
       body: "{ dia, opcion?: A-Z default A, plato_id }"
     menu_sin_servicio:
@@ -399,11 +475,88 @@ payload_formats:
         - "foto_url local debe apuntar a /uploads/platos/*.webp si no es URL absoluta http/https"
         - "si se envia foto nueva, reemplaza foto_url y se intenta borrar el archivo local anterior"
     empresa_create:
-      body: "{ nombre, slug, plan?, modo_pedido?, dias_laborales?, limite_hora?, limite_dia_semana?, limite_anticipacion_dias?, email?, telefono? }"
+      body: "{ nombre, slug, plan_id?, plan?, modo_pedido?, dias_laborales?, limite_hora?, limite_dia_semana?, limite_anticipacion_dias?, email?, telefono? }"
+      list_response: "{ data: array, total: number, page: number, pageSize: number } dentro de response.data; excluye empresas con deleted_at no null"
+      dependencias_response: "{ puedeEliminarse: boolean, pedidosActivos: number, saldoCuentaCorriente: number }"
       enums:
         plan: ["basico", "con_postre", "con_postre_bebida"]
         modo_pedido: ["semanal", "diario", "ambos"]
         dias_laborales: ["lunes_viernes", "lunes_sabado", "lunes_domingo"]
+      note: "plan legacy se conserva; plan_id referencia planes_vianda y la respuesta incluye plan_detalle. DELETE marca activo=false y deleted_at=NOW(); si hay pedidos estado pendiente/en_proceso/listo o saldo distinto de cero responde 409 con detalle."
+    planes_vianda:
+      endpoint: "GET/POST/PATCH/DELETE /api/v1/planes"
+      body_create_update: "{ codigo?, nombre, descripcion?, gramaje_min, gramaje_max?, incluye_postre, incluye_bebida, activo?, orden? }"
+      storage: "planes_vianda"
+      defaults:
+        - "Plan Clasico 450"
+        - "Plan Clasico 450 + Postre"
+        - "Plan Clasico 450 + Bebida"
+        - "Plan Clasico 450 Completo"
+        - "Plan Abundante 600"
+        - "Plan Abundante 600 + Postre"
+        - "Plan Abundante 600 + Bebida"
+        - "Plan Abundante 600 Completo"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "gramaje_min debe ser positivo"
+        - "gramaje_max null o mayor/igual a gramaje_min"
+        - "DELETE no borra fisicamente; marca activo=false"
+    estadisticas_admin:
+      endpoints:
+        - "GET /api/v1/estadisticas/platos-mas-usados?desde=&hasta=&empresa_id="
+        - "GET /api/v1/estadisticas/distribucion-tags?desde=&hasta=&empresa_id="
+        - "GET /api/v1/estadisticas/uso-por-dia?desde=&hasta=&empresa_id="
+        - "GET /api/v1/estadisticas/tendencia-mensual?desde=&hasta=&empresa_id="
+      note: "Sin empresa_id usa historial_uso_platos global; con empresa_id usa pedidos/pedido_items no cancelados para metricas por cliente."
+    admin_auditoria:
+      endpoint: "GET /api/v1/admin/auditoria"
+      query: "{ page?: integer, limit?: integer<=200, entidad_tipo?: string, accion?: string, admin_id?: integer }"
+      storage: "admin_auditoria"
+      response_data: "{ eventos: array, pagination: object }"
+      note: "Registra acciones admin nivel 2 para menus, pedidos y empleados; el logger no rompe operaciones si la tabla aun no fue migrada."
+    finanzas:
+      endpoints:
+        - "GET /api/v1/finanzas/mi-historial"
+        - "GET /api/v1/finanzas/resumen"
+        - "GET /api/v1/finanzas/pedidos-pagos"
+        - "GET /api/v1/finanzas/cuenta-corriente/empresas/:empresaId"
+        - "GET /api/v1/finanzas/cuenta-corriente/empleados/:empleadoId"
+        - "POST/PATCH/POST anular/POST aplicar/DELETE aplicacion sobre /api/v1/finanzas/pagos"
+        - "POST /api/v1/finanzas/ajustes"
+      frontend_consumers:
+        - "front_clientes/src/services/api.js"
+        - "front_clientes/src/pages/HistorialPage.jsx"
+        - "front_menu/src/hooks/useFinanzas.js"
+        - "front_menu/src/pages/PedidosPagos.jsx"
+        - "front_menu/src/pages/Empresas.jsx"
+        - "front_menu/src/components/finanzas/CuentaCorrienteFicha.jsx"
+      auth: "mutaciones y consultas admin requieren Authorization Bearer admin via requireAdminAuth; GET /mi-historial requiere Authorization Bearer cliente via requireAuth"
+      storage:
+        - "pedidos.estado_financiero, pedidos.importe_total, pedidos.importe_pagado, pedidos.moneda"
+        - "pedido_items.precio_unitario, pedido_items.precio_moneda"
+        - "finanzas_pagos"
+        - "finanzas_pago_aplicaciones"
+        - "finanzas_configuracion_cobro"
+        - "finanzas_ajustes"
+      pago_body: "{ pagador_tipo: empresa|empleado, empresa_id?, empleado_id?, monto, fecha_pago: YYYY-MM-DD, metodo_pago, periodo_desde?, periodo_hasta?, observacion?, comprobante_url?, numero_recibo? }"
+      pago_update_body: "mismos campos opcionales que pago_body; solo permite editar pagos activos"
+      pago_anular_body: "{ motivo?: string }"
+      pago_aplicar_body: "{ aplicaciones?: [{ pedido_id, pedido_item_id?, monto_aplicado }] }"
+      ajuste_body: "{ empresa_id? xor empleado_id?, monto positivo o negativo distinto de 0, motivo, referencia? }"
+      cuenta_corriente_response: "{ tipo, id, pedidos: array con estado/estado_financiero/importes/cantidad_viandas/items/plan snapshot, pagos: array con monto_aplicado y aplicaciones[{ id, pedido_id, pedido_item_id, monto_aplicado, semana_inicio, pedido_estado, estado_financiero, empleado_nombre, empleado_apellido, empresa_nombre }], ajustes: array }"
+      mi_historial_cliente_response: "{ tipo, id, alcance: empleado|empresa, puede_ver_empresa, pedidos: array con estado/estado_financiero/importes/items/pagado_por_empresa/pagado_por_empleado, pagos: array activo sanitizado con aplicaciones, ajustes: array sanitizado, configuracion_cobro?, totales }"
+      invariants:
+        - "Un pago activo puede cubrir varios pedidos mediante finanzas_pago_aplicaciones."
+        - "GET /finanzas/mi-historial filtra por req.empleado y no acepta empresa_id/empleado_id por query como autoridad."
+        - "En GET /finanzas/mi-historial, un empleado con rol cliente ve solo pedidos, pagos propios y deuda propia; puede ver si un pedido fue cubierto por empresa sin listar pagos de empresa."
+        - "En GET /finanzas/mi-historial, un empleado con rol admin ve pedidos de su empresa y pagos de empresa, sin usar tokens de panel admin."
+        - "Si POST /pagos/:id/aplicar no recibe aplicaciones, intenta aplicar automaticamente a pedidos mas viejos con saldo pendiente del mismo pagador."
+        - "Las aplicaciones manuales no pueden superar el saldo disponible del pago."
+        - "Al crear/eliminar aplicaciones o anular pagos se recalcula pedidos.estado_financiero con pendiente/parcial/pagado/saldo_a_favor."
+        - "Los pagos no se borran fisicamente; se anulan con estado=anulado."
+        - "DELETE /pagos/:id/aplicaciones/:aplicacionId desasocia una aplicacion y registra admin_auditoria."
+        - "Los cambios financieros registran admin_auditoria si existe la tabla."
+        - "Pedido cancelado no se cobra en resumen/cuenta corriente salvo ajuste financiero manual."
 
 runtime_events:
   verified_in_repo:
@@ -417,6 +570,9 @@ runtime_events:
     db_events:
       table: "pedido_eventos"
       examples: ["pedido_creado", "pedido_actualizado", "pedido_confirmado", "pedido_cancelado", "estado_cambiado"]
+    admin_audit_events:
+      table: "admin_auditoria"
+      examples: ["crear", "actualizar", "eliminar", "duplicar", "cambiar_estado", "importar_csv", "agregar_plato", "quitar_plato"]
     notification_events:
       - "menu publicado -> notificaciones tipo menu para empleados activos"
       - "estado de pedido cambiado por admin -> notificacion al empleado del pedido"
@@ -432,7 +588,7 @@ ports:
 
 env_vars:
   verified_in_repo:
-    api: ["NODE_ENV", "PORT", "DATABASE_URL", "DB_SSL", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "JWT_SECRET", "JWT_EXPIRES_IN", "JWT_EXPIRES_IN_SHORT", "JWT_EXPIRES_IN_REMEMBER", "APP_TIMEZONE", "TRUST_PROXY_HOPS", "CORS_ORIGINS", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DEMO_ADMIN_EMAIL", "DEMO_ADMIN_PASSWORD", "DEMO_CLIENT_PASSWORD", "TEST_DATA_PASSWORD", "SEED_FULL_RESET_CONFIRM", "SUPERADMIN_EMAIL", "SUPERADMIN_PASSWORD", "DEFAULT_DEMO_PASSWORD", "TEST_USER_PASSWORD", "ADMIN_EMAIL", "ADMIN_NEW_PASSWORD"]
+    api: ["NODE_ENV", "PORT", "DATABASE_URL", "DB_SSL", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "JWT_SECRET", "JWT_EXPIRES_IN", "JWT_EXPIRES_IN_SHORT", "JWT_EXPIRES_IN_REMEMBER", "APP_TIMEZONE", "TRUST_PROXY_HOPS", "CORS_ORIGINS", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DEMO_ADMIN_EMAIL", "DEMO_ADMIN_PASSWORD", "DEMO_CLIENT_PASSWORD", "TEST_DATA_PASSWORD", "CLEAN_TEST_DATA_CONFIRM", "SEED_FULL_RESET_CONFIRM", "SUPERADMIN_EMAIL", "SUPERADMIN_PASSWORD", "DEFAULT_DEMO_PASSWORD", "ADMIN_EMAIL", "ADMIN_NEW_PASSWORD"]
     docker_root: ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "JWT_SECRET", "JWT_EXPIRES_IN", "DB_POOL_MAX", "DB_IDLE_TIMEOUT_MS", "DB_CONNECTION_TIMEOUT_MS", "CORS_ORIGINS", "APP_TIMEZONE", "CLOUDFLARED_TUNNEL_TOKEN"]
     frontends: ["VITE_API_URL", "VITE_USAR_ENDPOINT_LEGACY_PEDIDOS", "VITE_USAR_MOCKS_PEDIDO", "VITE_DEBUG_PERFORMANCE", "API_UPSTREAM"]
 

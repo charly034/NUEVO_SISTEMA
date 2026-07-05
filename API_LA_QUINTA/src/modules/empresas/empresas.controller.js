@@ -1,7 +1,8 @@
 import * as repo from './empresas.repository.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
-import { sendSuccess, sendCreated, sendNoContent } from '../../utils/response.js';
+import { sendSuccess, sendCreated } from '../../utils/response.js';
 import { ApiError } from '../../utils/ApiError.js';
+import * as planesRepo from '../planes/planes.repository.js';
 
 const PLANES = ['basico', 'con_postre', 'con_postre_bebida'];
 const MODOS = ['semanal', 'diario', 'ambos'];
@@ -25,8 +26,39 @@ function validarEmpresa(fields) {
   }
 }
 
+function planLegacyDesdeDetalle(plan) {
+  if (plan?.incluye_postre && plan?.incluye_bebida) return 'con_postre_bebida';
+  if (plan?.incluye_postre) return 'con_postre';
+  return 'basico';
+}
+
+async function resolverPlanEmpresa(fields) {
+  if (fields.plan_id) {
+    const plan = await planesRepo.findById(fields.plan_id);
+    if (!plan || !plan.activo) throw ApiError.badRequest('plan_id invalido');
+    fields.plan_id = plan.id;
+    fields.plan = planLegacyDesdeDetalle(plan);
+    return;
+  }
+  if (fields.plan) {
+    const plan = await planesRepo.findDefaultByLegacy(fields.plan);
+    if (plan) fields.plan_id = plan.id;
+  }
+}
+
 export const getEmpresas = asyncHandler(async (req, res) => {
-  sendSuccess(res, await repo.findAll(), 'Empresas obtenidas');
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize) || 20, 1), 1000);
+  const search = String(req.query.search || '').trim();
+  const estado = ['activa', 'inactiva', 'todas'].includes(req.query.estado)
+    ? req.query.estado
+    : 'todas';
+  const [data, total] = await Promise.all([
+    repo.findAll({ page, pageSize, search, estado }),
+    repo.countAll({ search, estado }),
+  ]);
+
+  sendSuccess(res, { data, total, page, pageSize }, 'Empresas obtenidas');
 });
 
 export const getEmpresa = asyncHandler(async (req, res) => {
@@ -35,9 +67,15 @@ export const getEmpresa = asyncHandler(async (req, res) => {
   sendSuccess(res, e, 'Empresa obtenida');
 });
 
+export const getDependenciasEmpresa = asyncHandler(async (req, res) => {
+  const e = await repo.findById(req.params.id);
+  if (!e) throw ApiError.notFound('Empresa no encontrada');
+  sendSuccess(res, await repo.getDependenciasEliminacion(req.params.id), 'Dependencias de empresa obtenidas');
+});
+
 export const createEmpresa = asyncHandler(async (req, res) => {
   const {
-    nombre, slug, plan, modo_pedido, dias_laborales,
+    nombre, slug, plan, plan_id, modo_pedido, dias_laborales,
     limite_hora, limite_dia_semana, limite_anticipacion_dias,
     email, telefono,
   } = req.body;
@@ -45,7 +83,8 @@ export const createEmpresa = asyncHandler(async (req, res) => {
   const fields = {
     nombre: nombre.trim(),
     slug: slug.trim().toLowerCase(),
-    plan,
+    plan: plan || 'basico',
+    plan_id,
     modo_pedido,
     dias_laborales,
     limite_hora: limite_hora || null,
@@ -55,6 +94,7 @@ export const createEmpresa = asyncHandler(async (req, res) => {
     telefono: telefono?.trim() || null,
   };
   validarEmpresa(fields);
+  await resolverPlanEmpresa(fields);
   const existe = await repo.findBySlug(fields.slug);
   if (existe) throw ApiError.conflict(`Ya existe una empresa con el slug "${slug}"`);
   sendCreated(res, await repo.create(fields), 'Empresa creada');
@@ -64,7 +104,7 @@ export const updateEmpresa = asyncHandler(async (req, res) => {
   const e = await repo.findById(req.params.id);
   if (!e) throw ApiError.notFound('Empresa no encontrada');
   const allowed = [
-    'nombre', 'slug', 'plan', 'modo_pedido', 'activo',
+    'nombre', 'slug', 'plan', 'plan_id', 'modo_pedido', 'activo',
     'limite_hora', 'limite_dia_semana', 'limite_anticipacion_dias', 'dias_laborales',
     'email', 'telefono',
   ];
@@ -81,6 +121,7 @@ export const updateEmpresa = asyncHandler(async (req, res) => {
     }
   }
   validarEmpresa(fields);
+  await resolverPlanEmpresa(fields);
   const updated = await repo.update(req.params.id, fields);
   sendSuccess(res, updated, 'Empresa actualizada');
 });
@@ -88,8 +129,22 @@ export const updateEmpresa = asyncHandler(async (req, res) => {
 export const deleteEmpresa = asyncHandler(async (req, res) => {
   const e = await repo.findById(req.params.id);
   if (!e) throw ApiError.notFound('Empresa no encontrada');
+  const dependencias = await repo.getDependenciasEliminacion(req.params.id);
+  if (!dependencias.puedeEliminarse) {
+    return res.status(409).json({
+      success: false,
+      message: 'No se puede eliminar',
+      data: {
+        detalle: {
+          pedidosActivos: dependencias.pedidosActivos,
+          saldoCuentaCorriente: dependencias.saldoCuentaCorriente,
+        },
+      },
+      errors: [],
+    });
+  }
   await repo.remove(req.params.id);
-  sendNoContent(res);
+  sendSuccess(res, { id: e.id, activo: false, deleted_at: new Date().toISOString() }, 'Empresa eliminada');
 });
 
 // Abre una ventana de pedido temporal para la empresa (bypassea el límite horario)

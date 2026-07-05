@@ -35,6 +35,19 @@ export const menuSemanalParamsSchema = z.object({
   id: z.string().regex(/^\d+$/, 'El id debe ser un número entero positivo'),
 });
 
+export const duplicarMenuSemanalSchema = z.object({
+  nombre: z.string({ required_error: 'El nombre es obligatorio' }).min(2).max(150),
+  fecha_inicio: z
+    .string({ required_error: 'La fecha de inicio es obligatoria' })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido, usar YYYY-MM-DD'),
+  fecha_fin: z
+    .string({ required_error: 'La fecha de fin es obligatoria' })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido, usar YYYY-MM-DD'),
+}).refine((d) => new Date(d.fecha_fin) >= new Date(d.fecha_inicio), {
+  message: 'La fecha de fin debe ser igual o posterior a la fecha de inicio',
+  path: ['fecha_fin'],
+});
+
 export const menusSemanalesQuerySchema = z
   .object({
     page: z.string().regex(/^\d+$/).optional().default('1'),

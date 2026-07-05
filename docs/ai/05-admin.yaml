@@ -129,14 +129,10 @@ test_access_notes:
   from_user_provided:
     purpose: "usuarios de prueba para validaciones manuales"
     accounts:
-      - email: "test@test.com"
-        password: "not_persisted"
-      - email: "florencia.ruiz@sol.test"
-        password: "not_persisted"
       - email: "admin@laquinta.com"
         password: "not_persisted"
         surface: "front_menu admin"
-    password_policy: "No guardar passwords en docs/ai; fueron provistas en chat para uso de la sesion actual."
+    password_policy: "No guardar passwords en docs/ai; cuentas cliente seed TEST/.test fueron retiradas de la base pre-produccion."
 
 current_worktree_notes:
   verified_in_repo:

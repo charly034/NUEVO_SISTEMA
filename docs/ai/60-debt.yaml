@@ -1,7 +1,25 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-07-02"
+updated_at: "2026-07-03"
 
 technical_debt:
+  - id: "debt-notificaciones-filtro-plan-legacy"
+    status: open
+    area: "notificaciones"
+    evidence:
+      - "planes_vianda agrega planes configurables con plan_id."
+      - "notificacion_reglas aun filtra por empresas.plan legacy basico/con_postre/con_postre_bebida."
+    risk: "Si se crean planes nuevos, los filtros de notificaciones por plan no distinguen gramaje ni bebida sin postre."
+    recommended_cut: "Migrar filtros de notificaciones a plan_id o permitir ambos campos con compatibilidad legacy."
+
+  - id: "debt-admin-auditoria-cobertura-parcial"
+    status: open
+    area: "admin_auditoria"
+    evidence:
+      - "admin_auditoria registra acciones admin nivel 2 para menus, empleados, importacion CSV y cambio de estado de pedidos."
+      - "No registra aun todos los CRUD de empresas, platos, guarniciones, administradores y reglas de notificacion."
+    risk: "La pantalla Auditoria no cubre todavia el 100% de acciones sensibles del panel admin."
+    recommended_cut: "Extender registrarAdminAction a empresas, platos, guarniciones, usuarios_admin y notificaciones en una tanda especifica."
+
   - id: "platos-fotos-reales-pendientes"
     status: open
     area: "API_LA_QUINTA.platos"
@@ -126,14 +144,16 @@ technical_debt:
     evidence:
       - "API_LA_QUINTA/scripts/seed-full-reset.js ejecuta TRUNCATE ... RESTART IDENTITY CASCADE."
       - "seed-full-reset.js bloquea NODE_ENV=production y requiere SEED_FULL_RESET_CONFIRM=RESET_DEV_DATABASE."
-      - "seed-full-reset.js exige SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD, DEFAULT_DEMO_PASSWORD y TEST_USER_PASSWORD por env."
+      - "seed-full-reset.js exige SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD y DEFAULT_DEMO_PASSWORD por env; ya no crea empresa literal TEST ni usuario test@test.com."
       - "seed-full-reset.js crea superadmin y admin operativo en usuarios_admin; DEMO_ADMIN_EMAIL debe ser distinto de SUPERADMIN_EMAIL."
       - "seed-full-reset.js carga metadata aproximada de platos y empleados demo con telefono, fecha_nacimiento y preferencias_alimentarias."
       - "backfill-demo-perfiles.js completa datos faltantes de empresas/empleados demo existentes y bloquea NODE_ENV=production."
       - "API_LA_QUINTA package.json deja npm run setup como solo migraciones y separa npm run setup:demo/seed:demo-reset para reset demo destructivo."
       - "Comandos npm de seeds consolidados: seed, seed:catalogo, seed:menus, seed:demo, seed:demo-reset, seed:admin y seed:demo-profiles."
+      - "seed:test-data crea datos QA no destructivos, asegura menus de test para semanas objetivo y desactiva empleados sobrantes en las empresas objetivo para conservar 4/4/4/13 empleados activos sin borrar historial."
       - "seed-admin.js crea usuarios del panel en usuarios_admin, no empleados, y preserva rol superadmin para usuarios existentes."
-      - "seed-test-data.js exige TEST_DATA_PASSWORD por env, usa tipos vigentes especial/ambos y completa datos de perfil de empleados."
+      - "seed-test-data.js exige TEST_DATA_PASSWORD por env, usa tipos vigentes especial/ambos, completa datos de perfil de empleados y guarda snapshot de planes_vianda en pedidos."
+      - "limpiar-datos-prueba.js agrega dry-run y apply para remover empresas/empleados/pedidos/menus seed de prueba conocidos; apply exige CLEAN_TEST_DATA_CONFIRM=ELIMINAR_DATOS_PRUEBA y bloquea NODE_ENV=production."
       - "API_LA_QUINTA/.env.example y .env.example usan placeholders para passwords demo/dev."
     risk: "Riesgo residual medio: seed-full-reset sigue siendo destructivo si se confirma explicitamente en dev/test."
     recommended_cut: "No ejecutar seed-full-reset en produccion; usar solo seed-admin con credenciales provistas por env si hace falta."

@@ -106,6 +106,10 @@ export const pedidoApi = {
   miHistorial: ()             => api.get('/pedidos/mi-historial').then(unwrap),
 };
 
+export const finanzasApi = {
+  miHistorial: () => api.get('/finanzas/mi-historial').then(unwrap),
+};
+
 export const guarnicionesApi = {
   listar: () => api.get('/guarniciones', { params: { activo: 'true' } }).then(unwrap),
 };

@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { getEmpleados, getEmpleado, createEmpleado, updateEmpleado, deleteEmpleado, generarResetCode } from './empleados.controller.js';
+import { getEmpleados, getEmpleado, createEmpleado, updateEmpleado, deleteEmpleado, generarResetCode, importarEmpleados } from './empleados.controller.js';
 import { requireAdmin, requireSuperAdmin } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 router.use(requireAdmin);
 router.get('/', getEmpleados);
+router.post('/importar', importarEmpleados);
 router.get('/:id', getEmpleado);
 router.post('/', createEmpleado);
 router.patch('/:id', updateEmpleado);

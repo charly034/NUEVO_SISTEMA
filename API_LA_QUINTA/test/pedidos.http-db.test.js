@@ -6,6 +6,7 @@ import { query } from '../src/database/connection.js';
 import {
   cerrarPoolDb,
   contarPedidosFixture,
+  crearPrefijoTest,
   crearFixturePedido,
   crearPedidoDirecto,
   iniciarServidorTest,
@@ -33,6 +34,39 @@ async function conFixture(opciones, prueba) {
   } finally {
     await limpiarDatosTest(fixture.prefijo);
   }
+}
+
+async function conAdminTest(prefijo, prueba, rol = 'superadmin') {
+  const email = `${prefijo}+admin-${Date.now()}@test.local`;
+  const admin = (await query(
+    `INSERT INTO usuarios_admin (nombre, apellido, email, password_hash, rol, activo)
+     VALUES ('Admin', 'Empresas', $1, 'test', $2, true)
+     RETURNING id`,
+    [email, rol],
+  )).rows[0];
+  const token = jwt.sign({ sub: admin.id, tipo: 'admin' }, env.JWT_SECRET, { expiresIn: '1h' });
+
+  try {
+    return await prueba({ admin, token });
+  } finally {
+    await query('DELETE FROM usuarios_admin WHERE id = $1', [admin.id]);
+  }
+}
+
+function fechaISOTest(fecha) {
+  return [
+    fecha.getFullYear(),
+    String(fecha.getMonth() + 1).padStart(2, '0'),
+    String(fecha.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function lunesSemanaActualTest() {
+  const fecha = new Date();
+  fecha.setHours(0, 0, 0, 0);
+  const dia = fecha.getDay();
+  fecha.setDate(fecha.getDate() + (dia === 0 ? -6 : 1 - dia));
+  return fechaISOTest(fecha);
 }
 
 test('POST /api/v1/pedidos sin token devuelve 401', async () => {
@@ -617,6 +651,112 @@ test('DELETE /pedidos/mi-pedido cancela pedido pendiente desde historial', async
   });
 });
 
+test('DELETE /pedidos/:id/dias/:dia cancela solo un dia pendiente', async () => {
+  await conFixture({
+    semanaInicio: '2026-07-06',
+    modoPedido: 'diario',
+  }, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
+
+    const respuesta = await requestJson(
+      servidor.baseUrl,
+      'DELETE',
+      `/pedidos/${pedido.id}/dias/lunes`,
+      { token: fixture.token },
+    );
+
+    assert.equal(respuesta.status, 200);
+    const actualizado = await obtenerPedidoDb(pedido.id);
+    const lunes = actualizado.items.find((item) => item.dia === 'lunes');
+    assert.equal(actualizado.estado, 'pendiente');
+    assert.equal(Boolean(lunes.sin_pedido), true);
+    assert.equal(lunes.plato_id, null);
+    assert.ok(actualizado.eventos.some((evento) => evento.tipo === 'pedido_dia_cancelado'));
+  });
+});
+
+test('DELETE /pedidos/:id/dias/:dia rechaza dias ya vencidos', async () => {
+  await conFixture({
+    semanaInicio: '2026-06-29',
+    modoPedido: 'diario',
+  }, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
+
+    const respuesta = await requestJson(
+      servidor.baseUrl,
+      'DELETE',
+      `/pedidos/${pedido.id}/dias/lunes`,
+      { token: fixture.token },
+    );
+
+    assert.equal(respuesta.status, 409);
+    const sinCambios = await obtenerPedidoDb(pedido.id);
+    const lunes = sinCambios.items.find((item) => item.dia === 'lunes');
+    assert.equal(Boolean(lunes.sin_pedido), false);
+    assert.equal(lunes.plato_id, fixture.platoConGuarnicion.id);
+  });
+});
+
+test('DELETE /pedidos/mi-pedido conserva dias vencidos al cancelar semana en curso', async () => {
+  await conFixture({
+    semanaInicio: lunesSemanaActualTest(),
+    modoPedido: 'diario',
+    diasLaborales: 'lunes_domingo',
+    incluirDiaSinServicio: false,
+  }, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [
+        {
+          dia: 'lunes',
+          plato_id: fixture.platoConGuarnicion.id,
+          opcion: 'A',
+          guarnicion_id: fixture.guarnicion.id,
+        },
+        {
+          dia: 'domingo',
+          plato_id: fixture.platoSinGuarnicion.id,
+          opcion: 'A',
+          guarnicion_id: null,
+        },
+      ],
+    });
+
+    const respuesta = await requestJson(
+      servidor.baseUrl,
+      'DELETE',
+      `/pedidos/mi-pedido?semana_inicio=${fixture.semanaInicio}`,
+      { token: fixture.token },
+    );
+
+    assert.equal(respuesta.status, 200);
+    assert.equal(respuesta.body.data.cancelacion.completa, false);
+    assert.deepEqual(respuesta.body.data.cancelacion.dias_cancelados, ['domingo']);
+    assert.deepEqual(respuesta.body.data.cancelacion.dias_conservados, ['lunes']);
+
+    const actualizado = await obtenerPedidoDb(pedido.id);
+    const lunes = actualizado.items.find((item) => item.dia === 'lunes');
+    const domingo = actualizado.items.find((item) => item.dia === 'domingo');
+    assert.equal(actualizado.estado, 'pendiente');
+    assert.equal(Boolean(lunes.sin_pedido), false);
+    assert.equal(Boolean(domingo.sin_pedido), true);
+    assert.ok(actualizado.eventos.some((evento) => evento.tipo === 'pedido_cancelado_parcial'));
+  });
+});
+
 test('GET /pedidos/semanas no expone pedidoId activo despues de cancelar', async () => {
   await conFixture({}, async (fixture) => {
     await crearPedidoDirecto(fixture, {
@@ -717,5 +857,129 @@ test('PATCH estado admin crea notificacion interna aunque WhatsApp este desactiv
     } finally {
       await query('DELETE FROM usuarios_admin WHERE id = $1', [admin.id]);
     }
+  });
+});
+
+test('GET /empresas pagina y busca parcialmente por email', async () => {
+  const prefijo = crearPrefijoTest();
+  await limpiarDatosTest(prefijo);
+
+  try {
+    for (let i = 0; i < 55; i += 1) {
+      await query(
+        `INSERT INTO empresas (nombre, slug, plan, modo_pedido, activo, codigo_registro, email)
+         VALUES ($1, $2, 'basico', 'semanal', true, $3, $4)`,
+        [
+          `${prefijo} Empresa ${String(i).padStart(2, '0')}`,
+          `${prefijo}-empresa-${i}`,
+          `${prefijo.slice(-5).toUpperCase()}${String(i).padStart(2, '0')}`,
+          `contacto-${i}@${prefijo}.test.local`,
+        ],
+      );
+    }
+
+    await conAdminTest(prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'GET',
+        `/empresas?page=2&pageSize=20&search=${prefijo}.test.local&estado=todas`,
+        { token },
+      );
+
+      assert.equal(respuesta.status, 200);
+      assert.equal(respuesta.body.data.total, 55);
+      assert.equal(respuesta.body.data.page, 2);
+      assert.equal(respuesta.body.data.pageSize, 20);
+      assert.equal(respuesta.body.data.data.length, 20);
+      assert.ok(respuesta.body.data.data.every((empresa) => empresa.email.includes(prefijo)));
+    });
+  } finally {
+    await limpiarDatosTest(prefijo);
+  }
+});
+
+test('GET /empresas/:id/dependencias detecta pedidos activos', async () => {
+  await conFixture({}, async (fixture) => {
+    await crearPedidoDirecto(fixture);
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'GET',
+        `/empresas/${fixture.empresa.id}/dependencias`,
+        { token },
+      );
+
+      assert.equal(respuesta.status, 200);
+      assert.equal(respuesta.body.data.puedeEliminarse, false);
+      assert.equal(respuesta.body.data.pedidosActivos, 1);
+    });
+  });
+});
+
+test('DELETE /empresas/:id bloquea empresas con pedidos activos', async () => {
+  await conFixture({}, async (fixture) => {
+    await crearPedidoDirecto(fixture);
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'DELETE',
+        `/empresas/${fixture.empresa.id}`,
+        { token },
+      );
+
+      assert.equal(respuesta.status, 409);
+      assert.equal(respuesta.body.message, 'No se puede eliminar');
+      assert.equal(respuesta.body.data.detalle.pedidosActivos, 1);
+    });
+  });
+});
+
+test('DELETE /empresas/:id bloquea empresas con saldo distinto de cero', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture);
+    await query(
+      `UPDATE pedidos
+       SET estado = 'entregado', importe_total = 1000, importe_pagado = 0
+       WHERE id = $1`,
+      [pedido.id],
+    );
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'DELETE',
+        `/empresas/${fixture.empresa.id}`,
+        { token },
+      );
+
+      assert.equal(respuesta.status, 409);
+      assert.equal(respuesta.body.data.detalle.pedidosActivos, 0);
+      assert.equal(Number(respuesta.body.data.detalle.saldoCuentaCorriente), 1000);
+    });
+  });
+});
+
+test('DELETE /empresas/:id aplica soft delete sin dependencias', async () => {
+  await conFixture({}, async (fixture) => {
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'DELETE',
+        `/empresas/${fixture.empresa.id}`,
+        { token },
+      );
+
+      assert.equal(respuesta.status, 200);
+
+      const empresa = (await query(
+        'SELECT activo, deleted_at FROM empresas WHERE id = $1',
+        [fixture.empresa.id],
+      )).rows[0];
+
+      assert.equal(empresa.activo, false);
+      assert.ok(empresa.deleted_at);
+    });
   });
 });

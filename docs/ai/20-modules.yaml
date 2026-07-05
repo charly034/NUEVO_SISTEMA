@@ -1,5 +1,5 @@
 schema: la_quinta_modules_v2
-updated_at: "2026-07-02"
+updated_at: "2026-07-04"
 
 modules:
   - owner_module: "API_LA_QUINTA.auth"
@@ -27,6 +27,18 @@ modules:
       - "Usa tokens con payload tipo=admin."
       - "requireSuperAdmin protege administracion de usuarios."
 
+  - owner_module: "API_LA_QUINTA.admin-auditoria"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/admin-auditoria"
+      - "API_LA_QUINTA/src/database/migrations/1719000042000_admin-auditoria.js"
+    routes_file: "API_LA_QUINTA/src/modules/admin-auditoria/admin-auditoria.routes.js"
+    owns: ["auditoria nivel 2 de acciones admin", "listado filtrable para panel admin", "registro de antes/despues cuando aplica"]
+    boundaries:
+      - "La auditoria no debe bloquear operaciones si una base vieja aun no tiene admin_auditoria; el logger verifica existencia de tabla."
+      - "No reemplaza pedido_eventos; pedido_eventos sigue siendo el historial especifico de pedidos."
+
   - owner_module: "API_LA_QUINTA.pedidos"
     status: verified_in_repo
     kind: api_module
@@ -36,7 +48,7 @@ modules:
       - "API_LA_QUINTA/test/pedidos.http-db.test.js"
       - "API_LA_QUINTA/test_helpers"
     routes_file: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
-    owns: ["semanas de pedido", "menu activo/hoy/semana legacy", "crear pedido", "modificar pedido", "confirmar", "sugerencias cliente para semanas sin menu", "listar sugerencias cliente para admin", "cancelar mi pedido", "historial", "estado admin"]
+    owns: ["semanas de pedido", "menu activo/hoy/semana legacy", "crear pedido", "modificar pedido", "confirmar", "sugerencias cliente para semanas sin menu", "opciones configurables de sugerencias por semana", "listar sugerencias cliente para admin", "cancelar mi pedido completo o parcial", "cancelar dia de mi pedido", "historial", "estado admin"]
     boundaries:
       - "Reglas de plazo, empresa, empleado, dia laboral, plato y guarnicion deben vivir en backend."
       - "Un dia marcado sin servicio en el menu bloquea la edicion cliente y el guardado backend: queda como sin_pedido por defecto y no debe enviarse como item editable."
@@ -60,7 +72,7 @@ modules:
       - "API_LA_QUINTA/src/modules/menus-semanales"
       - "API_LA_QUINTA/src/database/migrations"
     routes_file: "API_LA_QUINTA/src/modules/menus-semanales/menus-semanales.routes.js"
-    owns: ["CRUD menus semanales", "dias/opciones", "sin servicio", "estado de menu", "historial de uso"]
+    owns: ["CRUD menus semanales", "duplicar semana", "dias/opciones", "sin servicio", "estado de menu", "historial de uso"]
     boundaries:
       - "No debe asumir identidad de empleado cliente."
       - "Publicacion/cierre de menu afecta opciones vistas por cliente."
@@ -88,23 +100,53 @@ modules:
   - owner_module: "API_LA_QUINTA.empresas"
     status: verified_in_repo
     kind: api_module
-    paths: ["API_LA_QUINTA/src/modules/empresas"]
+    paths:
+      - "API_LA_QUINTA/src/modules/empresas"
+      - "API_LA_QUINTA/src/database/migrations/1719000047000_empresas-soft-delete.js"
     routes_file: "API_LA_QUINTA/src/modules/empresas/empresas.routes.js"
-    owns: ["empresas", "plan", "modo_pedido", "dias_laborales", "limites de pedido", "codigo_registro", "override de plazo"]
+    owns: ["empresas", "plan_id", "plan legacy de compatibilidad", "modo_pedido", "dias_laborales", "limites de pedido", "codigo_registro", "override de plazo", "soft delete deleted_at", "validacion de dependencias antes de eliminar"]
+
+  - owner_module: "API_LA_QUINTA.planes"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/planes"
+      - "API_LA_QUINTA/src/database/migrations/1719000043000_planes-vianda.js"
+    routes_file: "API_LA_QUINTA/src/modules/planes/planes.routes.js"
+    owns: ["CRUD admin de planes de vianda", "gramaje minimo/maximo", "incluye_postre", "incluye_bebida", "estado activo"]
+    boundaries:
+      - "empresas.plan se conserva como compatibilidad legacy; empresas.plan_id apunta a planes_vianda."
+      - "pedidos guarda snapshot del plan para cocina y trazabilidad historica."
+
+  - owner_module: "API_LA_QUINTA.finanzas"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/finanzas"
+      - "API_LA_QUINTA/src/database/migrations/1719000045000_finanzas-cuenta-corriente.js"
+      - "API_LA_QUINTA/test/finanzas.service.test.js"
+    routes_file: "API_LA_QUINTA/src/modules/finanzas/finanzas.routes.js"
+    owns: ["cuenta corriente admin", "historial financiero cliente", "pagos", "aplicaciones de pago", "ajustes financieros", "estado financiero de pedidos", "configuracion de cobro"]
+    boundaries:
+      - "No reemplaza pedidos.estado operativo; pedidos.estado_financiero vive separado y se recalcula desde aplicaciones activas."
+      - "No borra pagos fisicamente; los pagos se anulan con estado=anulado y auditoria admin."
+      - "Los cambios financieros registran admin_auditoria si la tabla existe."
+      - "GET /api/v1/finanzas/mi-historial usa requireAuth y filtra por req.empleado: rol cliente ve solo empleado; rol admin de empleado ve la empresa."
+      - "Los importes historicos quedan preparados con pedidos.importe_total y pedido_items.precio_unitario; al 2026-07-03 no hay precio automatico de plan."
 
   - owner_module: "API_LA_QUINTA.empleados"
     status: verified_in_repo
     kind: api_module
     paths: ["API_LA_QUINTA/src/modules/empleados"]
     routes_file: "API_LA_QUINTA/src/modules/empleados/empleados.routes.js"
-    owns: ["empleados", "reset code empleado", "activo/empresa/rol", "telefono empleado", "fecha_nacimiento empleado"]
+    owns: ["empleados", "importacion CSV admin", "reset code empleado", "activo/empresa/rol", "telefono empleado", "fecha_nacimiento empleado"]
 
   - owner_module: "API_LA_QUINTA.estadisticas"
     status: verified_in_repo
     kind: api_module
     paths: ["API_LA_QUINTA/src/modules/estadisticas"]
     routes_file: "API_LA_QUINTA/src/modules/estadisticas/estadisticas.routes.js"
-    owns: ["resumen", "platos mas usados", "distribucion tags", "uso por dia", "tendencia mensual", "top por dia"]
+    owns: ["resumen", "platos mas usados", "distribucion tags", "uso por dia", "tendencia mensual", "top por dia", "filtros por periodo y empresa cuando aplican"]
 
   - owner_module: "API_LA_QUINTA.sugerencias"
     status: verified_in_repo
@@ -129,7 +171,9 @@ modules:
       - "POST /api/v1/notificaciones/admin permite enviar notificaciones internas manuales por todos, empresa o empleado desde front_menu."
       - "GET/POST/PATCH/DELETE /api/v1/notificaciones/admin/reglas administra reglas para canal interna o whatsapp y eventos nuevo_registro, menu_publicado y pedido_estado_cambiado."
       - "GET/PATCH /api/v1/notificaciones/admin/whatsapp/config guarda activo/webhook_url de n8n en notificacion_configuracion."
+      - "GET /api/v1/notificaciones/admin/whatsapp/config devuelve solo estado enmascarado; GET /config/reveal devuelve la URL real bajo requireAdmin y registra admin_auditoria."
       - "GET/POST/PATCH/DELETE /api/v1/notificaciones/admin/whatsapp/destinatarios administra contactos externos de WhatsApp."
+      - "GET /api/v1/notificaciones/admin/whatsapp/test-logs lista pruebas manuales recientes desde whatsapp_test_logs."
       - "API_LA_QUINTA/src/modules/notificaciones/notificaciones.scheduler.js corre cada minuto y ejecuta reglas activas evento=pedido_semanal_pendiente segun programacion semanal."
       - "menus-semanales, pedidos y auth.registro disparan eventos que se resuelven contra reglas activas; si la tabla nueva falta, se conserva fallback interno legacy."
 
@@ -159,7 +203,7 @@ modules:
       - "front_menu/src"
       - "front_menu/public"
       - "front_menu/nginx/default.conf.template"
-    owns: ["dashboard", "platos con metadata/foto", "semanas", "historial", "estadisticas", "sugeridor", "recomendaciones-menu", "pedidos", "notificaciones", "empresas", "guarniciones", "administradores", "sidebar admin con grupo desplegable Menu semanal"]
+    owns: ["dashboard", "clientes como solapa canonica de administracion de empresas", "sugerencias de clientes en /recomendaciones-menu dentro del grupo Clientes", "platos con metadata/foto", "semanas", "historial", "estadisticas", "generar menu en /sugeridor", "pedidos", "pedidos de hoy", "pedidos y pagos dentro de clientes", "resumen de viandas en cuenta corriente", "notificaciones dentro de clientes", "empresas", "planes de vianda", "guarniciones", "auditoria", "administradores", "sidebar admin con grupos desplegables Clientes, Catalogo y Menu semanal agrupado por Planificacion/Analisis"]
     boundaries:
       - "Sesion admin debe pasar por front_menu/src/auth.js y front_menu/src/lib/apiClient.js."
 
@@ -175,6 +219,18 @@ modules:
       - "front_clientes/src/components/PerfilCliente.jsx"
       - "front_clientes/src/pages/PerfilPage.jsx"
     owns: ["login", "registro", "recuperar acceso", "perfil", "preferencias alimentarias", "preferencia de recordatorios por WhatsApp", "storage token/empleado"]
+
+  - owner_module: "front_clientes.historial"
+    status: verified_in_repo
+    kind: frontend_module
+    paths:
+      - "front_clientes/src/pages/HistorialPage.jsx"
+      - "front_clientes/src/services/api.js"
+      - "front_clientes/src/services/apiCliente.js"
+    owns: ["Historial tab Pedidos", "Historial tab Cuenta", "lectura de cuenta corriente cliente", "descarga CSV local de resumen financiero"]
+    boundaries:
+      - "No permite editar pagos ni aplicaciones desde el portal cliente."
+      - "La autoridad de alcance vive en API_LA_QUINTA.finanzas mediante requireAuth; el frontend solo renderiza la respuesta filtrada."
 
   - owner_module: "front_clientes.pedido"
     status: verified_in_repo

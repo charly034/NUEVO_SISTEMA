@@ -269,6 +269,8 @@ export const findById = async (id) => {
   const r = await query(
     `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
             p.empleado_id, p.empresa_id,
+            p.plan_id, p.plan_codigo, p.plan_nombre, p.plan_gramaje_min, p.plan_gramaje_max,
+            p.plan_incluye_postre, p.plan_incluye_bebida,
             e.nombre AS empleado_nombre, e.apellido AS empleado_apellido, e.email,
             emp.nombre AS empresa_nombre,
             json_agg(
@@ -310,6 +312,8 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
   const r = await query(
     `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
             p.empleado_id, p.empresa_id,
+            p.plan_id, p.plan_codigo, p.plan_nombre, p.plan_gramaje_min, p.plan_gramaje_max,
+            p.plan_incluye_postre, p.plan_incluye_bebida,
             e.nombre AS empleado_nombre, e.apellido AS empleado_apellido, e.email,
             emp.nombre AS empresa_nombre,
             json_agg(
@@ -338,17 +342,50 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
   return r.rows.map(p => ({ ...p, eventos: eventosPorPedido[p.id] ?? [] }));
 };
 
-export const upsertPedido = async ({ empleado_id, empresa_id, menu_semanal_id, semana_inicio, observaciones }, db = query) => {
+export const upsertPedido = async ({
+  empleado_id,
+  empresa_id,
+  menu_semanal_id,
+  semana_inicio,
+  observaciones,
+  plan_snapshot = {},
+}, db = query) => {
   const r = await execute(db,
-    `INSERT INTO pedidos (empleado_id, empresa_id, menu_semanal_id, semana_inicio, observaciones)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO pedidos (
+       empleado_id, empresa_id, menu_semanal_id, semana_inicio, observaciones,
+       plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
+       plan_incluye_postre, plan_incluye_bebida
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (empleado_id, semana_inicio)
      DO UPDATE SET menu_semanal_id = EXCLUDED.menu_semanal_id,
        observaciones = EXCLUDED.observaciones,
+       plan_id = EXCLUDED.plan_id,
+       plan_codigo = EXCLUDED.plan_codigo,
+       plan_nombre = EXCLUDED.plan_nombre,
+       plan_gramaje_min = EXCLUDED.plan_gramaje_min,
+       plan_gramaje_max = EXCLUDED.plan_gramaje_max,
+       plan_incluye_postre = EXCLUDED.plan_incluye_postre,
+       plan_incluye_bebida = EXCLUDED.plan_incluye_bebida,
        estado = 'pendiente',
        updated_at = NOW()
-     RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado, observaciones, created_at, updated_at`,
-    [empleado_id, empresa_id, menu_semanal_id || null, semana_inicio, observaciones || null]
+     RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado, observaciones,
+       plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
+       plan_incluye_postre, plan_incluye_bebida, created_at, updated_at`,
+    [
+      empleado_id,
+      empresa_id,
+      menu_semanal_id || null,
+      semana_inicio,
+      observaciones || null,
+      plan_snapshot.plan_id || null,
+      plan_snapshot.plan_codigo || null,
+      plan_snapshot.plan_nombre || null,
+      plan_snapshot.plan_gramaje_min || null,
+      plan_snapshot.plan_gramaje_max || null,
+      Boolean(plan_snapshot.plan_incluye_postre),
+      Boolean(plan_snapshot.plan_incluye_bebida),
+    ]
   );
   return r.rows[0];
 };
@@ -381,8 +418,26 @@ export const upsertItem = async (
   return r.rows[0];
 };
 
-export const deleteItem = async (pedidoId, dia) => {
-  await query('DELETE FROM pedido_items WHERE pedido_id = $1 AND dia = $2', [pedidoId, dia]);
+export const cancelarItemPedido = async (pedidoId, dia, db = query) => {
+  const r = await execute(
+    db,
+    `UPDATE pedido_items
+     SET plato_id = NULL,
+       opcion = NULL,
+       guarnicion_id = NULL,
+       notas = NULL,
+       sin_pedido = TRUE,
+       origen = 'usuario',
+       updated_at = NOW()
+     WHERE pedido_id = $1 AND dia = $2
+     RETURNING *`,
+    [pedidoId, dia],
+  );
+  return r.rows[0] || null;
+};
+
+export const deleteItem = async (pedidoId, dia, db = query) => {
+  await execute(db, 'DELETE FROM pedido_items WHERE pedido_id = $1 AND dia = $2', [pedidoId, dia]);
 };
 
 export const deleteItemsNotInDays = async (pedidoId, dias, db = query) => {
@@ -423,7 +478,7 @@ export const validateItemForMenu = async (menuId, item, db = query) => {
 export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
   const r = await query(
     `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
-            ms.nombre AS menu_nombre, ms.fecha_fin,
+            p.empresa_id, ms.nombre AS menu_nombre, ms.fecha_fin,
             json_agg(
               json_build_object(
                 'dia', pi.dia, 'plato_id', pi.plato_id,
@@ -480,6 +535,57 @@ export const findSugerenciasAdmin = async ({ empresa_id, semana_inicio, limit = 
     vals
   );
   return r.rows;
+};
+
+export const findOpcionesSugerencia = async (semanaInicio, db = query) => {
+  const r = await execute(db,
+    `SELECT pso.id, pso.semana_inicio, pso.plato_id, pso.orden,
+            p.nombre AS plato_nombre, p.descripcion, p.tags, p.tipo, p.foto_url
+     FROM pedido_sugerencia_opciones pso
+     JOIN platos p ON p.id = pso.plato_id
+     WHERE pso.semana_inicio = $1
+       AND pso.activo = TRUE
+       AND p.activo = TRUE
+     ORDER BY pso.orden ASC, p.nombre ASC`,
+    [semanaInicio]
+  );
+  return r.rows;
+};
+
+export const findOpcionesSugerenciaBySemanas = async (semanasInicio = [], db = query) => {
+  const semanas = [...new Set(semanasInicio.filter(Boolean))];
+  if (semanas.length === 0) return [];
+  const r = await execute(db,
+    `SELECT pso.id, pso.semana_inicio, pso.plato_id, pso.orden,
+            p.nombre AS plato_nombre, p.descripcion, p.tags, p.tipo, p.foto_url
+     FROM pedido_sugerencia_opciones pso
+     JOIN platos p ON p.id = pso.plato_id
+     WHERE pso.semana_inicio = ANY($1::date[])
+       AND pso.activo = TRUE
+       AND p.activo = TRUE
+     ORDER BY pso.semana_inicio ASC, pso.orden ASC, p.nombre ASC`,
+    [semanas]
+  );
+  return r.rows;
+};
+
+export const replaceOpcionesSugerencia = async ({ semana_inicio, plato_ids }, db = query) => {
+  await execute(db, 'DELETE FROM pedido_sugerencia_opciones WHERE semana_inicio = $1', [semana_inicio]);
+
+  const rows = [];
+  for (const [index, platoId] of plato_ids.entries()) {
+    const r = await execute(db,
+      `INSERT INTO pedido_sugerencia_opciones (semana_inicio, plato_id, orden)
+       SELECT $1, p.id, $3
+       FROM platos p
+       WHERE p.id = $2 AND p.activo = TRUE
+       RETURNING id, semana_inicio, plato_id, orden, activo, created_at, updated_at`,
+      [semana_inicio, platoId, index]
+    );
+    if (r.rows[0]) rows.push(r.rows[0]);
+  }
+
+  return rows;
 };
 
 export const upsertSugerencia = async ({

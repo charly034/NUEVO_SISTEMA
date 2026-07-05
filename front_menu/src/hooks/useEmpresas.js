@@ -3,8 +3,19 @@ import api from '../lib/apiClient.js';
 
 const KEY = 'empresas';
 
-export const useEmpresas = () =>
-  useQuery({ queryKey: [KEY], queryFn: () => api.get('/empresas').then(r => r.data) });
+export const useEmpresas = (params = null) =>
+  useQuery({
+    queryKey: [KEY, params || 'all'],
+    queryFn: () => api.get('/empresas', {
+      params: params || { page: 1, pageSize: 1000, estado: 'todas' },
+    }).then((r) => {
+      if (params) return r.data;
+      return Array.isArray(r.data) ? r.data : r.data?.data || [];
+    }),
+  });
+
+export const getDependenciasEmpresa = (id) =>
+  api.get(`/empresas/${id}/dependencias`).then(r => r.data);
 
 export const useCreateEmpresa = () => {
   const qc = useQueryClient();

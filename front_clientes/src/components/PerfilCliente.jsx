@@ -148,7 +148,11 @@ export default function PerfilCliente({
 }) {
   const iniciales =
     `${empleado.nombre?.[0] ?? ""}${empleado.apellido?.[0] ?? ""}`.toUpperCase();
-  const plan = PLANES[empleado.empresa?.plan] ?? empleado.empresa?.plan ?? "-";
+  const plan = empleado.empresa?.plan_detalle?.nombre
+    ?? empleado.empresa?.plan_nombre
+    ?? PLANES[empleado.empresa?.plan]
+    ?? empleado.empresa?.plan
+    ?? "-";
 
   const [editando, setEditando] = useState(false);
   const [showPass, setShowPass] = useState(false);

@@ -1,5 +1,5 @@
 schema: la_quinta_guardrails_v2
-updated_at: "2026-06-27"
+updated_at: "2026-07-04"
 
 non_breakable_invariants:
   verified_in_repo:
@@ -7,6 +7,7 @@ non_breakable_invariants:
     - "No guardar secretos ni valores reales de .env."
     - "Tokens cliente y admin no son intercambiables: admin lleva tipo=admin."
     - "Pedidos cliente deben usar identidad desde req.empleado, no usuarioId/empresaId del body."
+    - "Finanzas cliente debe usar identidad desde req.empleado; front_clientes no es autoridad para empresa_id/empleado_id ni puede editar pagos."
     - "Un empleado no puede tener mas de un pedido por semana: UNIQUE (empleado_id, semana_inicio)."
     - "pedido_items no puede repetir dia dentro del mismo pedido."
     - "sin_pedido=true implica plato_id NULL segun constraint pedido_items_plato_o_sin_pedido_check."
@@ -21,6 +22,8 @@ high_risk_areas:
   verified_in_repo:
     - area: "API_LA_QUINTA/src/modules/pedidos"
       risk: "Reglas de negocio criticas, transacciones, validacion de plazo, guarniciones y eventos."
+    - area: "API_LA_QUINTA/src/modules/finanzas"
+      risk: "Cuenta corriente, pagos, aplicaciones y estado financiero; debe mantener transacciones, auditoria y separacion de estado operativo."
     - area: "API_LA_QUINTA/src/database/migrations"
       risk: "Schema historico; editar migraciones aplicadas puede romper DB existente."
     - area: "API_LA_QUINTA/uploads/platos"
@@ -37,6 +40,8 @@ high_risk_areas:
       risk: "Cache de opciones puede quedar viejo."
     - area: "front_menu/src/lib/apiClient.js"
       risk: "Interceptors admin globales."
+    - area: "front_menu/src/pages/PedidosPagos.jsx"
+      risk: "Vista admin financiera; debe conservar separacion entre estado operativo de pedidos y estado_financiero de finanzas."
 
 recommended_blast_radius:
   api_contract_change:
@@ -71,7 +76,12 @@ safe_refactor_rules:
   - "Separar cambios mecanicos de cambios funcionales."
   - "No mover SQL fuera de repositories sin decision explicita."
   - "No mover reglas de pedido al frontend como fuente de verdad."
-  - "No introducir endpoints paralelos si uno existente puede corregirse."
+  - "No mezclar pedidos.estado operativo con pedidos.estado_financiero; las finanzas deben vivir en API_LA_QUINTA/src/modules/finanzas."
+  - "GET /api/v1/finanzas/mi-historial debe quedar antes de router.use(requireAdminAuth) y protegido con requireAuth."
+  - "front_menu/src/pages/PedidosPagos.jsx debe consumir contratos de /api/v1/finanzas para saldos/pagos y usar PATCH /api/v1/pedidos/:id/estado solo para estado operativo."
+    - "No borrar pagos fisicamente en flujos normales; usar estado=anulado y registrar admin_auditoria."
+    - "No borrar empresas fisicamente desde DELETE /api/v1/empresas/:id; validar dependencias y usar soft delete con activo=false/deleted_at."
+    - "No introducir endpoints paralelos si uno existente puede corregirse."
   - "Actualizar docs/ai despues de cualquier cambio de contrato."
   - "Agregar pruebas antes o junto con cambios de reglas de pedido."
 

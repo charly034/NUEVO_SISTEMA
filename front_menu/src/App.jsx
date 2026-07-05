@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout.jsx';
 import AdminLogin from './components/AdminLogin.jsx';
 import { adminAuth } from './auth.js';
@@ -11,13 +11,13 @@ const SemanaDetalle = lazy(() => import('./pages/SemanaDetalle.jsx'));
 const Historial = lazy(() => import('./pages/Historial.jsx'));
 const Estadisticas = lazy(() => import('./pages/Estadisticas.jsx'));
 const Sugeridor = lazy(() => import('./pages/Sugeridor.jsx'));
-const Empresas = lazy(() => import('./pages/Empresas.jsx'));
+const Clientes = lazy(() => import('./pages/Clientes.jsx'));
 const Guarniciones = lazy(() => import('./pages/Guarniciones.jsx'));
 const PedidosAdmin = lazy(() => import('./pages/PedidosAdmin.jsx'));
 const PedidosHoy = lazy(() => import('./pages/PedidosHoy.jsx'));
 const RecomendacionesMenu = lazy(() => import('./pages/RecomendacionesMenu.jsx'));
 const Administradores = lazy(() => import('./pages/Administradores.jsx'));
-const NotificacionesAdmin = lazy(() => import('./pages/NotificacionesAdmin.jsx'));
+const Auditoria = lazy(() => import('./pages/Auditoria.jsx'));
 
 function PageFallback() {
   return (
@@ -80,11 +80,14 @@ export default function App() {
           <Route path="sugeridor" element={<Suspense fallback={<PageFallback />}><Sugeridor /></Suspense>} />
           <Route path="pedidos" element={<Suspense fallback={<PageFallback />}><PedidosAdmin /></Suspense>} />
           <Route path="pedidos-hoy" element={<Suspense fallback={<PageFallback />}><PedidosHoy /></Suspense>} />
+          <Route path="clientes" element={<Suspense fallback={<PageFallback />}><Clientes /></Suspense>} />
+          <Route path="pedidos-pagos" element={<Navigate to="/clientes?vista=pagos" replace />} />
           <Route path="recomendaciones-menu" element={<Suspense fallback={<PageFallback />}><RecomendacionesMenu /></Suspense>} />
-          <Route path="empresas" element={<Suspense fallback={<PageFallback />}><Empresas /></Suspense>} />
-          <Route path="empleados" element={<Suspense fallback={<PageFallback />}><Empresas /></Suspense>} />
+          <Route path="empresas" element={<Navigate to="/clientes" replace />} />
+          <Route path="empleados" element={<Navigate to="/clientes" replace />} />
           <Route path="guarniciones" element={<Suspense fallback={<PageFallback />}><Guarniciones /></Suspense>} />
-          <Route path="notificaciones" element={<Suspense fallback={<PageFallback />}><NotificacionesAdmin /></Suspense>} />
+          <Route path="notificaciones" element={<Navigate to="/clientes?vista=notificaciones" replace />} />
+          <Route path="auditoria" element={<Suspense fallback={<PageFallback />}><Auditoria /></Suspense>} />
           <Route path="administradores" element={<Suspense fallback={<PageFallback />}><Administradores /></Suspense>} />
         </Route>
       </Routes>

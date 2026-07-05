@@ -4,6 +4,7 @@ export const menusService = {
   getAll: (params) => apiClient.get('/menus-semanales', { params }),
   getById: (id) => apiClient.get(`/menus-semanales/${id}`),
   create: (data) => apiClient.post('/menus-semanales', data),
+  duplicar: (id, data) => apiClient.post(`/menus-semanales/${id}/duplicar`, data),
   update: (id, data) => apiClient.put(`/menus-semanales/${id}`, data),
   remove: (id) => apiClient.delete(`/menus-semanales/${id}`),
 

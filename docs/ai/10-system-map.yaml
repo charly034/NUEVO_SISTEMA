@@ -1,5 +1,5 @@
 schema: la_quinta_system_map_v2
-updated_at: "2026-07-02"
+updated_at: "2026-07-03"
 
 runtime_surfaces:
   verified_in_repo:
@@ -105,6 +105,7 @@ storage_owners:
     postgres_tables_key_domains:
       - "empleados"
       - "empresas"
+      - "planes_vianda"
       - "usuarios_admin"
       - "menus_semanales"
       - "menu_semanal_dias"
@@ -115,12 +116,19 @@ storage_owners:
       - "pedido_items"
       - "pedido_eventos"
       - "pedido_sugerencias"
+      - "pedido_sugerencia_opciones"
+      - "admin_auditoria"
+      - "finanzas_pagos"
+      - "finanzas_pago_aplicaciones"
+      - "finanzas_configuracion_cobro"
+      - "finanzas_ajustes"
       - "notificaciones"
       - "notificacion_reglas"
       - "notificacion_configuracion"
       - "notificacion_destinatarios_whatsapp"
       - "notificacion_envios_whatsapp"
       - "notificacion_ejecuciones_programadas"
+      - "whatsapp_test_logs"
     filesystem:
       api_uploads:
         path: "API_LA_QUINTA/uploads/platos"
@@ -154,11 +162,11 @@ global_variables_and_env:
       - "DEMO_ADMIN_PASSWORD"
       - "DEMO_CLIENT_PASSWORD"
       - "TEST_DATA_PASSWORD"
+      - "CLEAN_TEST_DATA_CONFIRM"
       - "SEED_FULL_RESET_CONFIRM"
       - "SUPERADMIN_EMAIL"
       - "SUPERADMIN_PASSWORD"
       - "DEFAULT_DEMO_PASSWORD"
-      - "TEST_USER_PASSWORD"
       - "ADMIN_EMAIL"
       - "ADMIN_NEW_PASSWORD"
     root_docker_env_names:

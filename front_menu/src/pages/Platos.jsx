@@ -1,64 +1,53 @@
-import { useState, useCallback, useMemo } from 'react';
-import { usePlatos, usePlatoTags, useCreatePlato, useUpdatePlato, useDeletePlato } from '../hooks/usePlatos.js';
-import { useGuarniciones, useUpdateGuarnicion, useDeleteGuarnicion } from '../hooks/useGuarniciones.js';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCreatePlato, useDeletePlato, usePlatos, usePlatoTags, useUpdatePlato } from '../hooks/usePlatos.js';
 import { useHistorialPlato } from '../hooks/useHistorial.js';
 import Modal from '../components/ui/Modal.jsx';
 import PlatoForm from '../components/platos/PlatoForm.jsx';
-import GuarnicionesPanel from '../components/platos/GuarnicionesPanel.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import ErrorMessage from '../components/ui/ErrorMessage.jsx';
+import { EyeIcon, IconActionButton, PencilIcon, TrashIcon } from '../components/ui/IconActionButton.jsx';
+import PlatoPhoto from '../components/ui/PlatoPhoto.jsx';
 import { toast } from '../lib/toast.js';
-import { confirmar } from '../lib/confirm.js';
 
 const ESTADO_FILTROS = [
-  { label: 'Activos',   value: 'true'    },
-  { label: 'Todos',     value: undefined },
-  { label: 'Inactivos', value: 'false'   },
+  { label: 'Activos', value: 'true' },
+  { label: 'Todos', value: undefined },
+  { label: 'Inactivos', value: 'false' },
 ];
 
 const TIPO_FILTROS = [
-  { label: 'Todos',            value: undefined  },
-  { label: '⭐ Especial',       value: 'especial' },
-  { label: '📌 Fijo',           value: 'fijo'     },
-  { label: '🔄 Fijo + Especial', value: 'ambos'   },
+  { label: 'Todos', value: undefined },
+  { label: 'Especial', value: 'especial' },
+  { label: 'Fijo', value: 'fijo' },
+  { label: 'Fijo + Especial', value: 'ambos' },
+];
+
+const SORT_OPTIONS = [
+  { label: 'Nombre A-Z', sortBy: 'nombre', sortDir: 'asc' },
+  { label: 'Nombre Z-A', sortBy: 'nombre', sortDir: 'desc' },
+  { label: 'Ultimo uso reciente', sortBy: 'ultimo_uso', sortDir: 'desc' },
+  { label: 'Ultimo uso antiguo', sortBy: 'ultimo_uso', sortDir: 'asc' },
+  { label: 'Estado activos primero', sortBy: 'activo', sortDir: 'desc' },
+  { label: 'Estado inactivos primero', sortBy: 'activo', sortDir: 'asc' },
 ];
 
 const TIPO_CONFIG = {
-  especial: { label: '⭐ Especial',      cls: 'bg-amber-50 text-amber-700'   },
-  fijo:     { label: '📌 Fijo',          cls: 'bg-blue-50 text-blue-700'     },
-  ambos:    { label: '🔄 Fijo + Especial', cls: 'bg-purple-50 text-purple-700' },
+  especial: { label: 'Especial', cls: 'bg-amber-50 text-amber-700' },
+  fijo: { label: 'Fijo', cls: 'bg-blue-50 text-blue-700' },
+  ambos: { label: 'Fijo + Especial', cls: 'bg-purple-50 text-purple-700' },
 };
-
-function TipoBadge({ tipo }) {
-  const cfg = TIPO_CONFIG[tipo] ?? { label: tipo ?? '—', cls: 'bg-gray-100 text-gray-500' };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.cls}`}>
-      {cfg.label}
-    </span>
-  );
-}
 
 const DIAS_LABEL = {
-  lunes: 'Lun', martes: 'Mar', miercoles: 'Mié',
-  jueves: 'Jue', viernes: 'Vie', sabado: 'Sáb', domingo: 'Dom',
+  lunes: 'Lun',
+  martes: 'Mar',
+  miercoles: 'Mie',
+  jueves: 'Jue',
+  viernes: 'Vie',
+  sabado: 'Sab',
+  domingo: 'Dom',
 };
 
-function soloFecha(str) {
-  return str ? str.split('T')[0] : '—';
-}
-
-function formatCorto(isoStr) {
-  const f = soloFecha(isoStr);
-  const [, m, d] = f.split('-');
-  return `${d}/${m}`;
-}
-
-function diasDesde(fechaIso) {
-  const diff = Date.now() - new Date(soloFecha(fechaIso)).getTime();
-  return Math.floor(diff / 86400000);
-}
-
-// ── Colores por tag ──────────────────────────────────────────────
 const TAG_COLORS = [
   'bg-blue-50 text-blue-700',
   'bg-purple-50 text-purple-700',
@@ -70,28 +59,159 @@ const TAG_COLORS = [
   'bg-green-50 text-green-700',
 ];
 
+function leerEnteroPositivo(value, fallback = 1) {
+  const numero = Number(value);
+  return Number.isInteger(numero) && numero > 0 ? numero : fallback;
+}
+
+function leerActivo(value) {
+  if (value === 'todos') return undefined;
+  if (value === 'false') return 'false';
+  return 'true';
+}
+
+function escribirActivo(value) {
+  return value === undefined ? 'todos' : value;
+}
+
+function hayFiltroActivo({ search, activoFilter, tipoFilter, tagFilter }) {
+  return Boolean(search || activoFilter !== 'true' || tipoFilter || tagFilter);
+}
+
+function textoEstadoPlatos({ search, activoFilter, tipoFilter, tagFilter, totalBase }) {
+  if (totalBase === 0) {
+    return {
+      titulo: 'No hay platos cargados aun.',
+      detalle: 'Cuando crees el primer plato, va a aparecer en este listado.',
+    };
+  }
+  if (search) {
+    return {
+      titulo: `No se encontraron platos para "${search}".`,
+      detalle: 'Probá con otro nombre o limpiá los filtros activos.',
+    };
+  }
+  if (activoFilter === 'false') {
+    return {
+      titulo: 'No hay platos inactivos.',
+      detalle: 'Todos los platos visibles estan activos.',
+    };
+  }
+  if (activoFilter === 'true' && (tipoFilter || tagFilter)) {
+    return {
+      titulo: 'No hay platos activos para este filtro.',
+      detalle: 'Probá cambiando el tipo o la categoria.',
+    };
+  }
+  if (tipoFilter) {
+    return {
+      titulo: 'No hay platos para este tipo.',
+      detalle: 'Probá con otro tipo de uso.',
+    };
+  }
+  if (tagFilter) {
+    return {
+      titulo: `No hay platos en "${tagFilter}".`,
+      detalle: 'Probá con otra categoria.',
+    };
+  }
+  return {
+    titulo: 'No se encontraron platos para este filtro.',
+    detalle: 'Probá limpiando los filtros activos.',
+  };
+}
+
+function EmptyState({ titulo, detalle, mostrarLimpiar, onLimpiar }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+      <div>
+        <p className="text-sm font-medium text-gray-600">{titulo}</p>
+        {detalle ? <p className="mt-1 text-xs text-gray-400">{detalle}</p> : null}
+      </div>
+      {mostrarLimpiar ? (
+        <button type="button" onClick={onLimpiar} className="btn-secondary text-xs">
+          Limpiar filtros
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SortSelect({ value, onChange }) {
+  return (
+    <label className="flex flex-col gap-1 md:hidden">
+      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ordenar por</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+      >
+        {SORT_OPTIONS.map((option) => (
+          <option key={`${option.sortBy}:${option.sortDir}`} value={`${option.sortBy}:${option.sortDir}`}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function soloFecha(str) {
+  return str ? str.split('T')[0] : null;
+}
+
+function formatCorto(isoStr) {
+  const fecha = soloFecha(isoStr);
+  if (!fecha) return '-';
+  const [, mes, dia] = fecha.split('-');
+  return `${dia}/${mes}`;
+}
+
+function diasDesde(fechaIso) {
+  const fecha = soloFecha(fechaIso);
+  if (!fecha) return null;
+  const diff = Date.now() - new Date(fecha).getTime();
+  return Math.floor(diff / 86400000);
+}
+
 function tagColor(tag) {
   let h = 0;
-  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) % TAG_COLORS.length;
+  for (let i = 0; i < tag.length; i += 1) h = (h * 31 + tag.charCodeAt(i)) % TAG_COLORS.length;
   return TAG_COLORS[h];
 }
 
-function TagBadge({ tag, onClick, active }) {
+function TipoBadge({ tipo }) {
+  const cfg = TIPO_CONFIG[tipo] ?? { label: tipo ?? '-', cls: 'bg-gray-100 text-gray-500' };
   return (
-    <span
-      onClick={onClick}
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-all
-        ${tagColor(tag)}
-        ${onClick ? 'cursor-pointer' : ''}
-        ${active ? 'ring-2 ring-offset-1 ring-current' : ''}
-      `}
-    >
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function TagBadge({ tag }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(tag)}`}>
       {tag}
     </span>
   );
 }
 
-// ── Modal detalle de plato ───────────────────────────────────────
+function EstadoBadge({ activo, onClick, disabled, femenino = false }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`badge cursor-pointer transition-colors ${
+        activo ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+      }`}
+    >
+      {activo ? `Activo${femenino ? 'a' : ''}` : `Inactivo${femenino ? 'a' : ''}`}
+    </button>
+  );
+}
+
 function DetallePlatoModal({ plato, onClose, onEdit }) {
   const { data, isLoading, isError, error } = useHistorialPlato(plato?.id);
 
@@ -103,105 +223,70 @@ function DetallePlatoModal({ plato, onClose, onEdit }) {
         <ErrorMessage message={error.message} />
       ) : (
         <div className="space-y-4">
-          {/* Info básica */}
-          <div className="space-y-2">
-            {plato?.foto_url && (
-              <img
-                src={plato.foto_url}
-                alt={plato.nombre}
-                className="h-44 w-full rounded-xl object-cover border border-gray-100"
-              />
-            )}
-            {plato?.descripcion && (
-              <p className="text-sm text-gray-600">{plato.descripcion}</p>
-            )}
-            {plato?.descripcion_larga && (
-              <p className="text-sm text-gray-500 whitespace-pre-line">{plato.descripcion_larga}</p>
-            )}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`badge ${plato?.activo ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
-                {plato?.activo ? '● Activo' : '○ Inactivo'}
-              </span>
-              {plato?.calorias ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700">
-                  {plato.calorias} kcal
-                </span>
-              ) : null}
-              {plato?.vegetariano ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                  Vegetariano
-                </span>
-              ) : null}
-              {plato?.tipo && <TipoBadge tipo={plato.tipo} />}
-              {plato?.tiene_guarnicion && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                  🥗 Con guarnición
-                </span>
-              )}
-              {(plato?.alergenos ?? []).map((alergeno) => (
-                <span key={alergeno} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
-                  {alergeno}
-                </span>
-              ))}
-              {(plato?.tags ?? []).map((t) => (
-                <TagBadge key={t} tag={t} />
-              ))}
+          <div className="h-44 w-full overflow-hidden rounded-xl border border-gray-100">
+            <PlatoPhoto
+              src={plato?.foto_url}
+              alt={plato?.nombre ?? 'Plato'}
+              plato={plato}
+              size="lg"
+            />
+          </div>
+
+          {plato?.descripcion ? <p className="text-sm text-gray-600">{plato.descripcion}</p> : null}
+          {plato?.descripcion_larga ? <p className="whitespace-pre-line text-sm text-gray-500">{plato.descripcion_larga}</p> : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`badge ${plato?.activo ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
+              {plato?.activo ? 'Activo' : 'Inactivo'}
+            </span>
+            {plato?.calorias ? <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">{plato.calorias} kcal</span> : null}
+            {plato?.vegetariano ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Vegetariano</span> : null}
+            {plato?.tipo ? <TipoBadge tipo={plato.tipo} /> : null}
+            {plato?.tiene_guarnicion ? <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Con guarnicion</span> : null}
+            {(plato?.alergenos ?? []).map((alergeno) => (
+              <span key={alergeno} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">{alergeno}</span>
+            ))}
+            {(plato?.tags ?? []).map((tag) => <TagBadge key={tag} tag={tag} />)}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{data?.historial?.length ?? 0}</p>
+              <p className="mt-0.5 text-xs text-gray-500">Veces usado</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{data?.historial?.[0] ? Math.abs(diasDesde(data.historial[0].fecha_servicio) ?? 0) : '-'}</p>
+              <p className="mt-0.5 text-xs text-gray-500">Dias desde/hasta</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-lg font-bold text-gray-800">{data?.historial?.[0] ? formatCorto(data.historial[0].fecha_servicio) : '-'}</p>
+              <p className="mt-0.5 text-xs text-gray-500">Ultimo uso</p>
             </div>
           </div>
 
-          {/* Stats rápidas */}
-          {(() => {
-            const ultimo = data?.historial?.[0];
-            const d = ultimo ? diasDesde(ultimo.fecha_servicio) : null;
-            const esFuturo = ultimo && new Date(soloFecha(ultimo.fecha_servicio)) > new Date();
-            return (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-gray-800">{data?.historial?.length ?? 0}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Veces usado</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-gray-800">{ultimo ? (esFuturo ? -d : d) : '—'}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{esFuturo ? 'Días hasta uso' : 'Días desde último'}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-bold text-gray-800">{ultimo ? formatCorto(ultimo.fecha_servicio) : '—'}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{esFuturo ? 'Próximo uso' : 'Último uso'}</p>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Historial */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Historial completo
-            </p>
-            <div className="max-h-60 overflow-y-auto divide-y divide-gray-50 rounded-lg border border-gray-100">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Historial completo</p>
+            <div className="max-h-60 divide-y divide-gray-50 overflow-y-auto rounded-lg border border-gray-100">
               {!data?.historial?.length ? (
-                <p className="text-sm text-gray-400 text-center py-6">Nunca usado aún</p>
+                <p className="py-6 text-center text-sm text-gray-400">Nunca usado aun</p>
               ) : (
                 data.historial.map((h) => (
                   <div key={h.id} className="flex items-center justify-between px-3 py-2.5">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{formatCorto(h.fecha_servicio)}</p>
                       <p className="text-xs text-gray-400">
-                        {h.menu_semanal_nombre ?? 'Semana eliminada'} · {DIAS_LABEL[h.dia]} · op. {h.opcion}
+                        {h.menu_semanal_nombre ?? 'Semana eliminada'} - {DIAS_LABEL[h.dia] ?? h.dia} - op. {h.opcion}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">{(() => { const d = diasDesde(h.fecha_servicio); return d < 0 ? `en ${-d}d` : d === 0 ? 'hoy' : `hace ${d}d`; })()}</span>
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          {/* Acciones */}
-          <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-            <button onClick={onClose} className="btn-secondary text-xs">Cerrar</button>
-            <button onClick={() => { onClose(); onEdit(plato); }} className="btn-primary text-xs">
-              ✏️ Editar plato
-            </button>
+          <div className="flex justify-end gap-2 border-t border-gray-100 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs">Cerrar</button>
+            <button type="button" onClick={() => { onClose(); onEdit(plato); }} className="btn-primary text-xs">Editar plato</button>
           </div>
         </div>
       )}
@@ -210,271 +295,196 @@ function DetallePlatoModal({ plato, onClose, onEdit }) {
 }
 
 function PlatoMobileCard({ plato, loading, onOpen, onToggleActivo, onEdit, onDelete }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   const ultimoUso = plato.ultimo_uso ? (() => {
     const d = diasDesde(plato.ultimo_uso.fecha_servicio);
     const esFuturo = new Date(soloFecha(plato.ultimo_uso.fecha_servicio)) > new Date();
-    return { texto: `${formatCorto(plato.ultimo_uso.fecha_servicio)} · ${esFuturo ? 'próximo uso' : d === 0 ? 'hoy' : `hace ${d}d`}`, urgente: !esFuturo && d <= 7 };
-  })() : { texto: 'Nunca usado', urgente: false };
-
-  const tags = plato.tags ?? [];
-  const tagsVisible = tags.slice(0, 3);
-  const tagsExtra = tags.length - 3;
+    return `${formatCorto(plato.ultimo_uso.fecha_servicio)} - ${esFuturo ? 'proximo uso' : d === 0 ? 'hoy' : `hace ${d}d`}`;
+  })() : 'Nunca usado';
 
   return (
-    <div className="px-4 py-3.5 bg-white relative">
-      {/* Fila principal: nombre + menú */}
-      <div className="flex items-start gap-2">
-        <button onClick={onOpen} className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center flex-shrink-0">
-          {plato.foto_url ? (
-            <img src={plato.foto_url} alt={plato.nombre} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-lg">🍽️</span>
-          )}
-        </button>
-        <button onClick={onOpen} className="flex-1 text-left min-w-0">
-          <p className="font-semibold text-gray-900 leading-snug">{plato.nombre}</p>
-          {plato.calorias ? <p className="text-xs text-orange-600 mt-0.5">{plato.calorias} kcal</p> : null}
-        </button>
-
-        {/* Estado badge tappable */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleActivo(plato); }}
-          disabled={loading}
-          className={`flex-shrink-0 badge transition-colors ${plato.activo ? 'bg-brand-50 text-brand-700 active:bg-brand-100' : 'bg-gray-100 text-gray-500 active:bg-gray-200'}`}
-        >
-          {plato.activo ? '● Activo' : '○ Inactivo'}
-        </button>
-
-        {/* Menú ⋮ */}
-        <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <button
-            onClick={() => setMenuOpen(v => !v)}
-            className="p-1.5 -mr-1 text-gray-400 hover:text-gray-600 rounded-lg active:bg-gray-100"
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/>
-            </svg>
-          </button>
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-8 z-20 bg-white rounded-xl shadow-lg border border-gray-100 py-1 min-w-[140px]">
-                <button onClick={() => { setMenuOpen(false); onOpen(plato); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                  👁 Ver historial
-                </button>
-                <button onClick={() => { setMenuOpen(false); onEdit(plato); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                  ✏️ Editar
-                </button>
-                <button onClick={() => { setMenuOpen(false); onToggleActivo(plato); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                  {plato.activo ? '○ Desactivar' : '● Activar'}
-                </button>
-                <div className="border-t border-gray-100 my-1" />
-                <button onClick={() => { setMenuOpen(false); onDelete(plato); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2">
-                  🗑 Eliminar
-                </button>
-              </div>
-            </>
-          )}
+    <div className="bg-white px-4 py-3.5">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Ver detalle de ${plato.nombre}`}
+        className="flex w-full items-start gap-3 text-left"
+      >
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100">
+          <PlatoPhoto src={plato.foto_url} alt={plato.nombre} plato={plato} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-snug text-gray-900">{plato.nombre}</p>
+          <p className="mt-0.5 text-xs text-gray-400">{ultimoUso}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {plato.tipo ? <TipoBadge tipo={plato.tipo} /> : null}
+            {plato.tiene_guarnicion ? <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Guarnicion</span> : null}
+            {plato.calorias ? <span className="text-xs text-orange-600">{plato.calorias} kcal</span> : null}
+          </div>
+        </div>
+      </button>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <EstadoBadge activo={plato.activo} disabled={loading} onClick={() => onToggleActivo(plato)} />
+        <div className="flex items-center gap-1">
+          <IconActionButton label={`Ver detalle de ${plato.nombre}`} tooltip="Ver detalle" onClick={onOpen}>
+            <EyeIcon />
+          </IconActionButton>
+          <IconActionButton label={`Editar plato ${plato.nombre}`} tooltip="Editar plato" tone="brand" onClick={() => onEdit(plato)}>
+            <PencilIcon />
+          </IconActionButton>
+          <IconActionButton label={`Eliminar plato ${plato.nombre}`} tooltip="Eliminar plato" tone="danger" onClick={() => onDelete(plato)}>
+            <TrashIcon />
+          </IconActionButton>
         </div>
       </div>
-
-      {/* Fila secundaria: tipo + guarnición + último uso */}
-      <button onClick={onOpen} className="w-full text-left mt-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {plato.tipo && <TipoBadge tipo={plato.tipo} />}
-          {plato.tiene_guarnicion && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">🥗 Guarnición</span>
-          )}
-          <span className={`text-xs ml-auto ${ultimoUso.urgente ? 'text-amber-500 font-medium' : 'text-gray-400'}`}>
-            {ultimoUso.texto}
-          </span>
-        </div>
-
-        {/* Tags (máx 3 + contador) */}
-        {tagsVisible.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {tagsVisible.map(t => <TagBadge key={t} tag={t} />)}
-            {tagsExtra > 0 && (
-              <span className="px-2 py-0.5 text-xs text-gray-400 bg-gray-100 rounded-full">+{tagsExtra}</span>
-            )}
-          </div>
-        )}
-      </button>
     </div>
   );
 }
 
-// ── Página principal ─────────────────────────────────────────────
 export default function Platos() {
-  const [tab, setTab]                       = useState('platos');
-  const [search, setSearch]                 = useState('');
-  const [activoFilter, setActivo]           = useState('true');
-  const [tagFilter, setTagFilter]           = useState(null);
-  const [tipoFilter, setTipoFilter]         = useState(undefined);
-  const [page, setPage]                     = useState(1);
-  const [sortBy, setSortBy]                 = useState('nombre');
-  const [sortDir, setSortDir]               = useState('asc');
-  const [detalle, setDetalle]               = useState(null);
-  const [modalCreate, setModalCreate]       = useState(false);
-  const [editando, setEditando]             = useState(null);
-  const [confirmDelete, setConfirmDelete]   = useState(null);
-  const [modalGuarnicion, setModalGuarnicion] = useState(false);
-  // Guarniciones state
-  const [gSortBy, setGSortBy]               = useState('nombre');
-  const [gSortDir, setGSortDir]             = useState('asc');
-  const [gTipoFilter, setGTipoFilter]       = useState(undefined);
-  const [gEditando, setGEditando]           = useState(null);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('search') ?? '';
+  const activoFilter = leerActivo(searchParams.get('activo'));
+  const tagFilter = searchParams.get('tag') || null;
+  const tipoFilter = searchParams.get('tipo') || undefined;
+  const page = leerEnteroPositivo(searchParams.get('page'), 1);
+  const sortBy = searchParams.get('sort_by') || 'nombre';
+  const sortDir = searchParams.get('sort_dir') === 'desc' ? 'desc' : 'asc';
 
-  const handleSort = (col) => {
-    if (sortBy === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); }
-    else { setSortBy(col); setSortDir('asc'); }
-    setPage(1);
-  };
-  const handleGSort = (col) => {
-    if (gSortBy === col) setGSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setGSortBy(col); setGSortDir('asc'); }
-  };
+  const [detalle, setDetalle] = useState(null);
+  const [modalCreate, setModalCreate] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const { data: guarnicionesData = [], isLoading: gLoading } = useGuarniciones();
-  const gUpdate = useUpdateGuarnicion();
-  const gDelete = useDeleteGuarnicion();
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'guarniciones') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    navigate({ pathname: '/guarniciones', search: next.toString() ? `?${next.toString()}` : '' }, { replace: true });
+  }, [navigate, searchParams]);
 
-  const query    = usePlatos({ page, limit: 15, activo: activoFilter, search: search || undefined, tag: tagFilter || undefined, tipo: tipoFilter, sort_by: sortBy, sort_dir: sortDir });
+  const updateParams = useCallback((changes) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') next.delete(key);
+      else next.set(key, String(value));
+    });
+    next.delete('tab');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const query = usePlatos({
+    page,
+    limit: 15,
+    activo: activoFilter,
+    search: search || undefined,
+    tag: tagFilter || undefined,
+    tipo: tipoFilter,
+    sort_by: sortBy,
+    sort_dir: sortDir,
+  });
+  const baseQuery = usePlatos({ page: 1, limit: 1, activo: undefined });
   const tagsQuery = usePlatoTags();
-
   const createMutation = useCreatePlato();
   const updateMutation = useUpdatePlato();
   const deleteMutation = useDeletePlato();
 
-  const platos     = query.data?.platos ?? [];
+  const platos = query.data?.platos ?? [];
   const pagination = query.data?.pagination;
-  const allTags    = tagsQuery.data ?? [];
+  const totalBase = baseQuery.data?.pagination?.total ?? 0;
+  const allTags = tagsQuery.data ?? [];
+  const filtrosActivos = hayFiltroActivo({ search, activoFilter, tipoFilter, tagFilter });
+  const emptyState = textoEstadoPlatos({ search, activoFilter, tipoFilter, tagFilter, totalBase });
 
-  const handleCreate = useCallback(async (data) => {
+  const handleSort = (col) => {
+    updateParams({
+      sort_by: col,
+      sort_dir: sortBy === col && sortDir === 'asc' ? 'desc' : 'asc',
+      page: null,
+    });
+  };
+  const handleMobileSort = (value) => {
+    const [nextSortBy, nextSortDir] = value.split(':');
+    updateParams({
+      sort_by: nextSortBy,
+      sort_dir: nextSortDir,
+      page: null,
+    });
+  };
+  const limpiarFiltros = () => setSearchParams(new URLSearchParams(), { replace: true });
+
+  const handleCreate = async (data) => {
     try {
       await createMutation.mutateAsync(data);
       toast.success('Plato creado correctamente');
       setModalCreate(false);
-    } catch (e) { toast.error(e.message); }
-  }, [createMutation]);
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
 
-  const handleUpdate = useCallback(async (data) => {
+  const handleUpdate = async (data) => {
     try {
       await updateMutation.mutateAsync({ id: editando.id, data });
       toast.success('Plato actualizado');
       setEditando(null);
-    } catch (e) { toast.error(e.message); }
-  }, [updateMutation, editando]);
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
 
   const handleToggleActivo = useCallback(async (plato, e) => {
     e?.stopPropagation();
     try {
       await updateMutation.mutateAsync({ id: plato.id, data: { activo: !plato.activo } });
       toast.success(plato.activo ? 'Plato desactivado' : 'Plato activado');
-    } catch (e) { toast.error(e.message); }
+    } catch (e) {
+      toast.error(e.message);
+    }
   }, [updateMutation]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(confirmDelete.id);
       toast.success('Plato eliminado');
       setConfirmDelete(null);
-    } catch (e) { toast.error(e.message); setConfirmDelete(null); }
-  }, [deleteMutation, confirmDelete]);
-
-  const guarnicionesFiltradas = useMemo(() => {
-    let list = guarnicionesData.filter(g =>
-      (!search || g.nombre.toLowerCase().includes(search.toLowerCase())) &&
-      (gTipoFilter === undefined || g.tipo === gTipoFilter)
-    );
-    if (activoFilter === 'true')  list = list.filter(g =>  g.activo);
-    if (activoFilter === 'false') list = list.filter(g => !g.activo);
-    return [...list].sort((a, b) => {
-      let va, vb;
-      if (gSortBy === 'nombre') { va = a.nombre.toLowerCase(); vb = b.nombre.toLowerCase(); }
-      else if (gSortBy === 'tipo') { va = a.tipo ?? 'zzz'; vb = b.tipo ?? 'zzz'; }
-      else { va = a.activo ? 1 : 0; vb = b.activo ? 1 : 0; }
-      if (va < vb) return gSortDir === 'asc' ? -1 : 1;
-      if (va > vb) return gSortDir === 'asc' ?  1 : -1;
-      return 0;
-    });
-  }, [guarnicionesData, search, activoFilter, gTipoFilter, gSortBy, gSortDir]);
-
-  const handleSearchChange = (e) => { setSearch(e.target.value); setPage(1); };
-  const handleFiltroEstado = (val) => { setActivo(val); setPage(1); };
-  const handleFiltroTipo = (val) => { setTipoFilter(val); setPage(1); };
+    } catch (e) {
+      toast.error(e.message);
+      setConfirmDelete(null);
+    }
+  };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 md:space-y-5">
-
-      {/* Header */}
+    <div className="mx-auto max-w-7xl space-y-4 p-4 md:space-y-5 md:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-h-[52px]">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {tab === 'platos' ? 'Platos' : 'Guarniciones'}
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5 h-5">
-            {tab === 'platos' && pagination
-              ? `${pagination.total} plato${pagination.total !== 1 ? 's' : ''}`
-              : tab === 'guarniciones' && guarnicionesData.length > 0
-              ? `${guarnicionesData.length} guarnición${guarnicionesData.length !== 1 ? 'es' : ''}`
-              : ''}
+          <h1 className="text-2xl font-bold text-gray-900">Platos</h1>
+          <p className="mt-0.5 h-5 text-sm text-gray-400">
+            {pagination ? `${pagination.total} plato${pagination.total !== 1 ? 's' : ''}` : ''}
           </p>
         </div>
-        {tab === 'platos'
-          ? <button onClick={() => setModalCreate(true)}    className="btn-primary flex-shrink-0">+ Nuevo plato</button>
-          : <button onClick={() => setModalGuarnicion(true)} className="btn-primary flex-shrink-0">+ Nueva guarnición</button>
-        }
+        <button type="button" onClick={() => setModalCreate(true)} className="btn-primary flex-shrink-0">+ Nuevo plato</button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 self-start w-fit">
-        {[
-          { key: 'platos',       label: '🍽️ Platos'      },
-          { key: 'guarniciones', label: '🥗 Guarniciones' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-              tab === key
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Barra de búsqueda — siempre visible, compartida entre tabs */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Buscar</span>
           <input
             type="text"
             value={search}
-            onChange={handleSearchChange}
-            placeholder={tab === 'platos' ? 'Buscar por nombre o descripción...' : 'Buscar guarnición...'}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg outline-none
-              focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+            onChange={(e) => updateParams({ search: e.target.value, page: null })}
+            placeholder="Buscar por nombre o descripcion..."
+            className="w-full rounded-lg border border-gray-300 py-2 pl-16 pr-4 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
           />
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+        <div className="flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
           {ESTADO_FILTROS.map((f) => (
             <button
               key={String(f.value)}
-              onClick={() => handleFiltroEstado(f.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                activoFilter === f.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+              type="button"
+              onClick={() => updateParams({ activo: escribirActivo(f.value), page: null })}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                activoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {f.label}
@@ -483,266 +493,208 @@ export default function Platos() {
         </div>
       </div>
 
-      {/* Fila de filtros secundarios — scroll horizontal en mobile */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-        {tab === 'platos' ? (<>
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
-            {TIPO_FILTROS.map((f) => (
-              <button key={String(f.value)} onClick={() => handleFiltroTipo(f.value)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${tipoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                {f.label}
-              </button>
-            ))}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
+          {TIPO_FILTROS.map((f) => (
+            <button
+              key={String(f.value)}
+              type="button"
+              onClick={() => updateParams({ tipo: f.value, page: null })}
+              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                tipoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {allTags.length > 0 ? (
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            <select
+              value={tagFilter ?? ''}
+              onChange={(e) => updateParams({ tag: e.target.value || null, page: null })}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-[7px] text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">Todas las categorias</option>
+              {allTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+            </select>
+            {tagFilter ? (
+              <button type="button" onClick={() => updateParams({ tag: null, page: null })} className="flex-shrink-0 text-xs text-gray-400 underline hover:text-gray-600">Limpiar</button>
+            ) : null}
           </div>
-          {allTags.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <select value={tagFilter ?? ''} onChange={(e) => { setTagFilter(e.target.value || null); setPage(1); }}
-                className="text-sm border border-gray-300 rounded-lg px-3 py-[7px] outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white text-gray-700">
-                <option value="">Todas las categorías</option>
-                {allTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-              </select>
-              {tagFilter && <button onClick={() => { setTagFilter(null); setPage(1); }} className="text-xs text-gray-400 hover:text-gray-600 underline flex-shrink-0">Limpiar</button>}
-            </div>
-          )}
-        </>) : (
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
-            {[
-              { label: 'Todas',        value: undefined    },
-              { label: '🔥 Calientes', value: 'caliente'  },
-              { label: '❄️ Frías',     value: 'fria'       },
-            ].map(f => (
-              <button key={String(f.value)} onClick={() => setGTipoFilter(f.value)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${gTipoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
+        ) : null}
       </div>
 
-      {/* ── CARD ÚNICO — nunca se desmonta ── */}
+      <SortSelect value={`${sortBy}:${sortDir}`} onChange={handleMobileSort} />
+
       <div className="card overflow-hidden">
-        {(tab === 'platos' ? query.isLoading : gLoading) ? (
+        {query.isLoading ? (
           <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-        ) : tab === 'platos' && query.isError ? (
+        ) : query.isError ? (
           <ErrorMessage message={query.error.message} onRetry={query.refetch} />
         ) : (
           <>
-          {/* Mobile cards (solo platos) */}
-          {tab === 'platos' && (
-            <div className="md:hidden divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 md:hidden">
               {platos.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-4xl mb-3">🍽️</p>
-                  <p className="text-gray-500 text-sm">{search || tagFilter ? 'Sin resultados.' : 'No hay platos cargados aún.'}</p>
-                </div>
+                <EmptyState
+                  titulo={emptyState.titulo}
+                  detalle={emptyState.detalle}
+                  mostrarLimpiar={filtrosActivos}
+                  onLimpiar={limpiarFiltros}
+                />
               ) : platos.map((plato) => (
-                <PlatoMobileCard key={plato.id} plato={plato} loading={updateMutation.isPending}
-                  onOpen={() => setDetalle(plato)} onToggleActivo={handleToggleActivo}
-                  onEdit={setEditando} onDelete={setConfirmDelete} />
+                <PlatoMobileCard
+                  key={plato.id}
+                  plato={plato}
+                  loading={updateMutation.isPending}
+                  onOpen={() => setDetalle(plato)}
+                  onToggleActivo={handleToggleActivo}
+                  onEdit={setEditando}
+                  onDelete={setConfirmDelete}
+                />
               ))}
             </div>
-          )}
 
-          {/* Tabla desktop — siempre el mismo <table>, solo cambia thead/tbody */}
-          <div className="overflow-y-auto max-h-[520px] scrollbar-none">
-          <table className={tab === 'platos' ? 'hidden md:table w-full text-sm' : 'w-full text-sm'}>
-            <thead className="sticky top-0 z-10">
-              <tr className="border-b border-gray-100 bg-gray-50">
-                {tab === 'platos' ? (<>
-                  {[
-                    { col: 'nombre',     label: 'Nombre'     },
-                    { col: null,         label: 'Tipo',       cls: 'hidden md:table-cell' },
-                    { col: null,         label: 'Tags',       cls: 'hidden lg:table-cell' },
-                    { col: 'ultimo_uso', label: 'Último uso', cls: 'hidden sm:table-cell' },
-                    { col: 'activo',     label: 'Estado'     },
-                  ].map(({ col, label, cls = '' }) => (
-                    <th key={label} className={`text-left px-5 py-3 ${cls}`}>
-                      {col
-                        ? <button onClick={() => handleSort(col)} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800 transition-colors whitespace-nowrap">
-                            {label} <span className="text-gray-300">{sortBy === col ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</span>
+            <div className="max-h-[520px] overflow-y-auto">
+              <table className="hidden w-full text-sm md:table">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    {[
+                      { col: 'nombre', label: 'Nombre' },
+                      { col: null, label: 'Tipo', cls: 'hidden md:table-cell' },
+                      { col: null, label: 'Tags', cls: 'hidden lg:table-cell' },
+                      { col: 'ultimo_uso', label: 'Ultimo uso', cls: 'hidden sm:table-cell' },
+                      { col: 'activo', label: 'Estado' },
+                    ].map(({ col, label, cls = '' }) => (
+                      <th key={label} className={`px-5 py-3 text-left ${cls}`}>
+                        {col ? (
+                          <button type="button" onClick={() => handleSort(col)} className="flex items-center gap-1 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-gray-500 transition-colors hover:text-gray-800">
+                            {label} <span className="text-gray-300">{sortBy === col ? (sortDir === 'asc' ? 'up' : 'down') : '-'}</span>
                           </button>
-                        : <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{label}</span>
-                      }
-                    </th>
-                  ))}
-                  <th className="px-5 py-3" />
-                </>) : (<>
-                  {[
-                    { col: 'nombre', label: 'Nombre' },
-                    { col: 'tipo',   label: 'Tipo'   },
-                    { col: 'activo', label: 'Estado' },
-                  ].map(({ col, label }) => (
-                    <th key={label} className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-gray-800" onClick={() => handleGSort(col)}>
-                      {label} <span className="text-gray-300">{gSortBy === col ? (gSortDir === 'asc' ? '↑' : '↓') : '↕'}</span>
-                    </th>
-                  ))}
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Acciones</th>
-                </>)}
-              </tr>
-            </thead>
-            <tbody key={tab} className="divide-y divide-gray-50 rows-fade">
-              {tab === 'platos' ? (
-                platos.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-16 text-gray-500 text-sm">
-                    {search || tagFilter ? 'Sin resultados para este filtro.' : 'No hay platos cargados aún.'}
-                  </td></tr>
-                ) : platos.map((plato) => (
-                  <tr key={plato.id} onClick={() => setDetalle(plato)} className="group hover:bg-gray-50/80 transition-colors cursor-pointer">
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center flex-shrink-0">
-                          {plato.foto_url ? (
-                            <img src={plato.foto_url} alt={plato.nombre} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-base">🍽️</span>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900">{plato.nombre}</p>
-                          {plato.descripcion && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{plato.descripcion}</p>}
-                          <div className="flex items-center gap-1.5 mt-1">
-                            {plato.calorias ? <span className="text-xs text-orange-600">{plato.calorias} kcal</span> : null}
-                            {plato.vegetariano ? <span className="text-xs text-emerald-600">Vegetariano</span> : null}
+                        ) : (
+                          <span className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+                        )}
+                      </th>
+                    ))}
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {platos.length === 0 ? (
+                    <tr>
+                      <td colSpan={6}>
+                        <EmptyState
+                          titulo={emptyState.titulo}
+                          detalle={emptyState.detalle}
+                          mostrarLimpiar={filtrosActivos}
+                          onLimpiar={limpiarFiltros}
+                        />
+                      </td>
+                    </tr>
+                  ) : platos.map((plato) => (
+                    <tr key={plato.id} onClick={() => setDetalle(plato)} className="group cursor-pointer transition-colors hover:bg-gray-50/80">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100">
+                            <PlatoPhoto src={plato.foto_url} alt={plato.nombre} plato={plato} />
+                          </div>
+                          <div className="min-w-0">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setDetalle(plato); }}
+                              aria-label={`Ver detalle de ${plato.nombre}`}
+                              className="rounded text-left font-medium text-gray-900 transition-colors hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
+                            >
+                              {plato.nombre}
+                            </button>
+                            {plato.descripcion ? <p className="mt-0.5 line-clamp-1 text-xs text-gray-400">{plato.descripcion}</p> : null}
+                            <div className="mt-1 flex items-center gap-1.5">
+                              {plato.calorias ? <span className="text-xs text-orange-600">{plato.calorias} kcal</span> : <span className="text-xs text-gray-400">Sin kcal</span>}
+                              {plato.vegetariano ? <span className="text-xs text-emerald-600">Vegetariano</span> : null}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 hidden md:table-cell">
-                      <div className="flex flex-col gap-1.5">
-                        <TipoBadge tipo={plato.tipo} />
-                        {plato.tiene_guarnicion && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 w-fit">🥗 Guarnición</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {(plato.tags ?? []).length === 0 ? <span className="text-gray-300 text-xs">—</span> : plato.tags.map((t) => <TagBadge key={t} tag={t} />)}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 hidden sm:table-cell">
-                      {plato.ultimo_uso ? (() => {
-                        const d = diasDesde(plato.ultimo_uso.fecha_servicio);
-                        const esFuturo = new Date(soloFecha(plato.ultimo_uso.fecha_servicio)) > new Date();
-                        return <div><p className="text-gray-700">{formatCorto(plato.ultimo_uso.fecha_servicio)}</p><p className="text-xs text-gray-400">{esFuturo ? 'próximo uso' : d === 0 ? 'hoy' : `hace ${d}d`}</p></div>;
-                      })() : <span className="text-gray-300 text-xs">Nunca usado</span>}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <button onClick={(e) => handleToggleActivo(plato, e)} disabled={updateMutation.isPending}
-                        className={`badge cursor-pointer transition-colors ${plato.activo ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                        {plato.activo ? '● Activo' : '○ Inactivo'}
-                      </button>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-gray-300 text-xs mr-1 group-hover:text-gray-400 transition-colors">Ver →</span>
-                        <button onClick={() => setEditando(plato)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Editar">✏️</button>
-                        <button onClick={() => setConfirmDelete(plato)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                guarnicionesFiltradas.length === 0 ? (
-                  <tr><td colSpan={4} className="text-center py-16 text-gray-500 text-sm">Sin resultados para este filtro.</td></tr>
-                ) : guarnicionesFiltradas.map((g) => {
-                  const tipoCfg = g.tipo === 'caliente' ? { label: '🔥 Caliente', cls: 'bg-orange-50 text-orange-700' }
-                                : g.tipo === 'fria'     ? { label: '❄️ Fría',     cls: 'bg-blue-50 text-blue-700'    }
-                                : null;
-                  return (
-                    <tr key={g.id} className="group hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3.5">
-                        {gEditando?.id === g.id ? (
-                          <form onSubmit={async (e) => { e.preventDefault(); try { await gUpdate.mutateAsync({ id: g.id, data: { nombre: gEditando.nombre, tipo: gEditando.tipo ?? null } }); setGEditando(null); toast.success('Guarnición actualizada'); } catch(err) { toast.error(err?.message || 'Error'); }}} className="flex gap-2 items-center">
-                            <input autoFocus value={gEditando.nombre} onChange={e => setGEditando(ed => ({ ...ed, nombre: e.target.value }))}
-                              className="border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-brand-500 w-48" />
-                            <select value={gEditando.tipo ?? ''} onChange={e => setGEditando(ed => ({ ...ed, tipo: e.target.value || null }))}
-                              className="border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-500 bg-white">
-                              <option value="">Sin tipo</option>
-                              <option value="caliente">🔥 Caliente</option>
-                              <option value="fria">❄️ Fría</option>
-                            </select>
-                            <button type="submit" className="text-brand-700 text-xs font-semibold">Guardar</button>
-                            <button type="button" onClick={() => setGEditando(null)} className="text-gray-400 text-xs">Cancelar</button>
-                          </form>
-                        ) : <span className="font-medium text-gray-900">{g.nombre}</span>}
+                      </td>
+                      <td className="hidden px-5 py-3.5 md:table-cell">
+                        <div className="flex flex-col gap-1.5">
+                          <TipoBadge tipo={plato.tipo} />
+                          {plato.tiene_guarnicion ? <span className="w-fit rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Guarnicion</span> : null}
+                        </div>
+                      </td>
+                      <td className="hidden px-5 py-3.5 lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {(plato.tags ?? []).length === 0 ? <span className="text-xs text-gray-300">-</span> : plato.tags.map((tag) => <TagBadge key={tag} tag={tag} />)}
+                        </div>
+                      </td>
+                      <td className="hidden px-5 py-3.5 sm:table-cell">
+                        {plato.ultimo_uso ? (
+                          <div>
+                            <p className="text-gray-700">{formatCorto(plato.ultimo_uso.fecha_servicio)}</p>
+                            <p className="text-xs text-gray-400">{diasDesde(plato.ultimo_uso.fecha_servicio) === 0 ? 'hoy' : `hace ${diasDesde(plato.ultimo_uso.fecha_servicio)}d`}</p>
+                          </div>
+                        ) : <span className="text-xs text-gray-300">Nunca usado</span>}
                       </td>
                       <td className="px-5 py-3.5">
-                        {tipoCfg ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${tipoCfg.cls}`}>{tipoCfg.label}</span>
-                                 : <span className="text-gray-300 text-xs">—</span>}
+                        <EstadoBadge activo={plato.activo} disabled={updateMutation.isPending} onClick={(e) => handleToggleActivo(plato, e)} />
                       </td>
                       <td className="px-5 py-3.5">
-                        <button onClick={() => gUpdate.mutate({ id: g.id, data: { activo: !g.activo } })}
-                          className={`badge cursor-pointer transition-colors ${g.activo ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                          {g.activo ? '● Activa' : '○ Inactiva'}
-                        </button>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => setGEditando({ id: g.id, nombre: g.nombre, tipo: g.tipo })} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Editar">✏️</button>
-                          <button onClick={async () => {
-                            if (!await confirmar({ titulo: `¿Eliminar "${g.nombre}"?`, texto: 'Esta acción no se puede deshacer.', botonConfirmar: 'Sí, eliminar' })) return;
-                            try { await gDelete.mutateAsync(g.id); toast.success('Guarnición eliminada'); } catch(err) { toast.error(err?.message || 'Error'); }
-                          }} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">🗑️</button>
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          <IconActionButton label={`Ver detalle de ${plato.nombre}`} tooltip="Ver detalle" onClick={() => setDetalle(plato)}>
+                            <EyeIcon />
+                          </IconActionButton>
+                          <IconActionButton label={`Editar plato ${plato.nombre}`} tooltip="Editar plato" tone="brand" onClick={() => setEditando(plato)}>
+                            <PencilIcon />
+                          </IconActionButton>
+                          <IconActionButton label={`Eliminar plato ${plato.nombre}`} tooltip="Eliminar plato" tone="danger" onClick={() => setConfirmDelete(plato)}>
+                            <TrashIcon />
+                          </IconActionButton>
                         </div>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
 
-      {/* Paginación — solo platos */}
-      {tab === 'platos' && pagination && pagination.totalPages > 1 && (
+      {pagination && pagination.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm">
-          <p className="text-gray-400">Página {pagination.page} de {pagination.totalPages}</p>
+          <p className="text-gray-400">Pagina {pagination.page} de {pagination.totalPages}</p>
           <div className="flex gap-2">
-            <button onClick={() => setPage((p) => p - 1)} disabled={page <= 1} className="btn-secondary text-xs disabled:opacity-40">← Anterior</button>
-            <button onClick={() => setPage((p) => p + 1)} disabled={page >= pagination.totalPages} className="btn-secondary text-xs disabled:opacity-40">Siguiente →</button>
+            <button type="button" onClick={() => updateParams({ page: page - 1 > 1 ? page - 1 : null })} disabled={page <= 1} className="btn-secondary text-xs disabled:opacity-40">Anterior</button>
+            <button type="button" onClick={() => updateParams({ page: page + 1 })} disabled={page >= pagination.totalPages} className="btn-secondary text-xs disabled:opacity-40">Siguiente</button>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Modal detalle */}
-      <DetallePlatoModal plato={detalle} onClose={() => setDetalle(null)} onEdit={(p) => setEditando(p)} />
+      <DetallePlatoModal plato={detalle} onClose={() => setDetalle(null)} onEdit={setEditando} />
 
-      {/* Modal crear plato */}
       <Modal open={modalCreate} onClose={() => setModalCreate(false)} title="Nuevo plato">
         <PlatoForm onSubmit={handleCreate} onCancel={() => setModalCreate(false)} loading={createMutation.isPending} />
       </Modal>
 
-      {/* Modal editar plato */}
       <Modal open={!!editando} onClose={() => setEditando(null)} title="Editar plato">
         <PlatoForm initial={editando} onSubmit={handleUpdate} onCancel={() => setEditando(null)} loading={updateMutation.isPending} />
       </Modal>
 
-      {/* Modal eliminar plato */}
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Eliminar plato">
-        <p className="text-sm text-gray-600 mb-1">¿Seguro que querés eliminar <strong>{confirmDelete?.nombre}</strong>?</p>
-        <p className="text-xs text-gray-400 mb-5">Esta acción no se puede deshacer. Si el plato está asignado a un menú semanal activo, no se podrá eliminar.</p>
+        <p className="mb-1 text-sm text-gray-600">Seguro que queres eliminar <strong>{confirmDelete?.nombre}</strong>?</p>
+        <p className="mb-5 text-xs text-gray-400">Esta accion no se puede deshacer. Si el plato esta asignado a un menu semanal activo, no se podra eliminar.</p>
         <div className="flex justify-end gap-2">
-          <button onClick={() => setConfirmDelete(null)} className="btn-secondary">Cancelar</button>
+          <button type="button" onClick={() => setConfirmDelete(null)} className="btn-secondary">Cancelar</button>
           <button
+            type="button"
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
           >
             {deleteMutation.isPending ? <Spinner size="sm" /> : null}
             Eliminar
           </button>
         </div>
       </Modal>
-
-      {/* Modal nueva guarnición */}
-      <GuarnicionesPanel
-        modalOpen={modalGuarnicion}
-        onModalClose={() => setModalGuarnicion(false)}
-      />
-
     </div>
   );
 }

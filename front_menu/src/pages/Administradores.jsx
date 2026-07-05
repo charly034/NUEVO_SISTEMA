@@ -121,7 +121,7 @@ export default function Administradores() {
                       {usuario.activo ? 'Activo' : 'Inactivo'}
                     </p>
                   </div>
-                  <p className="text-sm text-gray-500 break-all">{usuario.email}</p>
+                  <p className="text-sm text-gray-500 truncate" title={usuario.email}>{usuario.email}</p>
                   <p>
                     <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
                       usuario.rol === 'superadmin'

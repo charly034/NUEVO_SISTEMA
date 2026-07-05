@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa, reabrirPlazo, cerrarOverride, regenerarCodigo } from './empresas.controller.js';
+import { getEmpresas, getEmpresa, getDependenciasEmpresa, createEmpresa, updateEmpresa, deleteEmpresa, reabrirPlazo, cerrarOverride, regenerarCodigo } from './empresas.controller.js';
 import { requireAdmin, requireSuperAdmin } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 router.use(requireAdmin);
 router.get('/', getEmpresas);
+router.get('/:id/dependencias', getDependenciasEmpresa);
 router.get('/:id', getEmpresa);
 router.post('/', createEmpresa);
 router.patch('/:id', updateEmpresa);

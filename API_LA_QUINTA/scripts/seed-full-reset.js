@@ -6,10 +6,9 @@
  *   ✓ Superadmin + admin operativo
  *   ✓ Todos los platos (fijos, especiales, ambos) y guarniciones
  *   ✓ 22 semanas históricas de menús (desde CSV)
- *   ✓ 3 empresas de prueba + 1 empresa TEST
+ *   ✓ 3 empresas demo
  *   ✓ 5 empleados por empresa (nombres únicos)
  *   ✓ Pedidos realistas en 2 semanas pasadas, semana actual y próxima
- *   ✓ Usuario TEST: test@test.com / password configurada por TEST_USER_PASSWORD
  *
  * Uso: node scripts/seed-full-reset.js
  * ⚠ BORRA TODO. Solo para entornos de desarrollo/testing.
@@ -67,7 +66,6 @@ if (ADMIN_OPERATIVO_EMAIL.trim().toLowerCase() === SUPERADMIN_EMAIL.trim().toLow
   process.exit(1);
 }
 const DEFAULT_DEMO_PASSWORD = requireSeedSecret('DEFAULT_DEMO_PASSWORD');
-const TEST_USER_PASSWORD = requireSeedSecret('TEST_USER_PASSWORD');
 
 // ─── Helpers de fechas ────────────────────────────────────────────────────────
 function getLunes(offsetSemanas = 0) {
@@ -325,19 +323,6 @@ const EMPRESAS = [
       { nombre: 'Sebastián', apellido: 'Díaz',      email: 'sebastian.diaz@ef.test' },
       { nombre: 'Julia',     apellido: 'Herrera',   email: 'julia.herrera@ef.test' },
       { nombre: 'Agustín',   apellido: 'Castro',    email: 'agustin.castro@ef.test' },
-    ],
-  },
-  {
-    nombre: 'TEST',
-    slug: 'test',
-    plan: 'con_postre',
-    modo_pedido: 'semanal',
-    empleados: [
-      { nombre: 'Test',    apellido: 'Usuario',  email: 'test@test.com',         password: TEST_USER_PASSWORD },
-      { nombre: 'María',   apellido: 'Prueba',   email: 'maria.prueba@test.test' },
-      { nombre: 'Roberto', apellido: 'Demo',     email: 'roberto.demo@test.test' },
-      { nombre: 'Laura',   apellido: 'Ejemplo',  email: 'laura.ejemplo@test.test' },
-      { nombre: 'Jorge',   apellido: 'Testing',  email: 'jorge.testing@test.test' },
     ],
   },
 ];
@@ -674,8 +659,7 @@ async function main() {
         const diasConOpciones = Object.entries(porDia);
 
         for (const empleado of empleadosCreados) {
-          const esTest = empleado.email === 'test@test.com';
-          const hacePedido = esTest ? (offset <= 0) : random() < PROB_PEDIDO[key];
+          const hacePedido = random() < PROB_PEDIDO[key];
           if (!hacePedido) continue;
 
           const pedidoRes = await client.query(
@@ -731,15 +715,12 @@ async function main() {
     console.log(`  Historial uso     : ${hT.rows[0].count} entradas`);
     console.log(`  Empresas          : ${eT.rows[0].count}`);
     console.log(`  Empleados         : ${emT.rows[0].count}`);
-    console.log(`  Pedidos           : ${pdT.rows[0].count} (4 semanas × 4 empresas)`);
+    console.log(`  Pedidos           : ${pdT.rows[0].count} (4 semanas × 3 empresas demo)`);
     console.log('─'.repeat(58));
     console.log('  👑 SUPERADMIN');
     console.log(`     ${adminEmail}  /  (env SUPERADMIN_PASSWORD)`);
     console.log('  🛠 ADMIN OPERATIVO');
     console.log(`     ${ADMIN_OPERATIVO_EMAIL}  /  (env DEMO_ADMIN_PASSWORD)`);
-    console.log('─'.repeat(58));
-    console.log('  🧪 USUARIO TEST');
-    console.log('     test@test.com  /  (env TEST_USER_PASSWORD)  (empresa: TEST)');
     console.log('─'.repeat(58));
     console.log('  👥 Otros empleados: nombre.apellido@empresa.test  /  (env DEFAULT_DEMO_PASSWORD)');
     console.log('═'.repeat(58));

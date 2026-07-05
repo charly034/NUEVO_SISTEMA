@@ -6,8 +6,15 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes webhook-highlight {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+  35% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.25); }
+}
 .rows-fade {
   animation: rows-fade 150ms ease-out both;
+}
+.webhook-highlight {
+  animation: webhook-highlight 900ms ease-out 2;
 }
 .scrollbar-none {
   scrollbar-width: none;

@@ -14,12 +14,16 @@ import empleadosRoutes from '../modules/empleados/empleados.routes.js';
 import menuRoutes from '../modules/menu/menu.routes.js';
 import notificacionesRoutes from '../modules/notificaciones/notificaciones.routes.js';
 import sugerenciasEmpleadosRoutes from '../modules/sugerencias-empleados/sugerencias-empleados.routes.js';
+import adminAuditoriaRoutes from '../modules/admin-auditoria/admin-auditoria.routes.js';
+import planesRoutes from '../modules/planes/planes.routes.js';
+import finanzasRoutes from '../modules/finanzas/finanzas.routes.js';
 
 const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/admin/auth', adminAuthRoutes);
+router.use('/admin/auditoria', adminAuditoriaRoutes);
 router.use('/users', usersRoutes);
 router.use('/platos', platosRoutes);
 router.use('/menus-semanales', menusSemanalesRoutes);
@@ -30,7 +34,9 @@ router.use('/menu', menuRoutes);
 router.use('/guarniciones', guarnicionesRoutes);
 router.use('/empresas', empresasRoutes);
 router.use('/empleados', empleadosRoutes);
+router.use('/planes', planesRoutes);
 router.use('/notificaciones', notificacionesRoutes);
 router.use('/mis-sugerencias', sugerenciasEmpleadosRoutes);
+router.use('/finanzas', finanzasRoutes);
 
 export default router;

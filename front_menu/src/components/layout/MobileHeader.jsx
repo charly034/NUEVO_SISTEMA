@@ -3,36 +3,57 @@ import { useLocation } from 'react-router-dom';
 const PAGE_TITLES = {
   '/':             'Inicio',
   '/platos':       'Platos',
-  '/semanas':      'Menú semanal',
+  '/semanas':      'Semanas',
   '/historial':    'Historial',
   '/estadisticas': 'Estadísticas',
-  '/sugeridor':    'Sugeridor',
+  '/sugeridor':    'Generar menú',
   '/pedidos':      'Pedidos',
-  '/recomendaciones-menu': 'Recomendaciones',
+  '/pedidos-hoy':  'Pedidos de hoy',
+  '/clientes':     'Clientes',
+  '/pedidos-pagos': 'Pedidos y pagos',
+  '/recomendaciones-menu': 'Sugerencias de clientes',
   '/empresas':     'Empresas',
   '/guarniciones': 'Guarniciones',
+  '/auditoria':    'Auditoría',
   '/administradores': 'Administradores',
 };
 
-export default function MobileHeader({ onLogout }) {
+function MenuIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+export default function MobileHeader({ onLogout, onOpenMenu }) {
   const location = useLocation();
 
   // Semanas/:id tiene título dinámico — mostrar genérico
   const title = PAGE_TITLES[location.pathname]
     ?? (location.pathname.startsWith('/semanas/') ? 'Detalle de menú' : 'Panel admin');
 
-  // Pedidos tiene su propio header integrado — no duplicar
-  if (location.pathname === '/pedidos') return null;
-
   return (
-    <header className="md:hidden flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100 flex-shrink-0 sticky top-0 z-30">
-      <div className="flex items-center gap-2.5">
-        <span className="text-lg">🌿</span>
-        <h1 className="text-base font-bold text-gray-900">{title}</h1>
+    <header className="print:hidden lg:hidden flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100 flex-shrink-0 sticky top-0 z-30">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600"
+          aria-label="Abrir menu lateral"
+        >
+          <MenuIcon />
+        </button>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold leading-tight text-brand-700">La Quinta</p>
+          <p className="truncate text-[11px] leading-tight text-gray-500">Sistema de menús · {title}</p>
+        </div>
       </div>
       <button
+        type="button"
         onClick={onLogout}
         className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded"
+        aria-label="Cerrar sesion del panel admin"
       >
         Salir
       </button>
