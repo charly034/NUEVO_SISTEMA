@@ -1,50 +1,47 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useMenusSemanales, useCreateMenu, useDeleteMenu, useCambiarEstadoMenu, useDuplicarMenu } from '../hooks/useMenus.js';
 import { usePedidos } from '../hooks/usePedidos.js';
+import SideDrawer from '../components/ui/SideDrawer.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
 
-// ── helpers de fecha ────────────────────────────────────────────────
-const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const DIAS_SEMANA = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
-const DIA_LABEL = { lunes:'Lun', martes:'Mar', miercoles:'Mié', jueves:'Jue', viernes:'Vie', sabado:'Sáb', domingo:'Dom' };
+// ── helpers de fecha ──────────────────────────────────────────────────
+const MESES_LARGO  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MESES_CORTO  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DIAS_SEMANA  = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+const DIAS_HEADER  = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const DIA_LABEL    = { lunes:'Lun', martes:'Mar', miercoles:'Mié', jueves:'Jue', viernes:'Vie', sabado:'Sáb', domingo:'Dom' };
 
-// Extrae YYYY-MM-DD de un string ISO (no toca timezone)
 function soloFecha(str) { return str ? str.split('T')[0] : ''; }
-
-// Convierte un objeto Date a YYYY-MM-DD usando hora LOCAL (evita el desfase UTC)
 function localISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-
-// Suma n días a una fecha ISO YYYY-MM-DD usando aritmética local
 function addDias(iso, n) {
   const [y, m, d] = iso.split('-').map(Number);
   return localISO(new Date(y, m - 1, d + n));
 }
-
 function addSemanas(iso, n) { return addDias(iso, n * 7); }
-
-// Lunes de la semana actual en hora local
 function getLunesActual() {
   const hoy = new Date();
-  const offset = (hoy.getDay() + 6) % 7; // lun=0 mar=1 ... dom=6
+  const offset = (hoy.getDay() + 6) % 7;
   return localISO(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - offset));
 }
-
 function formatCorto(iso) {
   if (!iso) return '—';
   const [, m, d] = soloFecha(iso).split('-');
-  return `${parseInt(d)} ${MESES[parseInt(m) - 1]}`;
+  return `${parseInt(d)} ${MESES_CORTO[parseInt(m) - 1]}`;
 }
-
+function formatLargo(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = soloFecha(iso).split('-');
+  return `${parseInt(d)} ${MESES_LARGO[parseInt(m) - 1]} ${y}`;
+}
 function esSemanaCursada(lunesIso, estado) {
   if (!['cerrado', 'publicado'].includes(estado)) return false;
   return addDias(lunesIso, 6) < localISO(new Date());
 }
-
 function nombreSugerido(lunesIso) {
   const [, lm, ld] = soloFecha(lunesIso).split('-');
   const domingoIso = addDias(lunesIso, 6);
@@ -52,125 +49,349 @@ function nombreSugerido(lunesIso) {
   return `Semana del ${parseInt(ld)}/${parseInt(lm)} al ${parseInt(dd)}/${parseInt(dm)}`;
 }
 
-// ── estado config ────────────────────────────────────────────────────
+// Dado un year/month (0-indexed) retorna array de ISO lunes que cubren ese mes
+function semanasDelMes(year, month) {
+  const primerDia    = new Date(year, month, 1);
+  const offsetLunes  = (primerDia.getDay() + 6) % 7;
+  const primerLunes  = new Date(year, month, 1 - offsetLunes);
+  const ultimoDia    = new Date(year, month + 1, 0);
+  const semanas = [];
+  let cur = primerLunes;
+  while (cur <= ultimoDia) {
+    semanas.push(localISO(cur));
+    cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7);
+  }
+  return semanas;
+}
+
+// ── config de estado ──────────────────────────────────────────────────
 const ESTADO_CFG = {
-  borrador:  { label: 'Borrador',  bg: '#f3f4f6', color: '#374151', border: '#d1d5db' },
-  publicado: { label: 'Publicado', bg: '#dcfce7', color: '#15803d', border: '#86efac' },
-  cerrado:   { label: 'Cerrado',   bg: '#ffedd5', color: '#c2410c', border: '#fdba74' },
-  vacio:     { label: 'Sin menú',  bg: '#fff',    color: '#d1d5db', border: '#f3f4f6' },
+  borrador:  { label: 'Borrador',  accentCls: 'bg-gray-400',   chipCls: 'bg-gray-100 text-gray-600 border-gray-200',   rowTint: '' },
+  publicado: { label: 'Publicado', accentCls: 'bg-green-500',  chipCls: 'bg-green-100 text-green-700 border-green-200',  rowTint: 'bg-green-50/60' },
+  cerrado:   { label: 'Cerrado',   accentCls: 'bg-orange-400', chipCls: 'bg-orange-100 text-orange-700 border-orange-200',rowTint: 'bg-orange-50/40' },
+  vacio:     { label: 'Sin menu',  accentCls: 'bg-gray-200',   chipCls: 'bg-gray-50 text-gray-300 border-gray-100',      rowTint: '' },
 };
 
-// ── Tile de semana ───────────────────────────────────────────────────
-function SemanaTile({ lunesIso, menu, selected, onSelect, esHoy }) {
-  const domingo = addDias(lunesIso, 6);
-  const estado = menu?.estado ?? 'vacio';
-  const cfg = ESTADO_CFG[estado];
-  const diasMap = new Set((menu?.dias ?? []).map(d => d.dia));
-  const sinSet  = new Set((menu?.sin_servicio ?? []).map(d => d.dia));
-  const rangoLabel = `${formatCorto(lunesIso)} a ${formatCorto(domingo)}`;
-  const mostrarEstadisticas = menu && esSemanaCursada(lunesIso, estado);
-  const cardStyle = {
-    flex: 1,
-    minWidth: 0,
-    padding: '10px 6px 8px',
-    borderRadius: 12,
-    border: selected ? '2px solid #16a34a' : `2px solid ${esHoy ? '#fde68a' : '#e5e7eb'}`,
-    background: selected ? '#f0fdf4' : esHoy ? '#fffbeb' : '#fff',
-    boxShadow: selected ? '0 0 0 3px #bbf7d0' : '0 1px 4px rgba(0,0,0,0.06)',
-    textAlign: 'center',
-    transition: 'all 0.15s',
-    position: 'relative',
-  };
+// ── Celda de un dia en el calendario ─────────────────────────────────
+function CeldaDia({ lunesIso, diaIdx, menu, esHoy }) {
+  const fechaDia  = addDias(lunesIso, diaIdx);
+  const diaNum    = parseInt(fechaDia.split('-')[2]);
+  const diaNombre = DIAS_SEMANA[diaIdx];
+  const esFDS     = diaIdx >= 5;
+
+  let platos = [];
+  let esSinServicio = false;
+  if (menu) {
+    const diaData = (menu.dias ?? []).find(x => x.dia === diaNombre);
+    platos = diaData?.platos ?? [];
+    esSinServicio = (menu.sin_servicio ?? []).some(x => x.dia === diaNombre);
+  }
+
+  // Fondo de celda
+  let bgCls = esSinServicio
+    ? 'bg-red-50'
+    : esFDS
+      ? 'bg-gray-50'
+      : 'bg-white';
 
   return (
-    <div style={cardStyle}>
-      <button
-        type="button"
-        onClick={() => onSelect(lunesIso)}
-        aria-label={`${selected ? 'Semana seleccionada' : 'Seleccionar semana'} del ${rangoLabel}`}
-        title={`Semana del ${rangoLabel}`}
-        style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'center' }}
-      >
-      {esHoy && (
-        <span style={{
-          position: 'absolute', top: 5, right: 6,
-          fontSize: 8, fontWeight: 800, color: '#b45309',
-          background: '#fef3c7', padding: '1px 4px', borderRadius: 4,
-        }}>
-          HOY
+    <div className={`relative flex flex-col px-2 pt-1.5 pb-2 h-[80px] border-l border-gray-200 ${bgCls}`}>
+      {/* Número del día */}
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={`inline-flex items-center justify-center shrink-0 text-[11px] font-bold leading-none
+          ${esHoy
+            ? 'w-5 h-5 rounded-full bg-green-600 text-white'
+            : esFDS ? 'text-gray-300' : 'text-gray-500'
+          }`}>
+          {diaNum}
         </span>
-      )}
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>{formatCorto(lunesIso)}</div>
-      <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 7 }}>— {formatCorto(domingo)}</div>
-
-      {/* puntos L M X J V */}
-      <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 7 }}>
-        {DIAS_SEMANA.map(dia => (
-          <div
-            key={dia}
-            style={{
-              width: 7, height: 7, borderRadius: '50%',
-              background: sinSet.has(dia) ? '#fca5a5' : diasMap.has(dia) ? '#16a34a' : '#e5e7eb',
-            }}
-          />
-        ))}
+        {esSinServicio && (
+          <span className="text-[7px] font-bold uppercase text-red-400 tracking-wide bg-red-100 px-1 py-px rounded">Feriado</span>
+        )}
       </div>
 
-      <span style={{
-        display: 'inline-block', fontSize: 9, fontWeight: 700,
-        padding: '2px 6px', borderRadius: 20,
-        background: cfg.bg, color: cfg.color,
-        textTransform: 'uppercase', letterSpacing: '0.04em',
-        border: `1px solid ${cfg.border}`,
-      }}>
-        {cfg.label}
-      </span>
-      </button>
-      {mostrarEstadisticas && (
-        <Link
-          to={`/estadisticas?desde=${lunesIso}&hasta=${domingo}`}
-          style={{ display: 'inline-block', marginTop: 6, fontSize: 10, fontWeight: 700, color: '#15803d', textDecoration: 'none' }}
-        >
-          Ver estadísticas
-        </Link>
+      {/* Contenido */}
+      {!esSinServicio && platos.length > 0 ? (
+        <div className="flex flex-col gap-0.5 overflow-hidden">
+          {platos.slice(0, 2).map((p, i) => (
+            <div key={i} className="flex items-start gap-0.5 min-w-0">
+              {p.opcion && (
+                <span className="shrink-0 text-[8px] font-black text-green-600 leading-tight mt-px">{p.opcion[0]}</span>
+              )}
+              <span className="text-[9px] leading-tight text-gray-600 truncate">{p.plato_nombre}</span>
+            </div>
+          ))}
+          {platos.length > 2 && (
+            <span className="text-[8px] text-gray-300 leading-none">+{platos.length - 2} más</span>
+          )}
+        </div>
+      ) : null}
+
+      {/* Dot indicador abajo si tiene platos */}
+      {!esSinServicio && platos.length > 0 && (
+        <div className="absolute bottom-1.5 right-1.5 w-1 h-1 rounded-full bg-green-400 opacity-70" />
       )}
     </div>
   );
 }
 
-// ── Modal publicar ───────────────────────────────────────────────────
+// ── Fila de semana en el calendario ──────────────────────────────────
+function FilaSemana({ lunesIso, menu, isActiva, onClick, hoyIso, lunesActual }) {
+  const estado = menu?.estado ?? 'vacio';
+  const cfg    = ESTADO_CFG[estado];
+  const esSemanaActual = lunesIso === lunesActual;
+
+  return (
+    <div
+      className={`grid cursor-pointer select-none group transition-all duration-150
+        ${isActiva ? 'ring-2 ring-inset ring-green-400' : 'hover:brightness-[0.97]'}
+        ${cfg.rowTint}`}
+      style={{ gridTemplateColumns: '80px repeat(7, minmax(0,1fr))' }}
+      onClick={onClick}
+    >
+      {/* Columna semana */}
+      <div className={`relative flex flex-col justify-between px-3 py-2 h-[80px] border-r border-gray-200 bg-white`}>
+        {/* Acento de estado */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-r ${cfg.accentCls}`} />
+
+        <div className="pl-1">
+          <div className="text-[10px] font-bold text-gray-700 leading-tight">
+            {formatCorto(lunesIso)}
+          </div>
+          <div className="text-[9px] text-gray-400 leading-tight">
+            {formatCorto(addDias(lunesIso, 6))}
+          </div>
+        </div>
+
+        <div className="pl-1 flex flex-col gap-0.5">
+          {esSemanaActual && (
+            <span className="text-[7px] font-black uppercase text-amber-700 bg-amber-100 px-1 py-px rounded-sm leading-tight w-fit">
+              Hoy
+            </span>
+          )}
+          <span className={`inline-flex text-[7px] font-bold px-1 py-px rounded border uppercase tracking-wide w-fit ${cfg.chipCls}`}>
+            {cfg.label}
+          </span>
+        </div>
+      </div>
+
+      {/* 7 dias */}
+      {DIAS_SEMANA.map((_, i) => (
+        <CeldaDia
+          key={i}
+          lunesIso={lunesIso}
+          diaIdx={i}
+          menu={menu}
+          esHoy={addDias(lunesIso, i) === hoyIso}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Grilla detallada en SideDrawer ────────────────────────────────────
+function GrillaDias({ menu }) {
+  const { dias = [], sin_servicio = [] } = menu;
+  const diasMap = Object.fromEntries(dias.map(d => [d.dia, d]));
+  const sinSet  = new Set(sin_servicio.map(s => s.dia));
+
+  return (
+    <div className="overflow-x-auto -mx-1 px-1">
+      <div className="grid grid-cols-7 gap-1.5 min-w-[420px]">
+        {DIAS_SEMANA.map((dia, i) => {
+          const fechaDia = addDias(soloFecha(menu.fecha_inicio), i);
+          const platos   = diasMap[dia]?.platos ?? [];
+          const esSin    = sinSet.has(dia);
+          const esFS     = i >= 5;
+          const borderCls = esSin
+            ? 'border-red-200 bg-red-50'
+            : platos.length > 0
+              ? 'border-green-200 bg-green-50'
+              : esFS ? 'border-gray-100 bg-gray-50' : 'border-gray-200 bg-white';
+
+          return (
+            <div key={dia} className={`rounded-xl border ${borderCls} p-2 min-h-[76px]`}>
+              <div className="text-[11px] font-bold text-gray-700">{DIA_LABEL[dia]}</div>
+              <div className="text-[10px] text-gray-400 mb-1.5">{formatCorto(fechaDia)}</div>
+              {esSin ? (
+                <div className="text-[10px] font-semibold text-red-500">Sin servicio</div>
+              ) : platos.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  {platos.slice(0, 3).map((p, pi) => (
+                    <div key={pi} className="text-[10px] text-green-700 leading-snug">
+                      {p.opcion && <span className="font-bold">{p.opcion}: </span>}
+                      {p.plato_nombre}
+                    </div>
+                  ))}
+                  {platos.length > 3 && (
+                    <div className="text-[10px] text-gray-400">+{platos.length - 3} más</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[10px] text-gray-300">Sin platos</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Contenido del SideDrawer ──────────────────────────────────────────
+function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, onDelete, estadoMut, estadoPending, totalPedidos, onClose }) {
+  const [creando, setCreando] = useState(false);
+  const [nombre, setNombre]   = useState('');
+  const createMut = useCreateMenu();
+  const domingo   = addDias(lunesIso, 6);
+
+  const handleCreate = async () => {
+    try {
+      const n = nombre.trim() || nombreSugerido(lunesIso);
+      await createMut.mutateAsync({ nombre: n, fecha_inicio: lunesIso, fecha_fin: domingo });
+      toast.success('Menu creado');
+      setCreando(false);
+      setNombre('');
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
+
+  if (!menu) {
+    return (
+      <div className="p-5 flex flex-col items-center justify-center text-center py-12">
+        <p className="text-sm font-semibold text-gray-700 mb-1">{formatCorto(lunesIso)} — {formatCorto(domingo)}</p>
+        <p className="text-sm text-gray-400 mb-6">No hay menu registrado para esta semana.</p>
+        {creando ? (
+          <div className="w-full max-w-xs text-left">
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre del menu</label>
+            <input
+              type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+              placeholder={nombreSugerido(lunesIso)} autoFocus
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
+            />
+            <div className="flex gap-2 justify-center">
+              <button onClick={() => { setCreando(false); setNombre(''); }} className="btn-secondary">Cancelar</button>
+              <button onClick={handleCreate} disabled={createMut.isPending} className="btn-primary flex items-center gap-1.5">
+                {createMut.isPending && <Spinner size="sm" />}
+                Crear menu
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <button onClick={() => setCreando(true)} className="btn-primary">+ Crear menu para esta semana</button>
+            <Link to={`/sugeridor?semana=${lunesIso}`} className="btn-secondary" onClick={onClose}>Generar menu</Link>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const { estado = 'borrador', dias = [], sin_servicio = [] } = menu;
+  const totalPlatos = dias.reduce((acc, d) => acc + (d.platos?.length ?? 0), 0);
+  const fechaLimiteStr = menu.fecha_limite_pedidos
+    ? new Date(menu.fecha_limite_pedidos).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  return (
+    <div className="p-5 space-y-5">
+      <div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
+          <span>{formatLargo(menu.fecha_inicio)} &mdash; {formatLargo(addDias(soloFecha(menu.fecha_inicio), 6))}</span>
+          <span>&middot;</span>
+          <span>{totalPlatos} plato{totalPlatos !== 1 ? 's' : ''}</span>
+          {sin_servicio.length > 0 && (<><span>&middot;</span><span>{sin_servicio.length} feriado{sin_servicio.length !== 1 ? 's' : ''}</span></>)}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {fechaLimiteStr && estado === 'publicado' && (
+            <p className="text-xs text-amber-600 font-medium">Pedidos hasta: {fechaLimiteStr}</p>
+          )}
+          {totalPedidos > 0 && (
+            <p className="text-xs text-blue-600 font-semibold">{totalPedidos} pedido{totalPedidos !== 1 ? 's' : ''} registrado{totalPedidos !== 1 ? 's' : ''}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link to={`/semanas/${menu.id}`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
+          onClick={onClose}>
+          Editar grilla &rarr;
+        </Link>
+        {estado === 'borrador' && (
+          <button onClick={onPublicar} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors">
+            Publicar
+          </button>
+        )}
+        {estado === 'cerrado' && (
+          <button onClick={onReabrir} disabled={estadoPending} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
+            Reabrir pedidos
+          </button>
+        )}
+        <button onClick={onDuplicar} className="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          Duplicar
+        </button>
+        {esSemanaCursada(lunesIso, estado) && (
+          <Link to={`/estadisticas?desde=${lunesIso}&hasta=${addDias(lunesIso, 6)}`}
+            className="rounded-lg border border-blue-100 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+            onClick={onClose}>
+            Ver estadisticas
+          </Link>
+        )}
+        {(estado === 'publicado' || estado === 'borrador') && (<div className="w-full border-t border-gray-100 my-1" />)}
+        {estado === 'publicado' && (
+          <>
+            <button onClick={() => estadoMut({ estado: 'cerrado' })} disabled={estadoPending}
+              className="rounded-lg border border-orange-200 bg-orange-50 px-3.5 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 transition-colors disabled:opacity-50">
+              Cerrar pedidos
+            </button>
+            <button onClick={() => estadoMut({ estado: 'borrador' })} disabled={estadoPending}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50">
+              Volver a borrador
+            </button>
+          </>
+        )}
+        {estado === 'borrador' && (
+          <button onClick={onDelete} className="rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors">
+            Eliminar
+          </button>
+        )}
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Detalle diario</p>
+        <GrillaDias menu={menu} />
+      </div>
+    </div>
+  );
+}
+
+// ── Modales ───────────────────────────────────────────────────────────
 function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
   const [fecha, setFecha] = useState('');
   const [hora, setHora]   = useState('10:00');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <p style={{ fontSize: 14, color: '#374151' }}>
-        Publicar <strong>{menu?.nombre}</strong> lo hará visible para que los empleados puedan hacer su pedido.
-      </p>
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">Publicar <strong>{menu?.nombre}</strong> lo hara visible para que los empleados puedan hacer su pedido.</p>
       <div>
-        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-          Fecha límite de pedidos <span style={{ fontWeight: 400, color: '#9ca3af' }}>(opcional)</span>
+        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+          Fecha limite de pedidos <span className="font-normal text-gray-400">(opcional)</span>
         </label>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="flex gap-2">
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-            style={{ flex: 1, padding: '8px 10px', fontSize: 13, border: '1.5px solid #d1d5db', borderRadius: 8, outline: 'none' }} />
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
           <input type="time" value={hora} onChange={e => setHora(e.target.value)}
-            style={{ width: 100, padding: '8px 10px', fontSize: 13, border: '1.5px solid #d1d5db', borderRadius: 8, outline: 'none' }} />
+            className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
         </div>
-        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>
-          Sin fecha → los pedidos quedan abiertos hasta que cerrés manualmente.
-        </p>
+        <p className="text-xs text-gray-400 mt-1.5">Sin fecha: los pedidos quedan abiertos hasta cerrarlos manualmente.</p>
       </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+      <div className="flex gap-2 justify-end pt-1">
         <button onClick={onCancel} className="btn-secondary">Cancelar</button>
-        <button
-          onClick={() => onConfirm(fecha ? `${fecha}T${hora}:00` : null)}
-          disabled={loading}
-          className="btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-        >
+        <button onClick={() => onConfirm(fecha ? `${fecha}T${hora}:00` : null)} disabled={loading} className="btn-primary flex items-center gap-1.5">
           {loading && <Spinner size="sm" />}
-          Publicar menú
+          Publicar menu
         </button>
       </div>
     </div>
@@ -178,52 +399,30 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
 }
 
 function ModalDuplicarForm({ menu, onConfirm, onCancel, loading }) {
-  const lunesBase = soloFecha(menu?.fecha_inicio || getLunesActual());
+  const lunesBase    = soloFecha(menu?.fecha_inicio || getLunesActual());
   const lunesInicial = addSemanas(lunesBase, 1);
   const [fechaInicio, setFechaInicio] = useState(lunesInicial);
-  const [nombre, setNombre] = useState(nombreSugerido(lunesInicial));
+  const [nombre, setNombre]           = useState(nombreSugerido(lunesInicial));
   const fechaFin = addDias(fechaInicio, 6);
-
-  const cambiarFecha = (value) => {
-    setFechaInicio(value);
-    setNombre(nombreSugerido(value));
-  };
+  const cambiarFecha = v => { setFechaInicio(v); setNombre(nombreSugerido(v)); };
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        onConfirm({ nombre, fecha_inicio: fechaInicio, fecha_fin: fechaFin });
-      }}
-      className="space-y-4"
-    >
-      <p className="text-sm text-gray-600">
-        Se copiarán platos, opciones y días sin servicio de <strong>{menu?.nombre}</strong> a una nueva semana en borrador.
-      </p>
+    <form onSubmit={e => { e.preventDefault(); onConfirm({ nombre, fecha_inicio: fechaInicio, fecha_fin: fechaFin }); }} className="space-y-4">
+      <p className="text-sm text-gray-600">Se copiaran platos, opciones y dias sin servicio de <strong>{menu?.nombre}</strong> a una nueva semana en borrador.</p>
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-gray-700">Lunes de destino</span>
-        <input
-          type="date"
-          value={fechaInicio}
-          onChange={(event) => cambiarFecha(event.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
-          required
-        />
+        <span className="block text-sm font-semibold text-gray-700 mb-1">Lunes de destino</span>
+        <input type="date" value={fechaInicio} onChange={e => cambiarFecha(e.target.value)}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none" required />
       </label>
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-gray-700">Nombre</span>
-        <input
-          type="text"
-          value={nombre}
-          onChange={(event) => setNombre(event.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
-          required
-        />
+        <span className="block text-sm font-semibold text-gray-700 mb-1">Nombre</span>
+        <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none" required />
       </label>
-      <p className="text-xs text-gray-400">Rango resultante: {formatCorto(fechaInicio)} — {formatCorto(fechaFin)}</p>
+      <p className="text-xs text-gray-400">Rango: {formatCorto(fechaInicio)} &mdash; {formatCorto(fechaFin)}</p>
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="btn-secondary">Cancelar</button>
-        <button type="submit" disabled={loading} className="btn-primary">
+        <button type="submit" disabled={loading} className="btn-primary flex items-center gap-1.5">
           {loading && <Spinner size="sm" />}
           Duplicar semana
         </button>
@@ -232,287 +431,82 @@ function ModalDuplicarForm({ menu, onConfirm, onCancel, loading }) {
   );
 }
 
-// ── Panel de detalle ─────────────────────────────────────────────────
-function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, onReabrir, onDelete, onDuplicar, totalPedidos }) {
-  const domingo = addDias(lunesIso, 6);
-
-  if (!menu) {
-    return <PanelVacio lunesIso={lunesIso} domingoIso={domingo} />;
-  }
-
-  const { estado = 'borrador', dias = [], sin_servicio = [] } = menu;
-  const cfg = ESTADO_CFG[estado];
-  const diasMap  = Object.fromEntries(dias.map(d => [d.dia, d]));
-  const sinSet   = new Set(sin_servicio.map(s => s.dia));
-  const totalPlatos = dias.reduce((acc, d) => acc + (d.platos?.length ?? 0), 0);
-  const fechaLimiteStr = menu.fecha_limite_pedidos
-    ? new Date(menu.fecha_limite_pedidos).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    : null;
-
-  return (
-    <div>
-      {/* Cabecera */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>{menu.nombre}</h2>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-              background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
-              textTransform: 'uppercase', letterSpacing: '0.05em',
-            }}>
-              {cfg.label}
-            </span>
-          </div>
-          <p style={{ fontSize: 12, color: '#6b7280' }}>
-            {formatCorto(menu.fecha_inicio)} — {formatCorto(addDias(soloFecha(menu.fecha_inicio), 6))}
-            {' · '}{totalPlatos} plato{totalPlatos !== 1 ? 's' : ''}
-            {sin_servicio.length > 0 && ` · ${sin_servicio.length} feriado${sin_servicio.length > 1 ? 's' : ''}`}
-          </p>
-          {fechaLimiteStr && estado === 'publicado' && (
-            <p style={{ fontSize: 12, color: '#d97706', marginTop: 2 }}>⏰ Pedidos hasta: {fechaLimiteStr}</p>
-          )}
-          {totalPedidos > 0 && (
-            <p style={{ fontSize: 12, color: '#2563eb', marginTop: 2, fontWeight: 600 }}>
-              {totalPedidos} pedido{totalPedidos !== 1 ? 's' : ''} registrado{totalPedidos !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-
-        {/* Acciones — primarias primero, destructivas separadas */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Siempre visible: editar */}
-          <Link
-            to={`/semanas/${menu.id}`}
-            style={{
-              fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 8,
-              background: '#16a34a', color: '#fff', textDecoration: 'none',
-            }}
-          >
-            Editar grilla →
-          </Link>
-
-          {/* Publicar solo en borrador */}
-          {estado === 'borrador' && (
-            <button onClick={onPublicar} style={btnStyle('#f0fdf4', '#15803d', '1.5px solid #86efac')}>
-              Publicar
-            </button>
-          )}
-
-          {/* Reabrir solo en cerrado */}
-          {estado === 'cerrado' && (
-            <button onClick={onReabrir} disabled={estadoPending} style={btnStyle('#f0fdf4', '#15803d', '1.5px solid #86efac')}>
-              Reabrir pedidos
-            </button>
-          )}
-
-          {/* Duplicar — siempre secundario */}
-          <button type="button" onClick={onDuplicar} style={btnStyle('#f3f4f6', '#374151', '1.5px solid #e5e7eb')}>
-            Duplicar
-          </button>
-
-          {/* Separator + destructivas — solo cuando hay algo destructivo */}
-          {(estado === 'publicado' || estado === 'borrador') && (
-            <div style={{ width: 1, height: 24, background: '#e5e7eb', margin: '0 4px' }} />
-          )}
-
-          {estado === 'publicado' && (
-            <>
-              <button
-                onClick={() => estadoMut({ estado: 'cerrado' })}
-                disabled={estadoPending}
-                style={btnStyle('#fff5f0', '#c2410c', '1.5px solid #fdba74')}
-              >
-                Cerrar pedidos
-              </button>
-              <button
-                onClick={() => estadoMut({ estado: 'borrador' })}
-                disabled={estadoPending}
-                style={btnStyle('#f9fafb', '#6b7280', '1.5px solid #e5e7eb')}
-              >
-                Volver a borrador
-              </button>
-            </>
-          )}
-
-          {estado === 'borrador' && (
-            <button
-              type="button"
-              onClick={onDelete}
-              aria-label={`Eliminar menu ${menu.nombre}`}
-              title="Eliminar menu"
-              style={{ padding: '7px 10px', borderRadius: 8, background: '#fff5f5', border: '1.5px solid #fecaca', cursor: 'pointer', fontSize: 13, color: '#ef4444', fontWeight: 600 }}
-            >
-              Eliminar
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Grid días L-D */}
-      <div style={{ overflowX: 'auto', marginLeft: -4, marginRight: -4, paddingLeft: 4, paddingRight: 4 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(80px, 1fr))', gap: 6, minWidth: 560 }}>
-        {DIAS_SEMANA.map((dia, i) => {
-          const fechaDia = addDias(soloFecha(menu.fecha_inicio), i);
-          const platos   = diasMap[dia]?.platos ?? [];
-          const esSin    = sinSet.has(dia);
-
-          return (
-            <div
-              key={dia}
-              style={{
-                borderRadius: 10,
-                border: `1.5px solid ${esSin ? '#fca5a5' : platos.length > 0 ? '#86efac' : (i >= 5 ? '#f3f4f6' : '#e5e7eb')}`,
-                background: esSin ? '#fff5f5' : platos.length > 0 ? '#f0fdf4' : (i >= 5 ? '#f9fafb' : '#fafafa'),
-                padding: '8px 5px',
-                minHeight: 80,
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 12, color: '#1f2937' }}>{DIA_LABEL[dia].slice(0, 3)}</div>
-              <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 7 }}>{formatCorto(fechaDia)}</div>
-              {esSin ? (
-                <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Sin servicio</div>
-              ) : platos.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {platos.slice(0, 3).map((p, pi) => (
-                    <div key={pi} style={{ fontSize: 10, color: '#15803d', lineHeight: 1.3 }}>
-                      {p.opcion && <span style={{ fontWeight: 700 }}>{p.opcion}: </span>}
-                      {p.plato_nombre}
-                    </div>
-                  ))}
-                  {platos.length > 3 && (
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>+{platos.length - 3} más</div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ fontSize: 10, color: '#d1d5db' }}>Sin platos</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      </div>
-    </div>
-  );
-}
-
-function PanelVacio({ lunesIso, domingoIso }) {
-  const [creando, setCreando] = useState(false);
-  const [nombre, setNombre]   = useState('');
-  const createMut = useCreateMenu();
-
-  const handleCreate = async () => {
-    try {
-      const n = nombre.trim() || nombreSugerido(lunesIso);
-      await createMut.mutateAsync({ nombre: n, fecha_inicio: lunesIso, fecha_fin: domingoIso });
-      toast.success('Menú creado');
-      setCreando(false);
-      setNombre('');
-    } catch (e) {
-      toast.error(e.message);
-    }
-  };
-
-  return (
-    <div style={{ textAlign: 'center', padding: '36px 20px' }}>
-      <div style={{ fontSize: 44, marginBottom: 10 }}>📅</div>
-      <h3 style={{ fontWeight: 700, fontSize: 17, color: '#1f2937', marginBottom: 4 }}>
-        {formatCorto(lunesIso)} — {formatCorto(domingoIso)}
-      </h3>
-      <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 24 }}>
-        No hay menú registrado para esta semana.
-      </p>
-
-      {creando ? (
-        <div style={{ maxWidth: 340, margin: '0 auto', textAlign: 'left' }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-            Nombre del menú
-          </label>
-          <input
-            type="text"
-            value={nombre}
-            onChange={e => setNombre(e.target.value)}
-            placeholder={nombreSugerido(lunesIso)}
-            autoFocus
-            onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            style={{
-              width: '100%', padding: '9px 12px', fontSize: 14, boxSizing: 'border-box',
-              border: '1.5px solid #d1d5db', borderRadius: 8, outline: 'none', marginBottom: 12,
-            }}
-          />
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-            <button onClick={() => { setCreando(false); setNombre(''); }} className="btn-secondary">
-              Cancelar
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={createMut.isPending}
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              {createMut.isPending && <Spinner size="sm" />}
-              Crear menú
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
-          <button onClick={() => setCreando(true)} className="btn-primary">
-            + Crear menú para esta semana
-          </button>
-          <Link
-            to={`/sugeridor?semana=${lunesIso}`}
-            className="btn-secondary"
-          >
-            Generar menú
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function btnStyle(bg, color, border = 'none') {
-  return {
-    fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 8,
-    background: bg, color, border, cursor: 'pointer',
-  };
-}
-
-// ── Componente principal ─────────────────────────────────────────────
+// ── Componente principal ──────────────────────────────────────────────
 export default function Semanas() {
+  const hoyIso      = localISO(new Date());
   const lunesActual = getLunesActual();
-  const [ventana, setVentana] = useState(-2);        // offset de la 1ª tile visible
-  const [selLunes, setSelLunes] = useState(lunesActual);
-  const [modalPublicar, setModalPublicar] = useState(false);
-  const [modalDuplicar, setModalDuplicar] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const hoyDate     = new Date();
+
+  const [navYear,  setNavYear]  = useState(hoyDate.getFullYear());
+  const [navMonth, setNavMonth] = useState(hoyDate.getMonth());
+  const [semanaActiva, setSemanaActiva] = useState(null);
+  const [modalPublicar,  setModalPublicar]  = useState(false);
+  const [modalDuplicar,  setModalDuplicar]  = useState(false);
+  const [confirmDelete,  setConfirmDelete]  = useState(false);
   const [confirmReabrir, setConfirmReabrir] = useState(false);
 
-  const query       = useMenusSemanales({ limit: 100 });
-  const pedidosQuery = usePedidos({ semana_inicio: selLunes, limit: 500 }, { enabled: Boolean(selLunes) });
-  const deleteMut = useDeleteMenu();
-  const duplicarMut = useDuplicarMenu();
-  const estadoMut = useCambiarEstadoMenu();
+  const query         = useMenusSemanales({ limit: 200 });
+  const pedidosQ      = usePedidos({ semana_inicio: semanaActiva, limit: 500 }, { enabled: Boolean(semanaActiva) });
+  const deleteMut     = useDeleteMenu();
+  const duplicarMut   = useDuplicarMenu();
+  const estadoMutHook = useCambiarEstadoMenu();
 
   const menus = query.data?.menus ?? [];
-  const menuByLunes = new Map(menus.map(m => [soloFecha(m.fecha_inicio), m]));
+  const menuByLunes = useMemo(
+    () => new Map(menus.map(m => [soloFecha(m.fecha_inicio), m])),
+    [menus]
+  );
 
-  // 5 tiles visibles
-  const tilesLunes = Array.from({ length: 5 }, (_, i) => addSemanas(lunesActual, ventana + i));
+  // Auto-cierre: semanas publicadas cuya fecha ya pasó se cierran solas
+  const autoCerradoRef = useRef(new Set());
+  useEffect(() => {
+    if (!menus.length) return;
+    const vencidas = menus.filter(m =>
+      m.estado === 'publicado' &&
+      soloFecha(m.fecha_inicio) &&
+      addDias(soloFecha(m.fecha_inicio), 6) < hoyIso &&
+      !autoCerradoRef.current.has(m.id)
+    );
+    if (!vencidas.length) return;
+    vencidas.forEach(m => autoCerradoRef.current.add(m.id));
+    Promise.all(
+      vencidas.map(m => estadoMutHook.mutateAsync({ id: m.id, estado: 'cerrado', extra: {} }))
+    ).then(() => {
+      if (vencidas.length === 1) {
+        toast.success(`Semana del ${formatCorto(soloFecha(vencidas[0].fecha_inicio))} cerrada automáticamente`);
+      } else {
+        toast.success(`${vencidas.length} semanas cerradas automáticamente`);
+      }
+    }).catch(() => {});
+  }, [menus]);
 
-  const menuSel = menuByLunes.get(selLunes) ?? null;
+  const semanasVisibles = useMemo(() => semanasDelMes(navYear, navMonth), [navYear, navMonth]);
+  const menuActivo   = semanaActiva ? (menuByLunes.get(semanaActiva) ?? null) : null;
+  const totalPedidos = pedidosQ.data?.length ?? 0;
+
+  const cerrarDrawer = () => setSemanaActiva(null);
+
+  const irAHoy = () => {
+    setNavYear(hoyDate.getFullYear());
+    setNavMonth(hoyDate.getMonth());
+    setSemanaActiva(lunesActual);
+  };
+
+  const prevMes = () => {
+    if (navMonth === 0) { setNavYear(y => y - 1); setNavMonth(11); }
+    else setNavMonth(m => m - 1);
+  };
+  const nextMes = () => {
+    if (navMonth === 11) { setNavYear(y => y + 1); setNavMonth(0); }
+    else setNavMonth(m => m + 1);
+  };
 
   const handleEstado = async ({ estado, extra = {} }) => {
-    if (!menuSel) return false;
+    if (!menuActivo) return false;
     try {
-      await estadoMut.mutateAsync({ id: menuSel.id, estado, extra });
-      const labels = {
-        publicado: menuSel.estado === 'cerrado' ? 'reabierto' : 'publicado',
-        borrador: 'vuelto a borrador',
-        cerrado: 'cerrado',
-      };
-      toast.success(`Menú ${labels[estado]}`);
+      await estadoMutHook.mutateAsync({ id: menuActivo.id, estado, extra });
+      const labels = { publicado: menuActivo.estado === 'cerrado' ? 'reabierto' : 'publicado', borrador: 'vuelto a borrador', cerrado: 'cerrado' };
+      toast.success(`Menu ${labels[estado]}`);
       setModalPublicar(false);
       return true;
     } catch (e) {
@@ -527,172 +521,140 @@ export default function Semanas() {
   };
 
   const handleDelete = async () => {
-    if (!menuSel) return;
+    if (!menuActivo) return;
     try {
-      await deleteMut.mutateAsync(menuSel.id);
-      toast.success('Menú eliminado');
+      await deleteMut.mutateAsync(menuActivo.id);
+      toast.success('Menu eliminado');
       setConfirmDelete(false);
+      cerrarDrawer();
     } catch (e) {
-      toast.error(e?.message || 'Error al cambiar el estado');
+      toast.error(e?.message || 'Error al eliminar el menu');
     }
   };
 
   const handleDuplicar = async (data) => {
-    if (!menuSel) return;
+    if (!menuActivo) return;
     try {
-      const res = await duplicarMut.mutateAsync({ id: menuSel.id, data });
-      const nuevo = res.data;
+      await duplicarMut.mutateAsync({ id: menuActivo.id, data });
       toast.success('Semana duplicada');
       setModalDuplicar(false);
-      if (nuevo?.fecha_inicio) handleSelectTile(soloFecha(nuevo.fecha_inicio));
     } catch (e) {
       toast.error(e?.message || 'No se pudo duplicar la semana');
     }
   };
 
-  // Cuando se hace click en tile fuera de la ventana, ajustar ventana
-  const handleSelectTile = (lunes) => {
-    setSelLunes(lunes);
-    // Si la semana seleccionada no está en las 5 tiles actuales, centrar ventana
-    const offsetFromActual = Math.round((new Date(lunes) - new Date(lunesActual)) / (7 * 86400000));
-    if (offsetFromActual < ventana || offsetFromActual >= ventana + 5) {
-      setVentana(offsetFromActual - 2);
-    }
-  };
-
-  // Ir a hoy
-  const irAHoy = () => {
-    setVentana(-2);
-    setSelLunes(lunesActual);
-  };
-
   return (
-    <div style={{ padding: '20px 16px 100px', maxWidth: 860, margin: '0 auto' }}>
-      {/* Título */}
-      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 2 }}>Menús semanales</h1>
-          <p style={{ fontSize: 13, color: '#6b7280' }}>
-            {query.isLoading ? 'Cargando...' : `${menus.length} semana${menus.length !== 1 ? 's' : ''} registrada${menus.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={irAHoy}
-          aria-label="Ir a la semana actual"
-          title="Ir a la semana actual"
-          style={{ fontSize: 12, color: '#16a34a', background: 'none', border: '1.5px solid #bbf7d0', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 600 }}
-        >
-          ↩ Esta semana
-        </button>
-      </div>
-
-      {/* ── Navegador de semanas ── */}
-      <div style={{
-        background: '#fff', borderRadius: 16, border: '1.5px solid #e5e7eb',
-        padding: '14px 14px 10px', marginBottom: 12,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
-          {/* Flecha izquierda */}
-          <button
-            type="button"
-            onClick={() => setVentana(v => v - 1)}
-            aria-label="Ver semanas anteriores"
-            title="Semanas anteriores"
-            style={{
-              width: 32, borderRadius: 8, border: '1.5px solid #e5e7eb',
-              background: '#fafafa', cursor: 'pointer', fontSize: 16,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              color: '#374151',
-            }}
-          >
-            ‹
-          </button>
-
-          {/* Tiles */}
-          <div style={{ flex: 1, display: 'flex', gap: 8 }}>
-            {tilesLunes.map(lunes => (
-              <SemanaTile
-                key={lunes}
-                lunesIso={lunes}
-                menu={menuByLunes.get(lunes) ?? null}
-                selected={lunes === selLunes}
-                esHoy={lunes === lunesActual}
-                onSelect={handleSelectTile}
-              />
-            ))}
+    <div className="min-h-full min-w-0 overflow-x-hidden bg-gray-50">
+      {/* Header sticky */}
+      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-4 py-3 md:px-6">
+        <div className="mx-auto max-w-[920px] flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Gestion de menus</p>
+            <h1 className="text-2xl font-bold text-gray-900">Menus semanales</h1>
           </div>
-
-          {/* Flecha derecha */}
-          <button
-            type="button"
-            onClick={() => setVentana(v => v + 1)}
-            aria-label="Ver semanas siguientes"
-            title="Semanas siguientes"
-            style={{
-              width: 32, borderRadius: 8, border: '1.5px solid #e5e7eb',
-              background: '#fafafa', cursor: 'pointer', fontSize: 16,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              color: '#374151',
-            }}
-          >
-            ›
+          <button onClick={irAHoy} className="shrink-0 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors">
+            Hoy
           </button>
-        </div>
-
-        {/* Leyenda */}
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 10 }}>
-          {[
-            { color: '#16a34a', label: 'Con platos' },
-            { color: '#fca5a5', label: 'Sin servicio' },
-            { color: '#e5e7eb', label: 'Vacío' },
-          ].map(({ color, label }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#6b7280' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-              {label}
-            </div>
-          ))}
         </div>
       </div>
 
-      {/* ── Panel de detalle ── */}
-      <div style={{
-        background: '#fff', borderRadius: 16, border: '1.5px solid #e5e7eb',
-        padding: 20, minHeight: 220,
-      }}>
+      <div className="mx-auto max-w-[920px] px-2 py-4 pb-24 md:px-4">
+        {/* Navegacion de mes */}
+        <div className="flex items-center justify-between mb-3 px-1">
+          <button onClick={prevMes} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors font-bold text-lg">
+            &lsaquo;
+          </button>
+          <h2 className="text-base font-bold text-gray-800">
+            {MESES_LARGO[navMonth]} {navYear}
+          </h2>
+          <button onClick={nextMes} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors font-bold text-lg">
+            &rsaquo;
+          </button>
+        </div>
+
         {query.isLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><Spinner size="lg" /></div>
+          <div className="flex justify-center py-16"><Spinner size="lg" /></div>
         ) : (
-          <PanelDetalle
-            lunesIso={selLunes}
-            menu={menuSel}
-            estadoMut={handleEstado}
-            estadoPending={estadoMut.isPending}
-            onPublicar={() => setModalPublicar(true)}
-            onReabrir={() => setConfirmReabrir(true)}
-            onDelete={() => setConfirmDelete(true)}
-            onDuplicar={() => setModalDuplicar(true)}
-            totalPedidos={pedidosQuery.data?.length ?? 0}
-          />
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            {/* Cabecera columnas */}
+            <div className="bg-gray-50 border-b border-gray-200"
+              style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, minmax(0,1fr))' }}>
+              <div className="px-3 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Semana</div>
+              {DIAS_HEADER.map((d, i) => (
+                <div key={i} className={`py-2.5 text-[10px] font-semibold uppercase tracking-wide text-center border-l border-gray-200 ${i >= 5 ? 'text-gray-300' : 'text-gray-500'}`}>
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Filas */}
+            <div className="divide-y divide-gray-200">
+              {semanasVisibles.map(lunes => (
+                <FilaSemana
+                  key={lunes}
+                  lunesIso={lunes}
+                  menu={menuByLunes.get(lunes) ?? null}
+                  isActiva={semanaActiva === lunes}
+                  hoyIso={hoyIso}
+                  lunesActual={lunesActual}
+                  onClick={() => setSemanaActiva(semanaActiva === lunes ? null : lunes)}
+                />
+              ))}
+            </div>
+
+            {/* Leyenda */}
+            <div className="flex flex-wrap gap-3 px-4 py-2 border-t border-gray-100 bg-gray-50">
+              {Object.entries(ESTADO_CFG).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-1">
+                  <span className={`inline-flex text-[8px] font-bold px-1.5 py-px rounded-full border uppercase tracking-wide ${v.chipCls}`}>{v.label}</span>
+                </div>
+              ))}
+              <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                <div className="w-2 h-2 rounded-full bg-red-300" /> Sin servicio
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Modal publicar */}
-      <Modal open={modalPublicar} onClose={() => setModalPublicar(false)} title="Publicar menú">
-        {menuSel && (
+      {/* SideDrawer */}
+      <SideDrawer
+        open={Boolean(semanaActiva)}
+        onClose={cerrarDrawer}
+        title={semanaActiva ? (menuActivo?.nombre ?? nombreSugerido(semanaActiva)) : ''}
+        width="lg"
+      >
+        {semanaActiva && (
+          <DrawerContenido
+            lunesIso={semanaActiva}
+            menu={menuActivo}
+            estadoMut={handleEstado}
+            estadoPending={estadoMutHook.isPending}
+            onPublicar={() => setModalPublicar(true)}
+            onReabrir={() => setConfirmReabrir(true)}
+            onDuplicar={() => setModalDuplicar(true)}
+            onDelete={() => setConfirmDelete(true)}
+            totalPedidos={totalPedidos}
+            onClose={cerrarDrawer}
+          />
+        )}
+      </SideDrawer>
+
+      <Modal open={modalPublicar} onClose={() => setModalPublicar(false)} title="Publicar menu">
+        {menuActivo && (
           <ModalPublicarForm
-            menu={menuSel}
-            onConfirm={(fechaLimite) => handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: fechaLimite } })}
+            menu={menuActivo}
+            onConfirm={fl => handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: fl } })}
             onCancel={() => setModalPublicar(false)}
-            loading={estadoMut.isPending}
+            loading={estadoMutHook.isPending}
           />
         )}
       </Modal>
 
       <Modal open={modalDuplicar} onClose={() => setModalDuplicar(false)} title="Duplicar semana">
-        {menuSel && (
+        {menuActivo && (
           <ModalDuplicarForm
-            menu={menuSel}
+            menu={menuActivo}
             onConfirm={handleDuplicar}
             onCancel={() => setModalDuplicar(false)}
             loading={duplicarMut.isPending}
@@ -700,42 +662,25 @@ export default function Semanas() {
         )}
       </Modal>
 
-      {/* Modal confirmar reabrir */}
       <Modal open={confirmReabrir} onClose={() => setConfirmReabrir(false)} title="Reabrir pedidos">
-        <p style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
-          ¿Reabrir <strong>{menuSel?.nombre}</strong>?
-        </p>
-        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 20 }}>
-          La semana volverá a estar publicada y los empleados podrán cargar o modificar pedidos si todavía están dentro del plazo definido.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <p className="text-sm text-gray-700 mb-2">Reabrir <strong>{menuActivo?.nombre}</strong>?</p>
+        <p className="text-xs text-gray-500 mb-5">La semana volvera a estar publicada y los empleados podran cargar o modificar pedidos.</p>
+        <div className="flex gap-2 justify-end">
           <button onClick={() => setConfirmReabrir(false)} className="btn-secondary">Cancelar</button>
-          <button
-            onClick={handleReabrir}
-            disabled={estadoMut.isPending}
-            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            {estadoMut.isPending && <Spinner size="sm" />}
-            Reabrir pedidos
+          <button onClick={handleReabrir} disabled={estadoMutHook.isPending} className="btn-primary flex items-center gap-1.5">
+            {estadoMutHook.isPending && <Spinner size="sm" />}
+            Reabrir
           </button>
         </div>
       </Modal>
 
-      {/* Modal confirmar eliminar */}
-      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Eliminar menú">
-        <p style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
-          ¿Eliminar <strong>{menuSel?.nombre}</strong>?
-        </p>
-        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 20 }}>
-          Se eliminarán todos los platos y días sin servicio asignados a esta semana.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Eliminar menu">
+        <p className="text-sm text-gray-700 mb-2">Eliminar <strong>{menuActivo?.nombre}</strong>?</p>
+        <p className="text-xs text-gray-500 mb-5">Se eliminaran todos los platos y dias sin servicio asignados a esta semana.</p>
+        <div className="flex gap-2 justify-end">
           <button onClick={() => setConfirmDelete(false)} className="btn-secondary">Cancelar</button>
-          <button
-            onClick={handleDelete}
-            disabled={deleteMut.isPending}
-            style={{ padding: '8px 16px', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
+          <button onClick={handleDelete} disabled={deleteMut.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50">
             {deleteMut.isPending && <Spinner size="sm" />}
             Eliminar
           </button>

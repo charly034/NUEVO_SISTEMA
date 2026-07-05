@@ -486,7 +486,7 @@ function AlertasOperativas({ menuEsta, menuProx, enviosWhatsapp, loading }) {
             <p className="text-sm font-bold">{alerta.titulo}</p>
             <p className="mt-1 text-xs opacity-80">
               {alerta.detalle
-                ? 'Hubo un problema tecnico enviando estos mensajes. Contacta al equipo de soporte tecnico si persiste.'
+                ? 'Hubo un problema técnico enviando estos mensajes. Contactá al equipo de soporte técnico si persiste.'
                 : alerta.texto}
             </p>
             <p className="mt-3 text-xs font-bold underline">{alerta.accion}</p>

@@ -265,12 +265,12 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Descripcion ampliada / receta <span className="text-gray-400 font-normal">(opcional)</span>
+          Descripción ampliada / receta <span className="text-gray-400 font-normal">(opcional)</span>
         </label>
         <textarea
           value={form.descripcion_larga}
           onChange={set('descripcion_larga')}
-          placeholder="Preparacion, ingredientes principales, porcion sugerida..."
+          placeholder="Preparación, ingredientes principales, porción sugerida..."
           rows={3}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none resize-none
             focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
@@ -280,7 +280,7 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Calorias aproximadas
+            Calorías aproximadas
           </label>
           <input
             type="number"

@@ -22,9 +22,9 @@ function formatearFechaCorta(fecha) {
   });
 }
 
-const PLANES = { basico: 'BÃ¡sico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
+const PLANES = { basico: 'Básico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
 const MODOS = { semanal: 'Semanal', diario: 'Diario', ambos: 'Ambos' };
-const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sÃ¡bado', lunes_domingo: 'Lunes a domingo' };
+const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sábado', lunes_domingo: 'Lunes a domingo' };
 
 function etiquetaPlan(plan) {
   if (!plan) return 'Sin plan';
@@ -33,7 +33,7 @@ function etiquetaPlan(plan) {
     plan.incluye_postre ? 'postre' : null,
     plan.incluye_bebida ? 'bebida' : null,
   ].filter(Boolean).join(' + ');
-  return `${plan.nombre} Â· ${rango}${extras ? ` Â· ${extras}` : ''}`;
+  return `${plan.nombre} · ${rango}${extras ? ` · ${extras}` : ''}`;
 }
 
 function generarSlug(value) {
@@ -126,8 +126,7 @@ export default function Empresas() {
 
   const [empresaActiva, setEmpresaActiva] = useState(null);
   const [modalEmpresa, setModalEmpresa] = useState(null); // null | 'nueva' | empresa
-  const [modalPlan, setModalPlan] = useState(null); // null | 'nuevo' | plan
-  const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
+const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
   const [modalEliminar, setModalEliminar] = useState(null);
   const [cuentaCorriente, setCuentaCorriente] = useState(null);
   const empresas = empresasResponse?.data || [];
@@ -340,12 +339,6 @@ export default function Empresas() {
         )}
       </SideDrawer>
 
-      <PlanesPanel
-        planes={planes}
-        onNuevo={() => setModalPlan('nuevo')}
-        onEditar={setModalPlan}
-      />
-
       {/* Modal empresa */}
       {modalEmpresa && (
         <ModalEmpresa
@@ -354,13 +347,6 @@ export default function Empresas() {
           onGuardar={handleGuardarEmpresa}
           onCerrar={() => setModalEmpresa(null)}
           loading={createEmpresa.isPending || updateEmpresa.isPending}
-        />
-      )}
-
-      {modalPlan && (
-        <ModalPlan
-          plan={modalPlan === 'nuevo' ? null : modalPlan}
-          onCerrar={() => setModalPlan(null)}
         />
       )}
 
@@ -770,7 +756,7 @@ function PlanesPanel({ planes, onNuevo, onEditar }) {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-bold text-gray-900">Planes de vianda</h2>
-          <p className="text-sm text-gray-500">Combinaciones de tamaÃ±o, postre y bebida para empresas y cocina.</p>
+          <p className="text-sm text-gray-500">Combinaciones de tamaÁ±o, postre y bebida para empresas y cocina.</p>
         </div>
         <button onClick={onNuevo} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800">
           + Nuevo plan
@@ -926,7 +912,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h2 className="font-bold text-gray-800">Empleados â€” {empresa.nombre}</h2>
+        <h2 className="font-bold text-gray-800">Empleados — {empresa.nombre}</h2>
         <div className="flex gap-2">
           <button onClick={() => setModalImportar(true)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
             Importar CSV
@@ -942,11 +928,11 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
           <div key={emp.id} className="flex flex-col gap-3 py-2 border-b border-gray-50 last:border-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="font-medium text-sm">{emp.nombre} {emp.apellido}</p>
-              <p className="text-xs text-gray-400">{emp.email} Â· {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
+              <p className="text-xs text-gray-400">{emp.email} · {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
               {(emp.telefono || emp.fecha_nacimiento) && (
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {emp.telefono || 'Sin telÃ©fono'}
-                  {emp.fecha_nacimiento ? ` Â· Nac. ${formatearFechaCorta(emp.fecha_nacimiento)}` : ''}
+                  {emp.telefono || 'Sin teléfono'}
+                  {emp.fecha_nacimiento ? ` · Nac. ${formatearFechaCorta(emp.fecha_nacimiento)}` : ''}
                 </p>
               )}
             </div>
@@ -972,10 +958,10 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
                   try {
                     const data = await generarReset.mutateAsync(emp.id);
                     setModalReset(data);
-                  } catch (e) { toast.error(e?.message || 'Error generando cÃ³digo'); }
+                  } catch (e) { toast.error(e?.message || 'Error generando código'); }
                 }}
-                aria-label={`Generar cÃ³digo de recuperaciÃ³n de contraseÃ±a para ${emp.nombre} ${emp.apellido}`}
-                title="Generar cÃ³digo de recuperaciÃ³n de contraseÃ±a"
+                aria-label={`Generar código de recuperación de contraseña para ${emp.nombre} ${emp.apellido}`}
+                title="Generar código de recuperación de contraseña"
                 className={iconButtonClass}
               >
                 <LlaveIcon />
@@ -1008,7 +994,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
             </div>
           </div>
         ))}
-        {empleados.length === 0 && <p className="text-gray-400 text-sm">Sin empleados aÃºn.</p>}
+        {empleados.length === 0 && <p className="text-gray-400 text-sm">Sin empleados aún.</p>}
       </div>
 
       {modalEmpleado && (
@@ -1023,21 +1009,21 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
         <ModalImportarEmpleados empresa={empresa} onCerrar={() => setModalImportar(false)} />
       )}
 
-      {/* Modal cÃ³digo de recuperaciÃ³n */}
+      {/* Modal código de recuperación */}
       {modalReset && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <div className="text-4xl mb-3">ðŸ”‘</div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">CÃ³digo de recuperaciÃ³n</h3>
+            <div className="text-4xl mb-3">ðŸ"‘</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Código de recuperación</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Para <strong>{modalReset.empleado}</strong>. CompartÃ­selo por WhatsApp o mensaje. Expira el <strong>{modalReset.expira}</strong>.
+              Para <strong>{modalReset.empleado}</strong>. Compartíselo por WhatsApp o mensaje. Expira el <strong>{modalReset.expira}</strong>.
             </p>
             <div className="bg-amber-50 border-2 border-amber-300 rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
               <span className="font-mono font-bold text-2xl tracking-widest text-amber-800 flex-1 text-center">
                 {modalReset.codigo}
               </span>
               <button
-                onClick={() => { navigator.clipboard.writeText(modalReset.codigo); toast.success('CÃ³digo copiado'); }}
+                onClick={() => { navigator.clipboard.writeText(modalReset.codigo); toast.success('Código copiado'); }}
                 className="text-amber-500 hover:text-amber-700 flex-shrink-0"
                 title="Copiar"
               >
@@ -1045,7 +1031,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
               </button>
             </div>
             <p className="text-xs text-gray-400 mb-5">
-              El empleado debe ir a "Â¿Olvidaste tu contraseÃ±a?" en la app e ingresar este cÃ³digo.
+              El empleado debe ir a "¿Olvidaste tu contraseña?" en la app e ingresar este código.
             </p>
             <button
               onClick={() => setModalReset(null)}
@@ -1130,20 +1116,20 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
   const enviar = async (event) => {
     event.preventDefault();
     if (filas.length === 0) {
-      toast.warning('PegÃ¡ un CSV con encabezados y al menos una fila');
+      toast.warning('Pegá un CSV con encabezados y al menos una fila');
       return;
     }
     try {
       const data = await importar.mutateAsync({ empresa_id: empresa.id, empleados: filas });
       setResultado(data);
-      toast.success(`ImportaciÃ³n procesada: ${data.creados?.length || 0} creados`);
+      toast.success(`Importación procesada: ${data.creados?.length || 0} creados`);
     } catch (e) {
       toast.error(e?.message || 'No se pudo importar el CSV');
     }
   };
 
   return (
-    <Modal onCerrar={onCerrar} titulo={`Importar empleados â€” ${empresa.nombre}`}>
+    <Modal onCerrar={onCerrar} titulo={`Importar empleados — ${empresa.nombre}`}>
       <form onSubmit={enviar} className="space-y-4">
         <p className="text-sm text-gray-500">
           Encabezados aceptados: nombre, apellido, email, telefono, fecha_nacimiento, password y rol.
@@ -1160,20 +1146,20 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
           <div className="mt-2 space-y-1">
             {filas.slice(0, 5).map((fila, index) => (
               <p key={`${fila.email}-${index}`} className="truncate text-xs text-gray-600">
-                {index + 1}. {fila.apellido}, {fila.nombre} Â· {fila.email || 'sin email'}
+                {index + 1}. {fila.apellido}, {fila.nombre} · {fila.email || 'sin email'}
               </p>
             ))}
-            {filas.length > 5 && <p className="text-xs text-gray-400">+{filas.length - 5} filas mÃ¡s</p>}
+            {filas.length > 5 && <p className="text-xs text-gray-400">+{filas.length - 5} filas más</p>}
           </div>
         </div>
         {resultado && (
           <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-sm text-green-800">
             <p className="font-semibold">
-              {resultado.creados?.length || 0} creados Â· {resultado.omitidos?.length || 0} omitidos Â· {resultado.errores?.length || 0} errores
+              {resultado.creados?.length || 0} creados · {resultado.omitidos?.length || 0} omitidos · {resultado.errores?.length || 0} errores
             </p>
             {(resultado.errores || []).slice(0, 4).map((error) => (
               <p key={`${error.fila}-${error.email}`} className="mt-1 text-xs text-red-600">
-                Fila {error.fila}: {error.email || 'sin email'} Â· {error.error}
+                Fila {error.fila}: {error.email || 'sin email'} · {error.error}
               </p>
             ))}
           </div>
@@ -1190,7 +1176,7 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
 }
 
 const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
-const DIAS_LABEL = { lunes: 'Lunes', martes: 'Martes', miercoles: 'MiÃ©rcoles', jueves: 'Jueves', viernes: 'Viernes' };
+const DIAS_LABEL = { lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes' };
 
 function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
   const esNueva = !empresa;
@@ -1236,14 +1222,14 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
     const nuevosErrores = {};
     const email = form.email.trim();
 
-    if (!form.nombre.trim()) nuevosErrores.nombre = 'IngresÃ¡ el nombre de la empresa.';
+    if (!form.nombre.trim()) nuevosErrores.nombre = 'Ingresá el nombre de la empresa.';
     if (!form.slug.trim()) {
-      nuevosErrores.slug = 'IngresÃ¡ el slug.';
+      nuevosErrores.slug = 'Ingresá el slug.';
     } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug.trim())) {
-      nuevosErrores.slug = 'UsÃ¡ solo letras, nÃºmeros y guiones.';
+      nuevosErrores.slug = 'Usá solo letras, números y guiones.';
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      nuevosErrores.email = 'IngresÃ¡ un email vÃ¡lido.';
+      nuevosErrores.email = 'Ingresá un email válido.';
     }
 
     setErrores(nuevosErrores);
@@ -1262,7 +1248,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
       telefono: form.telefono.trim(),
     };
     if (!data.plan_id) delete data.plan_id;
-    // Si no pusieron hora, limpiar los lÃ­mites
+    // Si no pusieron hora, limpiar los límites
     if (!data.limite_hora) {
       data.limite_hora = null;
       data.limite_dia_semana = null;
@@ -1300,7 +1286,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
           />
           {errores.nombre && <p id="empresa-nombre-error" className="mt-1 text-xs text-red-600">{errores.nombre}</p>}
         </Campo>
-        <Campo label="Slug (identificador Ãºnico, sin espacios)">
+        <Campo label="Slug (identificador único, sin espacios)">
           <input
             className={input}
             value={form.slug}
@@ -1325,17 +1311,17 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
             {Object.entries(MODOS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Campo>
-        <Campo label="DÃ­as laborales">
+        <Campo label="Días laborales">
           <select className={input} value={form.dias_laborales} onChange={e => set('dias_laborales', e.target.value)}>
             {Object.entries(DIAS_LAB).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Campo>
 
-        {/* â”€â”€ ConfiguraciÃ³n de lÃ­mite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Configuración de límite ─────────────────────────── */}
         <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">LÃ­mite de pedidos</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Límite de pedidos</p>
 
-          <Campo label="Hora de corte (dejar vacÃ­o = sin lÃ­mite)">
+          <Campo label="Hora de corte (dejar vacío = sin límite)">
             <input
               className={input}
               type="time"
@@ -1346,27 +1332,27 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
           </Campo>
 
           {tieneHora && (modo === 'semanal' || modo === 'ambos') && (
-            <Campo label="DÃ­a lÃ­mite (para pedido semanal)">
+            <Campo label="Día límite (para pedido semanal)">
               <select className={input} value={form.limite_dia_semana} onChange={e => set('limite_dia_semana', e.target.value)}>
                 {DIAS_SEMANA.map(d => <option key={d} value={d}>{DIAS_LABEL[d]}</option>)}
               </select>
               <p className="text-xs text-gray-400 mt-1">
-                Los empleados deben pedir antes del {DIAS_LABEL[form.limite_dia_semana] || 'â€”'} a las {form.limite_hora}hs.
+                Los empleados deben pedir antes del {DIAS_LABEL[form.limite_dia_semana] || '""'} a las {form.limite_hora}hs.
               </p>
             </Campo>
           )}
 
           {tieneHora && (modo === 'diario' || modo === 'ambos') && (
-            <Campo label="AnticipaciÃ³n requerida (para pedido diario)">
+            <Campo label="Anticipación requerida (para pedido diario)">
               <select className={input} value={form.limite_anticipacion_dias} onChange={e => set('limite_anticipacion_dias', parseInt(e.target.value))}>
-                <option value={0}>Mismo dÃ­a hasta las {form.limite_hora}hs</option>
-                <option value={1}>DÃ­a anterior hasta las {form.limite_hora}hs</option>
+                <option value={0}>Mismo día hasta las {form.limite_hora}hs</option>
+                <option value={1}>Día anterior hasta las {form.limite_hora}hs</option>
               </select>
             </Campo>
           )}
 
           {!tieneHora && (
-            <p className="text-xs text-gray-400">Sin lÃ­mite: los empleados pueden pedir hasta que cerrÃ©s el menÃº manualmente.</p>
+            <p className="text-xs text-gray-400">Sin límite: los empleados pueden pedir hasta que cerrés el menú manualmente.</p>
           )}
         </div>
 
@@ -1383,7 +1369,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
           />
           {errores.email && <p id="empresa-email-error" className="mt-1 text-xs text-red-600">{errores.email}</p>}
         </Campo>
-        <Campo label="TelÃ©fono de contacto (opcional)">
+        <Campo label="Teléfono de contacto (opcional)">
           <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" autoComplete="off" />
         </Campo>
 
@@ -1429,14 +1415,14 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
     const nuevosErrores = {};
     const email = form.email.trim();
 
-    if (!form.nombre.trim()) nuevosErrores.nombre = 'IngresÃ¡ el nombre.';
-    if (!form.apellido.trim()) nuevosErrores.apellido = 'IngresÃ¡ el apellido.';
+    if (!form.nombre.trim()) nuevosErrores.nombre = 'Ingresá el nombre.';
+    if (!form.apellido.trim()) nuevosErrores.apellido = 'Ingresá el apellido.';
     if (!email) {
-      nuevosErrores.email = 'IngresÃ¡ el email.';
+      nuevosErrores.email = 'Ingresá el email.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      nuevosErrores.email = 'IngresÃ¡ un email vÃ¡lido.';
+      nuevosErrores.email = 'Ingresá un email válido.';
     }
-    if (esNuevo && !form.password.trim()) nuevosErrores.password = 'IngresÃ¡ una contraseÃ±a.';
+    if (esNuevo && !form.password.trim()) nuevosErrores.password = 'Ingresá una contraseña.';
 
     setErrores(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
@@ -1522,21 +1508,21 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
           {errores.email && <p id="empleado-email-error" className="mt-1 text-xs text-red-600">{errores.email}</p>}
         </Campo>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo label="TelÃ©fono">
+          <Campo label="Teléfono">
             <input className={input} type="tel" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+54 261 555-0000" autoComplete="off" />
           </Campo>
           <Campo label="Fecha de nacimiento">
             <input className={input} type="date" value={form.fecha_nacimiento} onChange={e => set('fecha_nacimiento', e.target.value)} />
           </Campo>
         </div>
-        <Campo label={esNuevo ? 'ContraseÃ±a' : 'Nueva contraseÃ±a (dejar vacÃ­o para no cambiar)'}>
+        <Campo label={esNuevo ? 'contraseña' : 'Nueva contraseña (dejar vacío para no cambiar)'}>
           <input
             className={input}
             type="password"
             name="empleado-password"
             value={form.password}
             onChange={e => set('password', e.target.value)}
-            placeholder={esNuevo ? '' : 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢'}
+            placeholder={esNuevo ? '' : '"¢"¢"¢"¢"¢"¢"¢"¢'}
             autoComplete="new-password"
             aria-invalid={Boolean(errores.password)}
             aria-describedby={errores.password ? 'empleado-password-error' : undefined}
@@ -1578,7 +1564,7 @@ function Modal({ titulo, onCerrar, children, footer }) {
       <div ref={modalRef} data-admin-modal="true" className="flex h-full max-h-none w-full flex-col bg-white shadow-xl md:h-auto md:max-h-[90vh] md:max-w-md md:rounded-2xl">
         <div className="flex justify-between items-center p-5 border-b flex-shrink-0">
           <h3 className="font-bold text-lg">{titulo}</h3>
-          <button type="button" onClick={onCerrar} className="text-gray-400 hover:text-gray-700 text-xl" aria-label="Cerrar">âœ•</button>
+          <button type="button" onClick={onCerrar} className="text-gray-400 hover:text-gray-700 text-xl" aria-label="Cerrar">✕</button>
         </div>
         <div className="p-5 overflow-y-auto">{children}</div>
         {footer && (
@@ -1600,12 +1586,12 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
   const tieneOverrideActivo = empresa.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta);
 
   return (
-    <Modal onCerrar={onCerrar} titulo={`Reabrir plazo â€” ${empresa.nombre}`}>
+    <Modal onCerrar={onCerrar} titulo={`Reabrir plazo "" ${empresa.nombre}`}>
       <div className="space-y-4">
         {tieneOverrideActivo && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-sm text-green-800 font-medium">
-              ðŸ”“ Plazo actualmente abierto hasta las{' '}
+              ðŸ"" Plazo actualmente abierto hasta las{' '}
               {new Date(empresa.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
             </p>
             <button
@@ -1619,10 +1605,10 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
         )}
 
         <p className="text-sm text-gray-600">
-          Esto permite que los empleados de <strong>{empresa.nombre}</strong> hagan o modifiquen su pedido aunque haya pasado el lÃ­mite habitual.
+          Esto permite que los empleados de <strong>{empresa.nombre}</strong> hagan o modifiquen su pedido aunque haya pasado el límite habitual.
         </p>
 
-        <Campo label="Abrir por cuÃ¡ntas horas">
+        <Campo label="Abrir por cuántas horas">
           <select
             className={input}
             value={horas}
@@ -1631,7 +1617,7 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
             <option value={1}>1 hora</option>
             <option value={2}>2 horas</option>
             <option value={4}>4 horas</option>
-            <option value={8}>8 horas (hasta maÃ±ana)</option>
+            <option value={8}>8 horas (hasta maÁ±ana)</option>
             <option value={24}>24 horas</option>
           </select>
         </Campo>

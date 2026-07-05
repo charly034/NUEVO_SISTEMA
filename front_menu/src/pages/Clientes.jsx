@@ -1,5 +1,6 @@
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import Empresas from './Empresas.jsx';
+import Planes from './Planes.jsx';
 import PedidosPagos from './PedidosPagos.jsx';
 import NotificacionesAdmin from './NotificacionesAdmin.jsx';
 
@@ -7,13 +8,19 @@ const VISTAS = [
   {
     key: 'empresas',
     label: 'Empresas',
-    description: 'Empresas, empleados, planes y cuenta corriente.',
+    description: 'Empresas, empleados y cuenta corriente.',
     component: Empresas,
+  },
+  {
+    key: 'planes',
+    label: 'Planes',
+    description: 'Planes de vianda: gramaje, postre, bebida.',
+    component: Planes,
   },
   {
     key: 'pagos',
     label: 'Pagos',
-    description: 'Pedidos, pagos, saldos y resumenes para cobrar.',
+    description: 'Pedidos, pagos, saldos y resúmenes para cobrar.',
     component: PedidosPagos,
   },
   {
@@ -29,19 +36,36 @@ function getVistaActiva(value) {
 }
 
 export default function Clientes() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const vistaActiva = getVistaActiva(searchParams.get('vista'));
   const vista = VISTAS.find(item => item.key === vistaActiva) || VISTAS[0];
   const VistaComponent = vista.component;
 
+  const irA = (key) => setSearchParams({ vista: key });
+
   return (
     <div className="min-h-full min-w-0 overflow-x-hidden bg-gray-50">
-      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-4 py-3 md:top-0 md:px-6">
+      {/* Header sticky con tabs */}
+      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-4 md:px-6">
         <div className="mx-auto max-w-[1600px]">
-          <div>
+          <div className="pt-3 pb-0">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Administración de clientes</p>
             <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-            <p className="text-sm text-gray-500">{vista.description}</p>
+          </div>
+          {/* Tabs */}
+          <div className="flex gap-0 mt-3 -mx-1">
+            {VISTAS.map(v => (
+              <button
+                key={v.key}
+                onClick={() => irA(v.key)}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap
+                  ${v.key === vistaActiva
+                    ? 'border-green-600 text-green-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'}`}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
