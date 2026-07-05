@@ -7,6 +7,7 @@ import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 import { adminAuth } from '../auth.js';
 import CuentaCorrienteFicha from '../components/finanzas/CuentaCorrienteFicha.jsx';
+import SideDrawer from '../components/ui/SideDrawer.jsx';
 
 function normalizarFechaInput(fecha) {
   return fecha ? String(fecha).split('T')[0] : '';
@@ -175,66 +176,169 @@ export default function Empresas() {
         </button>
       </div>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        {/* Lista de empresas */}
-        <div className="space-y-3">
-          <input
-            value={busquedaEmpresa}
-            onChange={(event) => {
-              setBusquedaEmpresa(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Buscar por empresa, slug o email..."
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none"
-          />
-          <EstadoFiltroChips
-            value={estadoFiltro}
-            onChange={(value) => {
-              setEstadoFiltro(value);
-              setPage(1);
-            }}
-          />
-          {empresas.map(e => (
-            <EmpresaCard
-              key={e.id}
-              empresa={e}
-              activa={empresaActiva?.id === e.id}
-              esSuperAdmin={esSuperAdmin}
-              onSeleccionar={() => setEmpresaActiva(e)}
-              onEditar={() => setModalEmpresa(e)}
-              onEliminar={() => setModalEliminar(e)}
-              onCuentaCorriente={() => setCuentaCorriente({ tipo: 'empresa', id: e.id, nombre: e.nombre })}
-              onReabrirPlazo={() => setModalPlazo(e)}
-              onRegenerarCodigo={() => regenerarCodigo.mutate(e.id, { onSuccess: () => toast.success('Código regenerado') })}
-            />
-          ))}
-          {empresas.length === 0 && (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center">
-              <p className="text-sm font-semibold text-gray-700">
-                {hayBusquedaEmpresa
-                  ? `No se encontraron empresas para "${busquedaEmpresa.trim()}"`
-                  : 'Todavía no hay empresas cargadas.'}
-              </p>
-              {hayBusquedaEmpresa && (
-                <p className="mt-1 text-xs text-gray-400">Probá con otro nombre, slug o email.</p>
-              )}
-            </div>
-          )}
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
-        </div>
-        {/* Panel de empleados */}
-        {empresaActiva && (
-          <EmpleadosPanel
-            empresa={empresaActiva}
-            esSuperAdmin={esSuperAdmin}
-            onAbrirCuenta={(empleado) => setCuentaCorriente({
-              tipo: 'empleado',
-              id: empleado.id,
-              nombre: `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim() || empleado.email,
-            })}
-          />
+      {/* Barra de búsqueda + filtros */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          value={busquedaEmpresa}
+          onChange={(event) => { setBusquedaEmpresa(event.target.value); setPage(1); }}
+          placeholder="Buscar por empresa, slug o email..."
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none sm:max-w-sm"
+        />
+        <EstadoFiltroChips value={estadoFiltro} onChange={(value) => { setEstadoFiltro(value); setPage(1); }} />
+      </div>
+
+      {/* Tabla compacta */}
+      <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <th className="px-4 py-3 text-left">Empresa</th>
+              <th className="px-4 py-3 text-left hidden sm:table-cell">Plan</th>
+              <th className="px-4 py-3 text-left hidden md:table-cell">Modo</th>
+              <th className="px-4 py-3 text-left">Estado</th>
+              <th className="px-4 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {empresas.map(e => (
+              <tr
+                key={e.id}
+                onClick={() => setEmpresaActiva(e)}
+                className="cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <td className="px-4 py-3">
+                  <p className="font-semibold text-gray-900">{e.nombre}</p>
+                  <p className="text-xs text-gray-400">@{e.slug}</p>
+                </td>
+                <td className="px-4 py-3 hidden sm:table-cell text-gray-600">
+                  {e.plan_nombre || PLANES[e.plan] || '—'}
+                </td>
+                <td className="px-4 py-3 hidden md:table-cell text-gray-500 text-xs">
+                  {MODOS[e.modo_pedido] || '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <EstadoEmpresaBadge activa={e.activo} />
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={(ev) => { ev.stopPropagation(); setModalEmpresa(e); }}
+                    className={iconButtonClass}
+                    aria-label={`Editar ${e.nombre}`}
+                    title="Editar empresa"
+                  >
+                    <EditarIcon />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {empresas.length === 0 && (
+          <div className="px-4 py-10 text-center">
+            <p className="text-sm font-semibold text-gray-700">
+              {hayBusquedaEmpresa ? `No se encontraron empresas para "${busquedaEmpresa.trim()}"` : 'Todavía no hay empresas cargadas.'}
+            </p>
+            {hayBusquedaEmpresa && <p className="mt-1 text-xs text-gray-400">Probá con otro nombre, slug o email.</p>}
+          </div>
         )}
       </div>
+      <div className="mt-3">
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
+
+      {/* SideDrawer: detalle empresa + empleados */}
+      <SideDrawer
+        open={Boolean(empresaActiva)}
+        onClose={() => setEmpresaActiva(null)}
+        title={empresaActiva?.nombre || ''}
+        width="lg"
+      >
+        {empresaActiva && (
+          <div className="p-5 space-y-6">
+            {/* Datos de la empresa */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <EstadoEmpresaBadge activa={empresaActiva.activo} />
+                <span className="text-xs text-gray-400">@{empresaActiva.slug}</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                {empresaActiva.plan_nombre || PLANES[empresaActiva.plan] || 'Sin plan'} · {MODOS[empresaActiva.modo_pedido]}
+              </p>
+              {empresaActiva.limite_hora && (
+                <p className="text-xs text-amber-600">
+                  {empresaActiva.modo_pedido === 'semanal'
+                    ? `Límite: ${empresaActiva.limite_dia_semana || 'lunes'} ${empresaActiva.limite_hora}hs`
+                    : empresaActiva.limite_anticipacion_dias > 0
+                      ? `Límite: día anterior ${empresaActiva.limite_hora}hs`
+                      : `Límite: mismo día ${empresaActiva.limite_hora}hs`}
+                </p>
+              )}
+              {empresaActiva.plazo_override_hasta && new Date() <= new Date(empresaActiva.plazo_override_hasta) && (
+                <p className="text-xs font-medium text-green-700">
+                  Plazo reabierto hasta {new Date(empresaActiva.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
+                </p>
+              )}
+            </div>
+
+            {/* Código de registro */}
+            <CodigoBadge
+              empresa={empresaActiva}
+              esSuperAdmin={esSuperAdmin}
+              puedeReabrir={empresaActiva.limite_hora || empresaActiva.modo_pedido === 'semanal' || empresaActiva.modo_pedido === 'ambos'}
+              onRegenerarCodigo={() => regenerarCodigo.mutate(empresaActiva.id, { onSuccess: () => toast.success('Código regenerado') })}
+              onReabrirPlazo={() => setModalPlazo(empresaActiva)}
+            />
+
+            {/* Botones de acción */}
+            <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setModalEmpresa(empresaActiva)}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <EditarIcon /> Editar empresa
+              </button>
+              <button
+                type="button"
+                onClick={() => setCuentaCorriente({ tipo: 'empresa', id: empresaActiva.id, nombre: empresaActiva.nombre })}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <CuentaCorrienteIcon /> Cuenta corriente
+              </button>
+              {(empresaActiva.limite_hora || empresaActiva.modo_pedido === 'semanal' || empresaActiva.modo_pedido === 'ambos') && (
+                <button
+                  type="button"
+                  onClick={() => setModalPlazo(empresaActiva)}
+                  className="flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-1.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                >
+                  Reabrir plazo
+                </button>
+              )}
+              {esSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setModalEliminar(empresaActiva)}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-100 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 ml-auto"
+                >
+                  <EliminarIcon /> Eliminar
+                </button>
+              )}
+            </div>
+
+            {/* Empleados */}
+            <EmpleadosPanel
+              empresa={empresaActiva}
+              esSuperAdmin={esSuperAdmin}
+              onAbrirCuenta={(empleado) => setCuentaCorriente({
+                tipo: 'empleado',
+                id: empleado.id,
+                nombre: `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim() || empleado.email,
+              })}
+            />
+          </div>
+        )}
+      </SideDrawer>
 
       <PlanesPanel
         planes={planes}

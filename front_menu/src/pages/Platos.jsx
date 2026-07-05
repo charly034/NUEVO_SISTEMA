@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreatePlato, useDeletePlato, usePlatos, usePlatoTags, useUpdatePlato } from '../hooks/usePlatos.js';
 import { useHistorialPlato } from '../hooks/useHistorial.js';
 import Modal from '../components/ui/Modal.jsx';
+import SideDrawer from '../components/ui/SideDrawer.jsx';
 import PlatoForm from '../components/platos/PlatoForm.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import ErrorMessage from '../components/ui/ErrorMessage.jsx';
@@ -295,11 +296,9 @@ function DetallePlatoModal({ plato, onClose, onEdit }) {
 }
 
 function PlatoMobileCard({ plato, loading, onOpen, onToggleActivo, onEdit, onDelete }) {
-  const ultimoUso = plato.ultimo_uso ? (() => {
-    const d = diasDesde(plato.ultimo_uso.fecha_servicio);
-    const esFuturo = new Date(soloFecha(plato.ultimo_uso.fecha_servicio)) > new Date();
-    return `${formatCorto(plato.ultimo_uso.fecha_servicio)} - ${esFuturo ? 'proximo uso' : d === 0 ? 'hoy' : `hace ${d}d`}`;
-  })() : 'Nunca usado';
+  const ultimoUso = plato.ultimo_uso
+    ? `Último uso: ${formatCorto(plato.ultimo_uso.fecha_servicio)}`
+    : 'Nunca usado';
 
   return (
     <div className="bg-white px-4 py-3.5">
@@ -628,10 +627,7 @@ export default function Platos() {
                       </td>
                       <td className="hidden px-5 py-3.5 sm:table-cell">
                         {plato.ultimo_uso ? (
-                          <div>
-                            <p className="text-gray-700">{formatCorto(plato.ultimo_uso.fecha_servicio)}</p>
-                            <p className="text-xs text-gray-400">{diasDesde(plato.ultimo_uso.fecha_servicio) === 0 ? 'hoy' : `hace ${diasDesde(plato.ultimo_uso.fecha_servicio)}d`}</p>
-                          </div>
+                          <span className="text-sm text-gray-700">{formatCorto(plato.ultimo_uso.fecha_servicio)}</span>
                         ) : <span className="text-xs text-gray-300">Nunca usado</span>}
                       </td>
                       <td className="px-5 py-3.5">
@@ -671,13 +667,17 @@ export default function Platos() {
 
       <DetallePlatoModal plato={detalle} onClose={() => setDetalle(null)} onEdit={setEditando} />
 
-      <Modal open={modalCreate} onClose={() => setModalCreate(false)} title="Nuevo plato">
-        <PlatoForm onSubmit={handleCreate} onCancel={() => setModalCreate(false)} loading={createMutation.isPending} />
-      </Modal>
+      <SideDrawer open={modalCreate} onClose={() => setModalCreate(false)} title="Nuevo plato" width="lg">
+        <div className="p-5">
+          <PlatoForm onSubmit={handleCreate} onCancel={() => setModalCreate(false)} loading={createMutation.isPending} />
+        </div>
+      </SideDrawer>
 
-      <Modal open={!!editando} onClose={() => setEditando(null)} title="Editar plato">
-        <PlatoForm initial={editando} onSubmit={handleUpdate} onCancel={() => setEditando(null)} loading={updateMutation.isPending} />
-      </Modal>
+      <SideDrawer open={!!editando} onClose={() => setEditando(null)} title="Editar plato" width="lg">
+        <div className="p-5">
+          <PlatoForm initial={editando} onSubmit={handleUpdate} onCancel={() => setEditando(null)} loading={updateMutation.isPending} />
+        </div>
+      </SideDrawer>
 
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Eliminar plato">
         <p className="mb-1 text-sm text-gray-600">Seguro que queres eliminar <strong>{confirmDelete?.nombre}</strong>?</p>

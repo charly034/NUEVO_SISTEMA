@@ -403,8 +403,7 @@ function PanelOperacion({ pedidos, loading }) {
   );
 }
 
-function AlertasOperativas({ menuEsta, menuProx, pedidos, enviosWhatsapp, loading }) {
-  const pendientes = pedidos.filter(p => ['pendiente', 'en_proceso'].includes(p.estado));
+function AlertasOperativas({ menuEsta, menuProx, enviosWhatsapp, loading }) {
   const fallidos = enviosWhatsapp.filter(e => e.estado === 'fallido');
   const [alertasVistas, setAlertasVistas] = useState(leerAlertasVistas);
   const whatsappKey = keyAlertasWhatsapp(fallidos);
@@ -444,16 +443,6 @@ function AlertasOperativas({ menuEsta, menuProx, pedidos, enviosWhatsapp, loadin
       texto: `Tiene ${menuProx.dias?.length || 0} días cargados y estado ${menuProx.estado}.`,
       href: `/semanas/${menuProx.id}`,
       accion: 'Publicar',
-    });
-  }
-
-  if (pendientes.length > 0) {
-    alertas.push({
-      tono: 'blue',
-      titulo: `${pendientes.length} pedido${pendientes.length !== 1 ? 's' : ''} pendiente${pendientes.length !== 1 ? 's' : ''}`,
-      texto: 'Hay pedidos nuevos o en proceso que necesitan seguimiento.',
-      href: '/pedidos',
-      accion: 'Ver pedidos',
     });
   }
 
@@ -558,9 +547,8 @@ export default function Dashboard() {
       <AlertasOperativas
         menuEsta={menuEsta}
         menuProx={menuProx}
-        pedidos={pedidos}
         enviosWhatsapp={enviosWhatsapp}
-        loading={fechaOperativaQuery.isLoading || menusQuery.isLoading || pedidosQuery.isLoading || enviosQuery.isLoading}
+        loading={fechaOperativaQuery.isLoading || menusQuery.isLoading || enviosQuery.isLoading}
       />
 
       {/* Operación */}

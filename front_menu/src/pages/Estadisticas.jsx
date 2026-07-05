@@ -300,40 +300,58 @@ export default function Estadisticas() {
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Estadísticas</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Analizá el uso y rotación del menú</p>
-      </div>
-
-      <div className="card p-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Período</span>
-            <select value={periodo} onChange={(event) => setPeriodo(event.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              <option value="30">Últimos 30 días</option>
-              <option value="90">Últimos 90 días</option>
-              <option value="180">Últimos 180 días</option>
-              <option value="todo">Todo</option>
-              <option value="custom">Personalizado</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Empresa</span>
-            <select value={empresaId} onChange={(event) => setEmpresaId(event.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              <option value="">Todas</option>
-              {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Desde</span>
-            <input type="date" disabled={periodo !== 'custom'} value={custom.desde} onChange={(event) => setCustom((prev) => ({ ...prev, desde: event.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50" />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Hasta</span>
-            <input type="date" disabled={periodo !== 'custom'} value={custom.hasta} onChange={(event) => setCustom((prev) => ({ ...prev, hasta: event.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-50" />
-          </label>
+      {/* Header con filtros inline */}
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900">Estadísticas</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Analizá el uso y rotación del menú</p>
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <select
+            value={periodo}
+            onChange={(event) => setPeriodo(event.target.value)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+          >
+            <option value="30">Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+            <option value="180">Últimos 180 días</option>
+            <option value="todo">Todo el período</option>
+            <option value="custom">Rango personalizado</option>
+          </select>
+          <select
+            value={empresaId}
+            onChange={(event) => setEmpresaId(event.target.value)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+          >
+            <option value="">Todas las empresas</option>
+            {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
+          </select>
         </div>
       </div>
+
+      {/* Rango personalizado — solo visible cuando se elige */}
+      {periodo === 'custom' && (
+        <div className="flex flex-wrap gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <span className="font-medium">Desde</span>
+            <input
+              type="date"
+              value={custom.desde}
+              onChange={(event) => setCustom((prev) => ({ ...prev, desde: event.target.value }))}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm bg-white"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <span className="font-medium">Hasta</span>
+            <input
+              type="date"
+              value={custom.hasta}
+              onChange={(event) => setCustom((prev) => ({ ...prev, hasta: event.target.value }))}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm bg-white"
+            />
+          </label>
+        </div>
+      )}
 
       <SeccionResumen />
 

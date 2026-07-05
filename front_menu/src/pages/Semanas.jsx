@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMenusSemanales, useCreateMenu, useDeleteMenu, useCambiarEstadoMenu, useDuplicarMenu } from '../hooks/useMenus.js';
+import { usePedidos } from '../hooks/usePedidos.js';
 import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
@@ -232,7 +233,7 @@ function ModalDuplicarForm({ menu, onConfirm, onCancel, loading }) {
 }
 
 // ── Panel de detalle ─────────────────────────────────────────────────
-function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, onReabrir, onDelete, onDuplicar }) {
+function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, onReabrir, onDelete, onDuplicar, totalPedidos }) {
   const domingo = addDias(lunesIso, 6);
 
   if (!menu) {
@@ -271,42 +272,16 @@ function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, on
           {fechaLimiteStr && estado === 'publicado' && (
             <p style={{ fontSize: 12, color: '#d97706', marginTop: 2 }}>⏰ Pedidos hasta: {fechaLimiteStr}</p>
           )}
+          {totalPedidos > 0 && (
+            <p style={{ fontSize: 12, color: '#2563eb', marginTop: 2, fontWeight: 600 }}>
+              {totalPedidos} pedido{totalPedidos !== 1 ? 's' : ''} registrado{totalPedidos !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
 
-        {/* Acciones */}
+        {/* Acciones — primarias primero, destructivas separadas */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {estado === 'borrador' && (
-            <button onClick={onPublicar} style={btnStyle('#16a34a', '#fff')}>
-              Publicar
-            </button>
-          )}
-          {estado === 'publicado' && (
-            <>
-              <button
-                onClick={() => estadoMut({ estado: 'cerrado' })}
-                disabled={estadoPending}
-                style={btnStyle('#f97316', '#fff')}
-              >
-                Cerrar pedidos
-              </button>
-              <button
-                onClick={() => estadoMut({ estado: 'borrador' })}
-                disabled={estadoPending}
-                style={btnStyle('#f3f4f6', '#374151')}
-              >
-                Volver a borrador
-              </button>
-            </>
-          )}
-          {estado === 'cerrado' && (
-            <button
-              onClick={onReabrir}
-              disabled={estadoPending}
-              style={btnStyle('#16a34a', '#fff')}
-            >
-              Reabrir pedidos
-            </button>
-          )}
+          {/* Siempre visible: editar */}
           <Link
             to={`/semanas/${menu.id}`}
             style={{
@@ -316,22 +291,59 @@ function PanelDetalle({ lunesIso, menu, estadoMut, estadoPending, onPublicar, on
           >
             Editar grilla →
           </Link>
-          <button
-            type="button"
-            onClick={onDuplicar}
-            style={btnStyle('#f3f4f6', '#374151')}
-          >
+
+          {/* Publicar solo en borrador */}
+          {estado === 'borrador' && (
+            <button onClick={onPublicar} style={btnStyle('#f0fdf4', '#15803d', '1.5px solid #86efac')}>
+              Publicar
+            </button>
+          )}
+
+          {/* Reabrir solo en cerrado */}
+          {estado === 'cerrado' && (
+            <button onClick={onReabrir} disabled={estadoPending} style={btnStyle('#f0fdf4', '#15803d', '1.5px solid #86efac')}>
+              Reabrir pedidos
+            </button>
+          )}
+
+          {/* Duplicar — siempre secundario */}
+          <button type="button" onClick={onDuplicar} style={btnStyle('#f3f4f6', '#374151', '1.5px solid #e5e7eb')}>
             Duplicar
           </button>
+
+          {/* Separator + destructivas — solo cuando hay algo destructivo */}
+          {(estado === 'publicado' || estado === 'borrador') && (
+            <div style={{ width: 1, height: 24, background: '#e5e7eb', margin: '0 4px' }} />
+          )}
+
+          {estado === 'publicado' && (
+            <>
+              <button
+                onClick={() => estadoMut({ estado: 'cerrado' })}
+                disabled={estadoPending}
+                style={btnStyle('#fff5f0', '#c2410c', '1.5px solid #fdba74')}
+              >
+                Cerrar pedidos
+              </button>
+              <button
+                onClick={() => estadoMut({ estado: 'borrador' })}
+                disabled={estadoPending}
+                style={btnStyle('#f9fafb', '#6b7280', '1.5px solid #e5e7eb')}
+              >
+                Volver a borrador
+              </button>
+            </>
+          )}
+
           {estado === 'borrador' && (
             <button
               type="button"
               onClick={onDelete}
               aria-label={`Eliminar menu ${menu.nombre}`}
               title="Eliminar menu"
-              style={{ padding: '7px 8px', borderRadius: 8, background: 'transparent', border: '1.5px solid #e5e7eb', cursor: 'pointer', fontSize: 14 }}
+              style={{ padding: '7px 10px', borderRadius: 8, background: '#fff5f5', border: '1.5px solid #fecaca', cursor: 'pointer', fontSize: 13, color: '#ef4444', fontWeight: 600 }}
             >
-              🗑️
+              Eliminar
             </button>
           )}
         </div>
@@ -460,10 +472,10 @@ function PanelVacio({ lunesIso, domingoIso }) {
   );
 }
 
-function btnStyle(bg, color) {
+function btnStyle(bg, color, border = 'none') {
   return {
     fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 8,
-    background: bg, color, border: 'none', cursor: 'pointer',
+    background: bg, color, border, cursor: 'pointer',
   };
 }
 
@@ -477,7 +489,8 @@ export default function Semanas() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReabrir, setConfirmReabrir] = useState(false);
 
-  const query     = useMenusSemanales({ limit: 100 });
+  const query       = useMenusSemanales({ limit: 100 });
+  const pedidosQuery = usePedidos({ semana_inicio: selLunes, limit: 500 }, { enabled: Boolean(selLunes) });
   const deleteMut = useDeleteMenu();
   const duplicarMut = useDuplicarMenu();
   const estadoMut = useCambiarEstadoMenu();
@@ -659,6 +672,7 @@ export default function Semanas() {
             onReabrir={() => setConfirmReabrir(true)}
             onDelete={() => setConfirmDelete(true)}
             onDuplicar={() => setModalDuplicar(true)}
+            totalPedidos={pedidosQuery.data?.length ?? 0}
           />
         )}
       </div>

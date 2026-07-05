@@ -1,4 +1,5 @@
 ﻿import { useState, useMemo, useCallback } from 'react';
+import { Tabs, Tab } from '../components/ui/Tabs.jsx';
 import * as XLSX from 'xlsx';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -1289,25 +1290,11 @@ export default function PedidosAdmin() {
             {ESTADOS.map(e => <option key={e.key} value={e.key}>{e.icon} {e.label}</option>)}
           </select>
         </div>
-        {/* Vista tabs */}
-        <div className="grid gap-2 sm:grid-cols-2" role="tablist" aria-label="Vistas de pedidos">
-          {[
-            ['empresa', 'Seguimiento de pedidos', 'Estados y pedidos individuales'],
-            ['dia', 'Producción de cocina', 'Cantidades por día e impresión'],
-          ].map(([v, l, sub]) => (
-            <button
-              key={v}
-              onClick={() => setVista(v)}
-              role="tab"
-              aria-selected={vista === v}
-              className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${vista === v ? 'border-green-700 bg-green-700 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:border-green-300 hover:bg-green-50'}`}
-            >
-              <span className="block text-sm font-semibold">{l}</span>
-              <span className={`mt-0.5 block text-xs ${vista === v ? 'text-green-100' : 'text-gray-400'}`}>{sub}</span>
-            </button>
-          ))}
-        </div>
       </div>
+      <Tabs value={vista} onChange={setVista}>
+        <Tab value="empresa" label="Seguimiento" />
+        <Tab value="dia" label="Cocina / Producción" />
+      </Tabs>
 
       {/* Filtros activos */}
       {filtrosActivos && (
