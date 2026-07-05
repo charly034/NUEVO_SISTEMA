@@ -197,11 +197,11 @@ function resumenRespuestaWebhook(respuesta) {
 function mensajeErrorHttp(error, fallback) {
   const status = error?.status;
   const errorCode = error?.data?.errorCode || error?.data?.data?.errorCode;
-  if (errorCode === 'INVALID_WEBHOOK_URL') return 'Configura una URL HTTPS valida antes de probar WhatsApp.';
-  if (errorCode === 'N8N_TIMEOUT') return 'n8n no respondio a tiempo. Revisa si el workflow esta activo.';
-  if (status === 400) return error?.message || 'Revisa los datos ingresados.';
-  if (status === 401 || status === 403) return 'Tu sesion no tiene permisos para esta accion.';
-  if (status === 404) return 'No se encontro el recurso solicitado.';
+  if (errorCode === 'INVALID_WEBHOOK_URL') return 'Configurá una URL HTTPS válida antes de probar WhatsApp.';
+  if (errorCode === 'N8N_TIMEOUT') return 'n8n no respondió a tiempo. Revisá si el workflow está activo.';
+  if (status === 400) return error?.message || 'Revisá los datos ingresados.';
+  if (status === 401 || status === 403) return 'Tu sesión no tiene permisos para esta acción.';
+  if (status === 404) return 'No se encontró el recurso solicitado.';
   if (status === 500 || status === 502 || status === 504) return error?.message || 'Hubo un problema del servidor o de n8n.';
   return error?.message || fallback;
 }
@@ -536,7 +536,7 @@ function ReglaForm({ canal, regla, setRegla, empresas, empleados, destinatariosW
         </div>
       )}
 
-      <Input label="Titulo" value={regla.titulo} onChange={(value) => setField('titulo', value)} required maxLength={160} />
+      <Input label="Título" value={regla.titulo} onChange={(value) => setField('titulo', value)} required maxLength={160} />
       <Textarea label="Mensaje" value={regla.cuerpo} onChange={(value) => setField('cuerpo', value)} required />
 
       <FiltrosRegla
@@ -636,14 +636,14 @@ function ManualInterna({ empresas, empleados }) {
       toast.success(`Enviadas: ${resultado.enviadas}`);
       setForm(MANUAL_BASE);
     } catch (error) {
-      toast.error(error?.message || 'No se pudo enviar la notificacion');
+      toast.error(error?.message || 'No se pudo enviar la notificación');
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <div>
-        <h2 className="font-bold text-gray-900">Envio manual interno</h2>
+        <h2 className="font-bold text-gray-900">Envío manual interno</h2>
         <p className="text-sm text-gray-600">Crea avisos dentro de la app de clientes.</p>
       </div>
       <Select label="Alcance" value={form.alcance} onChange={(value) => setField('alcance', value)}>
@@ -666,14 +666,14 @@ function ManualInterna({ empresas, empleados }) {
       <Select label="Tipo" value={form.tipo} onChange={(value) => setField('tipo', value)}>
         {TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}
       </Select>
-      <Input label="Titulo" value={form.titulo} onChange={(value) => setField('titulo', value)} required maxLength={120} placeholder="Ej: Menu publicado" />
+      <Input label="Título" value={form.titulo} onChange={(value) => setField('titulo', value)} required maxLength={120} placeholder="Ej: Menú publicado" />
       <Textarea label="Mensaje" value={form.cuerpo} onChange={(value) => setField('cuerpo', value)} required maxLength={700} placeholder="Escribi el aviso para los clientes." />
       <button
         type="submit"
         disabled={enviar.isPending}
         className="w-full rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {enviar.isPending ? 'Enviando...' : 'Enviar notificacion'}
+        {enviar.isPending ? 'Enviando...' : 'Enviar notificación'}
       </button>
     </form>
   );
@@ -683,13 +683,13 @@ function HistorialInterno({ notificaciones, isLoading }) {
   return (
     <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="border-b border-gray-100 px-5 py-4">
-        <h2 className="font-bold text-gray-900">Ultimas internas</h2>
-        <p className="text-sm text-gray-600">Incluye envios manuales y eventos automaticos.</p>
+        <h2 className="font-bold text-gray-900">Últimas internas</h2>
+        <p className="text-sm text-gray-600">Incluye envíos manuales y eventos automáticos.</p>
       </div>
       {isLoading ? (
         <div className="grid min-h-[200px] place-items-center"><Spinner /></div>
       ) : notificaciones.length === 0 ? (
-        <div className="grid min-h-[200px] place-items-center px-5 text-center text-sm text-gray-600">Todavia no hay notificaciones creadas.</div>
+        <div className="grid min-h-[200px] place-items-center px-5 text-center text-sm text-gray-600">Todavía no hay notificaciones creadas.</div>
       ) : (
         <div className="max-h-[520px] divide-y divide-gray-100 overflow-auto">
           {notificaciones.map((notificacion) => (
@@ -699,7 +699,7 @@ function HistorialInterno({ notificaciones, isLoading }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">{notificacion.tipo}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${notificacion.leida ? 'bg-gray-100 text-gray-700' : 'bg-amber-50 text-amber-700'}`}>
-                      {notificacion.leida ? 'Leida' : 'No leida'}
+                      {notificacion.leida ? 'Leída' : 'No leída'}
                     </span>
                   </div>
                   <h3 className="mt-2 font-semibold text-gray-900">{notificacion.titulo}</h3>
@@ -1129,8 +1129,8 @@ function EnviosWhatsapp({ envios, isLoading }) {
   return (
     <section className="rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="border-b border-gray-100 px-5 py-4">
-        <h2 className="font-bold text-gray-900">Ultimos envios WhatsApp</h2>
-        <p className="text-sm text-gray-600">Auditoria de llamadas realizadas al webhook de n8n.</p>
+        <h2 className="font-bold text-gray-900">Últimos envíos WhatsApp</h2>
+        <p className="text-sm text-gray-600">Auditoría de llamadas realizadas al webhook de n8n.</p>
       </div>
       {isLoading ? (
         <div className="grid min-h-[180px] place-items-center"><Spinner /></div>
@@ -1213,7 +1213,7 @@ export default function NotificacionesAdmin() {
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Notificaciones</h1>
-          <p className="text-sm text-gray-600">Panel de control para avisos internos y WhatsApp via n8n.</p>
+          <p className="text-sm text-gray-600">Panel de control para avisos internos y WhatsApp vía n8n.</p>
         </div>
         <Tabs
           value={panel}

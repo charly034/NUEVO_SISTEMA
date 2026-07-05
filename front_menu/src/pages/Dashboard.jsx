@@ -298,7 +298,7 @@ function SeccionRotacion({ noUsados, loading }) {
             return (
             <span
               key={p.id}
-              title={esNuevo ? 'Plato nunca servido' : `Ultimo uso hace ${p.dias_desde_ultimo_uso} dias`}
+              title={esNuevo ? 'Plato nunca servido' : `Último uso hace ${p.dias_desde_ultimo_uso} días`}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border ${
                 esNuevo
                   ? 'bg-green-50 border-green-200 text-green-800'
@@ -454,7 +454,7 @@ function AlertasOperativas({ menuEsta, menuProx, enviosWhatsapp, loading }) {
       texto: 'Revisá n8n o el webhook antes del próximo aviso automático.',
       href: '/notificaciones',
       accion: 'Ver notificaciones',
-      detalle: 'Detalle tecnico: revisar n8n o el webhook antes del proximo aviso automatico.',
+      detalle: 'Detalle técnico: revisá n8n o el webhook antes del próximo aviso automático.',
       dismissible: true,
     });
   }

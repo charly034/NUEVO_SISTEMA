@@ -295,7 +295,7 @@ function textoWhatsApp({ nombre, metrics, pedidos }) {
     `Viandas: ${metrics.viandas}`,
     '',
     ...rows,
-    pedidos.length > rows.length ? `... y ${pedidos.length - rows.length} pedidos mas` : '',
+    pedidos.length > rows.length ? `... y ${pedidos.length - rows.length} pedidos más` : '',
   ].filter(Boolean).join('\n');
 }
 
@@ -582,7 +582,7 @@ function AplicacionesPagoModal({ pago, onClose, onDesasociar }) {
             { key: 'monto_aplicado', label: 'Monto', align: 'right', render: item => formatMoney(item.monto_aplicado) },
             {
               key: 'accion',
-              label: 'Accion',
+              label: 'Acción',
               render: item => (
                 <button
                   type="button"
@@ -937,7 +937,7 @@ export default function CuentaCorrienteFicha({ tipo, id, nombre, onClose }) {
                 <Kpi label="Saldo pendiente" value={formatMoney(metrics.pendiente)} tone="amber" />
                 <Kpi label="Saldo a favor" value={formatMoney(metrics.saldoFavor)} tone="blue" />
                 <Kpi label="Viandas periodo" value={metrics.viandas} />
-                <Kpi label="Ultimo pago" value={metrics.ultimoPago ? formatDate(metrics.ultimoPago.fecha_pago) : '-'} />
+                <Kpi label="Último pago" value={metrics.ultimoPago ? formatDate(metrics.ultimoPago.fecha_pago) : '-'} />
                 <Kpi label="Prox. vencimiento" value="Sin config." />
                 <Kpi label="Estado" value={metrics.estado} tone={metrics.estado === 'deuda' ? 'amber' : 'green'} />
               </div>

@@ -64,9 +64,9 @@ const TAG_COLORS = {
 };
 
 const CRITERIOS_VARIACION = {
-  1: { titulo: 'Rotacion segura', detalle: 'Evita repetir platos usados en las ultimas 2 semanas.' },
-  2: { titulo: 'Orden alternado', detalle: 'Alterna el orden de candidatos para abrir una segunda combinacion.' },
-  3: { titulo: 'Menos usados', detalle: 'Prioriza platos con menor uso historico.' },
+  1: { titulo: 'Rotación segura', detalle: 'Evita repetir platos usados en las últimas 2 semanas.' },
+  2: { titulo: 'Orden alternado', detalle: 'Alterna el orden de candidatos para abrir una segunda combinación.' },
+  3: { titulo: 'Menos usados', detalle: 'Prioriza platos con menor uso histórico.' },
 };
 
 const OPCIONES_MENU = ['A', 'C'];
@@ -74,7 +74,7 @@ const OPCIONES_MENU = ['A', 'C'];
 function criterioVariacion(variacion, index) {
   return CRITERIOS_VARIACION[variacion] ?? CRITERIOS_VARIACION[index + 1] ?? {
     titulo: 'Criterio alternativo',
-    detalle: 'Combinacion generada desde la rotacion historica.',
+    detalle: 'Combinación generada desde la rotación histórica.',
   };
 }
 

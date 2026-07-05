@@ -184,7 +184,7 @@ function textoWhatsApp(rows, metrics) {
   const detalle = rows.slice(0, 30).map(row =>
     `- ${formatDate(row.semana_inicio)} | ${row.empresa_nombre || '-'} | ${row.persona} | ${formatMoney(row.vendido)} | ${labelEstadoFinanciero(row.estado_financiero)}`
   );
-  const extra = rows.length > 30 ? [`... y ${rows.length - 30} pedidos mas`] : [];
+  const extra = rows.length > 30 ? [`... y ${rows.length - 30} pedidos más`] : [];
   return [...top, '', ...detalle, ...extra].join('\n');
 }
 

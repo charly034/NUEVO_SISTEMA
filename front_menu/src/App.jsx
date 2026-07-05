@@ -63,7 +63,7 @@ export default function App() {
   };
 
   if (checking) {
-    return <div className="min-h-screen grid place-items-center text-gray-500">Verificando sesion...</div>;
+    return <div className="min-h-screen grid place-items-center text-gray-500">Verificando sesión...</div>;
   }
   if (!admin) return <AdminLogin onLogin={login} />;
 

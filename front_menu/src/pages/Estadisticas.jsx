@@ -98,8 +98,8 @@ function SeccionTopPlatos({ filtros }) {
         <h2 className="font-semibold text-gray-900">Platos más repetidos</h2>
         <UpdatingBadge show={isFetching && !isLoading} />
       </div>
-      {isLoading ? <LoadingBlock label="Cargando platos mas repetidos..." /> : data.length === 0 ? (
-        <EmptyState title="Sin platos repetidos para este filtro" detail="Proba ampliar el periodo o quitar filtros de empresa." />
+      {isLoading ? <LoadingBlock label="Cargando platos más repetidos..." /> : data.length === 0 ? (
+        <EmptyState title="Sin platos repetidos para este filtro" detail="Probá ampliar el período o quitar filtros de empresa." />
       ) : (
         <div className="space-y-3">
           {data.map((p, i) => (

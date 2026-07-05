@@ -40,7 +40,7 @@ export default function MobileHeader({ onLogout, onOpenMenu }) {
           type="button"
           onClick={onOpenMenu}
           className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600"
-          aria-label="Abrir menu lateral"
+          aria-label="Abrir menú lateral"
         >
           <MenuIcon />
         </button>
@@ -53,7 +53,7 @@ export default function MobileHeader({ onLogout, onOpenMenu }) {
         type="button"
         onClick={onLogout}
         className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded"
-        aria-label="Cerrar sesion del panel admin"
+        aria-label="Cerrar sesión del panel admin"
       >
         Salir
       </button>

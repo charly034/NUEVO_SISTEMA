@@ -171,7 +171,7 @@ export default function Empresas() {
           <h1 className="text-2xl font-bold text-gray-900">Empresas</h1>
           <p className="text-sm text-gray-500">{textoCantidadEmpresas}</p>
         </div>
-        <button onClick={() => setModalEmpresa('nueva')} className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800">
+        <button onClick={() => setModalEmpresa('nueva')} className="self-start bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800">
           + Nueva empresa
         </button>
       </div>

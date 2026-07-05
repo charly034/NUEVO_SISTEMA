@@ -5,14 +5,14 @@ const NAV_PRIMARY = [
   { to: '/', label: 'Inicio' },
   { to: '/pedidos', label: 'Pedidos' },
   { to: '/clientes', label: 'Clientes' },
-  { to: '/semanas', label: 'Menus' },
+  { to: '/semanas', label: 'Menús' },
 ];
 
 const NAV_MORE = [
   { to: '/pedidos-hoy', label: 'Hoy' },
   { to: '/platos', label: 'Platos' },
   { to: '/guarniciones', label: 'Guarn.' },
-  { to: '/auditoria', label: 'Auditoria', superadminOnly: true },
+  { to: '/auditoria', label: 'Auditoría', superadminOnly: true },
   { to: '/administradores', label: 'Admins', superadminOnly: true },
 ];
 
@@ -104,7 +104,7 @@ export default function BottomNav({ admin }) {
             }`}
           >
             <IconMas />
-            Mas
+            Más
             {inMore && !masOpen && (
               <span className="absolute right-[20%] top-1.5 h-1.5 w-1.5 rounded-full bg-brand-600" />
             )}

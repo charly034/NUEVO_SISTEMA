@@ -1060,7 +1060,7 @@ export default function PedidosAdmin() {
   const [empresaFiltro, setEmpresaFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro]   = useState('');
   const [busqueda, setBusqueda]           = useState('');
-  const [vista, setVista]                 = useState('dia');
+  const [vista, setVista]                 = useState('empresa');
   const [diaActivo, setDiaActivo]         = useState(null);
   const [selected, setSelected]           = useState(new Set());
   const [bulkLoading, setBulkLoading]     = useState(false);

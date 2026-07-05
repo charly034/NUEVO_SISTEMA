@@ -27,8 +27,8 @@ const TIPO_FILTROS = [
 const SORT_OPTIONS = [
   { label: 'Nombre A-Z', sortBy: 'nombre', sortDir: 'asc' },
   { label: 'Nombre Z-A', sortBy: 'nombre', sortDir: 'desc' },
-  { label: 'Ultimo uso reciente', sortBy: 'ultimo_uso', sortDir: 'desc' },
-  { label: 'Ultimo uso antiguo', sortBy: 'ultimo_uso', sortDir: 'asc' },
+  { label: 'Último uso reciente', sortBy: 'ultimo_uso', sortDir: 'desc' },
+  { label: 'Último uso antiguo', sortBy: 'ultimo_uso', sortDir: 'asc' },
   { label: 'Estado activos primero', sortBy: 'activo', sortDir: 'desc' },
   { label: 'Estado inactivos primero', sortBy: 'activo', sortDir: 'asc' },
 ];
@@ -82,7 +82,7 @@ function hayFiltroActivo({ search, activoFilter, tipoFilter, tagFilter }) {
 function textoEstadoPlatos({ search, activoFilter, tipoFilter, tagFilter, totalBase }) {
   if (totalBase === 0) {
     return {
-      titulo: 'No hay platos cargados aun.',
+      titulo: 'No hay platos cargados aún.',
       detalle: 'Cuando crees el primer plato, va a aparecer en este listado.',
     };
   }
@@ -261,7 +261,7 @@ function DetallePlatoModal({ plato, onClose, onEdit }) {
             </div>
             <div className="rounded-lg bg-gray-50 p-3 text-center">
               <p className="text-lg font-bold text-gray-800">{data?.historial?.[0] ? formatCorto(data.historial[0].fecha_servicio) : '-'}</p>
-              <p className="mt-0.5 text-xs text-gray-500">Ultimo uso</p>
+              <p className="mt-0.5 text-xs text-gray-500">Último uso</p>
             </div>
           </div>
 
@@ -472,7 +472,7 @@ export default function Platos() {
             type="text"
             value={search}
             onChange={(e) => updateParams({ search: e.target.value, page: null })}
-            placeholder="Buscar por nombre o descripcion..."
+            placeholder="Buscar por nombre o descripción..."
             className="w-full rounded-lg border border-gray-300 py-2 pl-16 pr-4 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
           />
         </div>
@@ -514,7 +514,7 @@ export default function Platos() {
               onChange={(e) => updateParams({ tag: e.target.value || null, page: null })}
               className="rounded-lg border border-gray-300 bg-white px-3 py-[7px] text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
             >
-              <option value="">Todas las categorias</option>
+              <option value="">Todas las categorías</option>
               {allTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
             </select>
             {tagFilter ? (
@@ -562,7 +562,7 @@ export default function Platos() {
                       { col: 'nombre', label: 'Nombre' },
                       { col: null, label: 'Tipo', cls: 'hidden md:table-cell' },
                       { col: null, label: 'Tags', cls: 'hidden lg:table-cell' },
-                      { col: 'ultimo_uso', label: 'Ultimo uso', cls: 'hidden sm:table-cell' },
+                      { col: 'ultimo_uso', label: 'Último uso', cls: 'hidden sm:table-cell' },
                       { col: 'activo', label: 'Estado' },
                     ].map(({ col, label, cls = '' }) => (
                       <th key={label} className={`px-5 py-3 text-left ${cls}`}>
@@ -657,7 +657,7 @@ export default function Platos() {
 
       {pagination && pagination.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm">
-          <p className="text-gray-400">Pagina {pagination.page} de {pagination.totalPages}</p>
+          <p className="text-gray-400">Página {pagination.page} de {pagination.totalPages}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => updateParams({ page: page - 1 > 1 ? page - 1 : null })} disabled={page <= 1} className="btn-secondary text-xs disabled:opacity-40">Anterior</button>
             <button type="button" onClick={() => updateParams({ page: page + 1 })} disabled={page >= pagination.totalPages} className="btn-secondary text-xs disabled:opacity-40">Siguiente</button>
@@ -681,7 +681,7 @@ export default function Platos() {
 
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Eliminar plato">
         <p className="mb-1 text-sm text-gray-600">Seguro que queres eliminar <strong>{confirmDelete?.nombre}</strong>?</p>
-        <p className="mb-5 text-xs text-gray-400">Esta accion no se puede deshacer. Si el plato esta asignado a un menu semanal activo, no se podra eliminar.</p>
+        <p className="mb-5 text-xs text-gray-400">Esta acción no se puede deshacer. Si el plato está asignado a un menú semanal activo, no se podrá eliminar.</p>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={() => setConfirmDelete(null)} className="btn-secondary">Cancelar</button>
           <button

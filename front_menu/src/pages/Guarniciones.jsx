@@ -293,7 +293,7 @@ export default function Guarniciones() {
   };
 
   const handleDelete = async (guarnicion) => {
-    if (!await confirmar({ titulo: `Eliminar "${guarnicion.nombre}"?`, texto: 'Esta accion no se puede deshacer.', botonConfirmar: 'Si, eliminar' })) return;
+    if (!await confirmar({ titulo: `Eliminar "${guarnicion.nombre}"?`, texto: 'Esta acción no se puede deshacer.', botonConfirmar: 'Sí, eliminar' })) return;
     try {
       await eliminar.mutateAsync(guarnicion.id);
       toast.success('Guarnicion eliminada');
@@ -508,7 +508,7 @@ export default function Guarniciones() {
 
       {totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm">
-          <p className="text-gray-400">Pagina {safePage} de {totalPages}</p>
+          <p className="text-gray-400">Página {safePage} de {totalPages}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => updateParams({ page: safePage - 1 > 1 ? safePage - 1 : null })} disabled={safePage <= 1} className="btn-secondary text-xs disabled:opacity-40">Anterior</button>
             <button type="button" onClick={() => updateParams({ page: safePage + 1 })} disabled={safePage >= totalPages} className="btn-secondary text-xs disabled:opacity-40">Siguiente</button>

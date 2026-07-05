@@ -39,7 +39,7 @@ export default function Clientes() {
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-4 py-3 md:top-0 md:px-6">
         <div className="mx-auto max-w-[1600px]">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Administracion de clientes</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Administración de clientes</p>
             <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
             <p className="text-sm text-gray-500">{vista.description}</p>
           </div>

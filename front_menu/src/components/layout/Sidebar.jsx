@@ -8,7 +8,7 @@ const NAV = [
   { type: 'menu-semanal' },
   { to: '/pedidos', label: 'Pedidos' },
   { to: '/pedidos-hoy', label: 'Pedidos de hoy' },
-  { to: '/auditoria', label: 'Auditoria', superadminOnly: true },
+  { to: '/auditoria', label: 'Auditoría', superadminOnly: true },
   { to: '/administradores', label: 'Administradores', superadminOnly: true },
 ];
 
@@ -301,7 +301,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
         <p className="truncate px-2 text-xs font-medium text-gray-700">{admin.nombre} {admin.apellido}</p>
         <button onClick={handleLogout} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></svg>
-          Cerrar sesion
+          Cerrar sesión
         </button>
       </div>
     </>
