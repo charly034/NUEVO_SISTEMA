@@ -1,0 +1,91 @@
+schema: la_quinta_model_guidance_v1
+updated_at: "2026-07-09"
+language: es
+
+proposito:
+  status: from_chat_summary
+  summary: "Guia para elegir el modelo de Claude segun el tipo de tarea en La Quinta y optimizar tokens/costo. No automatiza la eleccion: es referencia para trabajo manual o para definir subagentes."
+
+modelos_disponibles:
+  status: from_chat_summary
+  updated_at: "2026-07-09"
+  nota: "Precios por millon de tokens; revalidar en platform.claude.com antes de decidir por costo."
+  lista:
+    - id: "claude-opus-4-8"
+      nombre: "Opus 4.8"
+      precio_entrada_salida_usd_por_1m: "5 / 25"
+      uso: "El mas capaz. Razonamiento profundo y trabajo autonomo largo."
+    - id: "claude-sonnet-5"
+      nombre: "Sonnet 5"
+      precio_entrada_salida_usd_por_1m: "3 / 15"
+      uso: "Casi calidad Opus en codigo a menor costo. Modelo por defecto."
+    - id: "claude-haiku-4-5"
+      nombre: "Haiku 4.5"
+      precio_entrada_salida_usd_por_1m: "1 / 5"
+      uso: "Rapido y barato para tareas simples y mecanicas."
+
+regla_base:
+  - "Empezar siempre en Sonnet 5."
+  - "Subir a Opus 4.8 solo cuando el problema lo pida (ver escalado)."
+  - "Bajar a Haiku 4.5 lo trivial."
+
+modelo_por_tarea:
+  sonnet_5:
+    descripcion: "Trabajo diario. ~80% de las tareas."
+    tareas:
+      - "Endpoints nuevos en API_LA_QUINTA/src/modules"
+      - "Tests backend (API_LA_QUINTA/test) y de cliente"
+      - "Componentes React en front_menu y front_clientes"
+      - "Revisar un PR"
+      - "Seeds y scripts de complejidad media"
+      - "Ajustes acotados dentro de un modulo"
+  opus_4_8:
+    descripcion: "Solo lo critico o dificil."
+    tareas:
+      - "Migraciones PostgreSQL (API_LA_QUINTA/src/database/migrations): error caro en base ya aplicada"
+      - "Reglas de negocio delicadas: modules/pedidos (semanas, plazo, guarniciones, transacciones)"
+      - "Modulo finanzas: cuenta corriente, pagos, estado_financiero"
+      - "Refactors grandes por capas (helpers -> modulo/orquestador -> docs)"
+      - "Bug que Sonnet no resuelve tras 1-2 intentos"
+  haiku_4_5:
+    descripcion: "Tareas mecanicas."
+    tareas:
+      - "Renombrar y formatear"
+      - "Resumir o clasificar"
+      - "Seed o script trivial"
+
+escalado_de_modelo:
+  - "Entrar a la tarea en Sonnet 5."
+  - "Si toca migraciones o finanzas o un bug que no cede: subir a Opus 4.8 solo para esa tarea."
+  - "Volver a Sonnet 5 al terminar la parte critica."
+  - "Cambio de modelo en Claude Code: comando /model."
+
+optimizacion_tokens:
+  prioridad_alta:
+    - "Arrancar cada sesion leyendo docs/ai (mapa) y no recorriendo API_LA_QUINTA/src a ciegas. Ahorra mas tokens que elegir el modelo."
+    - "Respetar recommended_read_order de 00-index.yaml segun la tarea."
+    - "Mantener docs/ai actualizado (politica de mutacion de AGENTS.md): un doc obsoleto obliga a re-explorar."
+  prioridad_media:
+    - "Alcance acotado por subsistema (blast radius de 50-guardrails.yaml). Menos archivos = menos contexto."
+    - "Una sesion = un subsistema (pedidos, o menus, o migraciones)."
+  prompt_caching:
+    aplica_si: "Se integra la API de Claude en codigo, no solo Claude Code."
+    reglas:
+      - "Poner el prefijo estable (system + contexto docs/ai) antes de la parte que varia."
+      - "Marcar ese prefijo con cache_control; las lecturas de cache cuestan ~10% del precio normal."
+      - "Nunca meter timestamps ni UUID en el prefijo cacheado: rompe la cache."
+
+skill_recomendadora:
+  status: verified_general
+  existe_skill_automatica: false
+  nota: "No hay Skill que detecte la tarea y elija el modelo. La eleccion es manual o via subagentes."
+  alternativas:
+    - "/model: cambio manual de modelo."
+    - "/fast: modo rapido (Opus con salida mas veloz, no baja de modelo)."
+    - "Subagentes con modelo fijo en .claude/agents/*.md: lo mas cercano a automatizar (ej agente migraciones en Opus, agente frontend en Sonnet)."
+    - "Esta guia en docs/ai como referencia documentada."
+
+marking_policy:
+  from_chat_summary: "recomendaciones de flujo de trabajo dadas en conversacion con el usuario"
+  verified_general: "comportamiento general de Claude Code/API, no especifico del repo"
+  needs_verification: "precios y ids de modelo: revalidar en la fuente antes de decidir por costo"

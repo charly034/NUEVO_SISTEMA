@@ -120,6 +120,8 @@ recommended_read_order:
       - "docs/ai/60-debt.yaml"
     history:
       - "docs/ai/70-project-history.yaml"
+    eleccion_modelo_ia:
+      - "docs/ai/80-model-guidance.yaml"
 
 quick_paths:
   verified_in_repo:
