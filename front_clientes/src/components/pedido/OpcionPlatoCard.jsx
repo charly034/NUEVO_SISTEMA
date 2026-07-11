@@ -26,45 +26,54 @@ export default function OpcionPlatoCard({
 }) {
   return (
     <RadioCard compacto seleccionado={seleccionado} onClick={() => onSeleccionar?.(plato)}>
-      <span className="block">
-        <span className="flex items-start justify-between gap-2">
-          <span className="block min-w-0 text-[1.12rem] font-extrabold leading-tight text-[#292925]">
-            {plato.nombre}
+      <span className="flex items-start gap-3">
+        <span className="min-w-0 flex-1 block">
+          <span className="flex items-start justify-between gap-2">
+            <span className="block min-w-0 text-[1.12rem] font-extrabold leading-tight text-[#292925]">
+              {plato.nombre}
+            </span>
+            {plato.destacado && (
+              <span className="shrink-0 rounded-full bg-[#586b24] px-2 py-1 text-[0.68rem] font-black uppercase tracking-wide text-white">
+                Especial
+              </span>
+            )}
           </span>
-          {plato.destacado && (
-            <span className="shrink-0 rounded-full bg-[#586b24] px-2 py-1 text-[0.68rem] font-black uppercase tracking-wide text-white">
-              Especial
+          <span className="mt-1 block text-[0.98rem] font-semibold leading-snug text-[#6e6b64]">
+            {plato.descripcion}
+          </span>
+          {(plato.etiquetas?.length > 0 || plato.guarniciones?.length > 0) && (
+            <span className="mt-1.5 flex flex-wrap gap-1.5">
+              {plato.guarniciones?.length > 0 &&
+                !plato.etiquetas?.includes("Requiere guarnición") && (
+                  <span
+                    className={unirClases(
+                      "rounded-full border px-2 py-0.5 text-[0.72rem] font-extrabold",
+                      estiloEtiqueta("Requiere guarnición"),
+                    )}
+                  >
+                    Requiere guarnición
+                  </span>
+                )}
+              {plato.etiquetas?.map((etiqueta) => (
+                <span
+                  key={etiqueta}
+                  className={unirClases(
+                    "rounded-full border px-2 py-0.5 text-[0.72rem] font-black",
+                    estiloEtiqueta(etiqueta),
+                  )}
+                >
+                  {etiqueta}
+                </span>
+              ))}
             </span>
           )}
         </span>
-        <span className="mt-1 block text-[0.98rem] font-semibold leading-snug text-[#6e6b64]">
-          {plato.descripcion}
-        </span>
-        {(plato.etiquetas?.length > 0 || plato.guarniciones?.length > 0) && (
-          <span className="mt-1.5 flex flex-wrap gap-1.5">
-            {plato.guarniciones?.length > 0 &&
-              !plato.etiquetas?.includes("Requiere guarnición") && (
-                <span
-                  className={unirClases(
-                    "rounded-full border px-2 py-0.5 text-[0.72rem] font-extrabold",
-                    estiloEtiqueta("Requiere guarnición"),
-                  )}
-                >
-                  Requiere guarnición
-                </span>
-              )}
-            {plato.etiquetas?.map((etiqueta) => (
-              <span
-                key={etiqueta}
-                className={unirClases(
-                  "rounded-full border px-2 py-0.5 text-[0.72rem] font-black",
-                  estiloEtiqueta(etiqueta),
-                )}
-              >
-                {etiqueta}
-              </span>
-            ))}
-          </span>
+        {plato.foto_url && (
+          <img
+            src={plato.foto_url}
+            alt={plato.nombre}
+            className="h-16 w-16 shrink-0 rounded-xl object-cover"
+          />
         )}
       </span>
     </RadioCard>

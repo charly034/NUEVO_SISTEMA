@@ -1,0 +1,86 @@
+[
+  {
+    "nombre": "Ensalada mixta",
+    "tipo": "fria"
+  },
+  {
+    "nombre": "Ensalada rusa",
+    "tipo": "fria"
+  },
+  {
+    "nombre": "Remolacha y zanahoria",
+    "tipo": "fria"
+  },
+  {
+    "nombre": "Puré de papas",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Puré de zapallo",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Puré mixto",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Puré de batata",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Papas al horno",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Papas rústicas",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Verduras asadas",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Arroz",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Arroz integral",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Arroz primavera",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Fideos al pesto",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Salsa bolognesa",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Salsa fileto",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Salsa blanca",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Salsa caruso",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Salsa con albóndigas",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Salsa de hongos",
+    "tipo": "caliente"
+  },
+  {
+    "nombre": "Estofado",
+    "tipo": "caliente"
+  }
+]

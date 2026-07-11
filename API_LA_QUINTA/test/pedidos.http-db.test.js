@@ -69,6 +69,15 @@ function lunesSemanaActualTest() {
   return fechaISOTest(fecha);
 }
 
+function lunesSemanaProximaTest() {
+  const fecha = new Date();
+  fecha.setHours(0, 0, 0, 0);
+  const dia = fecha.getDay();
+  const diasHastaLunes = dia === 0 ? 1 : (8 - dia) % 7 || 7;
+  fecha.setDate(fecha.getDate() + diasHastaLunes);
+  return fechaISOTest(fecha);
+}
+
 test('POST /api/v1/pedidos sin token devuelve 401', async () => {
   const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
     payload: { semana_inicio: '2026-07-06', items: [] },
@@ -233,6 +242,156 @@ test('POST con guarnicion indebida devuelve 422 y no guarda parcial', async () =
     assert.equal(respuesta.status, 422);
     assert.match(respuesta.body.message, /no admite guarnicion/);
     assert.equal(await contarPedidosFixture(fixture), 0);
+  });
+});
+
+test('POST con plato disponible_vianda=false devuelve 422 y no guarda parcial', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'lunes',
+          plato_id: fixture.platoNoDisponibleVianda.id,
+          guarnicion_id: null,
+        }],
+      }),
+    });
+
+    assert.equal(respuesta.status, 422);
+    assert.match(respuesta.body.message, /ya no esta disponible/);
+    assert.equal(await contarPedidosFixture(fixture), 0);
+  });
+});
+
+test('GET /api/v1/pedidos/semanas no ofrece un plato fijo con disponible_vianda=false', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'GET', '/pedidos/semanas', {
+      token: fixture.token,
+    });
+
+    assert.equal(respuesta.status, 200);
+    const semana = respuesta.body.data.semanas.find((s) => s.id === fixture.semanaInicio);
+    const lunes = semana.dias.find((d) => d.clave === 'lunes');
+    assert.ok(!lunes.opciones.some((o) => o.platoId === fixture.platoNoDisponibleVianda.id));
+  });
+});
+
+test('POST con guarnicion y salsa a eleccion se persisten de forma independiente', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'lunes',
+          plato_id: fixture.platoConGuarnicionYSalsa.id,
+          guarnicion_id: fixture.guarnicion.id,
+          salsa_id: fixture.salsa.id,
+        }],
+      }),
+    });
+
+    assert.equal(respuesta.status, 201);
+    const pedido = await obtenerPedidoDb(respuesta.body.data.pedido.id);
+    const lunes = pedido.items.find((item) => item.dia === 'lunes');
+    assert.equal(lunes.guarnicion_id, fixture.guarnicion.id);
+    assert.equal(lunes.salsa_id, fixture.salsa.id);
+  });
+});
+
+test('POST con salsa a eleccion faltante devuelve 422 y no guarda parcial', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'lunes',
+          plato_id: fixture.platoConGuarnicionYSalsa.id,
+          guarnicion_id: fixture.guarnicion.id,
+          salsa_id: null,
+        }],
+      }),
+    });
+
+    assert.equal(respuesta.status, 422);
+    assert.match(respuesta.body.message, /Elegi una salsa/);
+    assert.equal(await contarPedidosFixture(fixture), 0);
+  });
+});
+
+test('POST con salsa indebida devuelve 422 y no guarda parcial', async () => {
+  await conFixture({}, async (fixture) => {
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'lunes',
+          plato_id: fixture.platoFijo.id,
+          guarnicion_id: null,
+          salsa_id: fixture.salsa.id,
+        }],
+      }),
+    });
+
+    assert.equal(respuesta.status, 422);
+    assert.match(respuesta.body.message, /no admite salsa/);
+    assert.equal(await contarPedidosFixture(fixture), 0);
+  });
+});
+
+test('POST con plato de salsa fija ignora la salsa enviada y persiste la fija del plato', async () => {
+  await conFixture({}, async (fixture) => {
+    const otraSalsa = (await query(
+      `INSERT INTO salsas (nombre, activo) VALUES ($1, true) RETURNING *`,
+      [`${fixture.prefijo} Salsa blanca`],
+    )).rows[0];
+
+    const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'lunes',
+          plato_id: fixture.platoConSalsaFija.id,
+          guarnicion_id: null,
+          salsa_id: otraSalsa.id,
+        }],
+      }),
+    });
+
+    assert.equal(respuesta.status, 201);
+    const pedido = await obtenerPedidoDb(respuesta.body.data.pedido.id);
+    const lunes = pedido.items.find((item) => item.dia === 'lunes');
+    assert.equal(lunes.salsa_id, fixture.salsa.id);
+  });
+});
+
+test('GET /api/v1/pedidos/semanas expone salsaModo, salsas disponibles y la seleccion guardada', async () => {
+  await conFixture({}, async (fixture) => {
+    await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
+      token: fixture.token,
+      payload: payloadPedidoValido(fixture, {
+        items: [{
+          dia: 'lunes',
+          plato_id: fixture.platoConGuarnicionYSalsa.id,
+          guarnicion_id: fixture.guarnicion.id,
+          salsa_id: fixture.salsa.id,
+        }],
+      }),
+    });
+
+    const respuesta = await requestJson(servidor.baseUrl, 'GET', `/pedidos/semanas?empresaId=${fixture.empresa.id}`, {
+      token: fixture.token,
+    });
+
+    assert.equal(respuesta.status, 200);
+    const semana = respuesta.body.data.semanas.find((s) => s.id === fixture.semanaInicio);
+    const lunes = semana.dias.find((d) => d.clave === 'lunes');
+    const opcionPlato = lunes.opciones.find((o) => o.platoId === fixture.platoConGuarnicionYSalsa.id);
+
+    assert.equal(opcionPlato.salsaModo, 'libre');
+    assert.ok(opcionPlato.salsas.some((s) => s.id === fixture.salsa.id));
+    assert.equal(lunes.seleccion.salsaId, fixture.salsa.id);
+    assert.equal(lunes.seleccion.nombreSalsa, fixture.salsa.nombre);
   });
 });
 
@@ -653,7 +812,7 @@ test('DELETE /pedidos/mi-pedido cancela pedido pendiente desde historial', async
 
 test('DELETE /pedidos/:id/dias/:dia cancela solo un dia pendiente', async () => {
   await conFixture({
-    semanaInicio: '2026-07-06',
+    semanaInicio: lunesSemanaProximaTest(),
     modoPedido: 'diario',
   }, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture, {
@@ -716,6 +875,7 @@ test('DELETE /pedidos/mi-pedido conserva dias vencidos al cancelar semana en cur
     semanaInicio: lunesSemanaActualTest(),
     modoPedido: 'diario',
     diasLaborales: 'lunes_domingo',
+    limiteHora: '00:00',
     incluirDiaSinServicio: false,
   }, async (fixture) => {
     const pedido = await crearPedidoDirecto(fixture, {
@@ -844,7 +1004,7 @@ test('PATCH estado admin crea notificacion interna aunque WhatsApp este desactiv
     try {
       const respuesta = await requestJson(servidor.baseUrl, 'PATCH', `/pedidos/${pedido.id}/estado`, {
         token: tokenAdmin,
-        payload: { estado: 'listo' },
+        payload: { estado: 'completo' },
       });
 
       assert.equal(respuesta.status, 200);
@@ -860,6 +1020,189 @@ test('PATCH estado admin crea notificacion interna aunque WhatsApp este desactiv
   });
 });
 
+test('PATCH estado de item admin marca vianda y recalcula estado del pedido', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{
+        dia: 'lunes',
+        plato_id: fixture.platoConGuarnicion.id,
+        opcion: 'A',
+        guarnicion_id: fixture.guarnicion.id,
+      }],
+    });
+
+    const pedidoAntes = await obtenerPedidoDb(pedido.id);
+    const item = pedidoAntes.items.find((pedidoItem) => pedidoItem.dia === 'lunes');
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        `/pedidos/items/${item.id}/estado`,
+        { token, payload: { estado: 'entregado' } },
+      );
+
+      assert.equal(respuesta.status, 200);
+      assert.equal(respuesta.body.data.item.estado, 'entregado');
+      assert.equal(respuesta.body.data.pedido.estado, 'completo');
+
+      const actualizado = await obtenerPedidoDb(pedido.id);
+      assert.equal(actualizado.estado, 'completo');
+      assert.equal(actualizado.items[0].estado, 'entregado');
+      assert.equal(actualizado.eventos.at(-1).tipo, 'estado_item_cambiado');
+    });
+  });
+});
+
+test('PATCH estado de item admin cancela vianda y mantiene trazabilidad', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [
+        {
+          dia: 'lunes',
+          plato_id: fixture.platoConGuarnicion.id,
+          opcion: 'A',
+          guarnicion_id: fixture.guarnicion.id,
+        },
+        {
+          dia: 'martes',
+          plato_id: fixture.platoConGuarnicion.id,
+          opcion: 'A',
+          guarnicion_id: fixture.guarnicion.id,
+        },
+      ],
+    });
+
+    const pedidoAntes = await obtenerPedidoDb(pedido.id);
+    const item = pedidoAntes.items.find((pedidoItem) => pedidoItem.dia === 'lunes');
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        `/pedidos/items/${item.id}/estado`,
+        { token, payload: { estado: 'cancelado' } },
+      );
+
+      assert.equal(respuesta.status, 200);
+      assert.equal(respuesta.body.data.item.estado, 'cancelado');
+      assert.equal(respuesta.body.data.pedido.estado, 'en_proceso');
+
+      const actualizado = await obtenerPedidoDb(pedido.id);
+      assert.equal(actualizado.items.length, 2);
+      assert.equal(actualizado.items.find((pedidoItem) => pedidoItem.dia === 'lunes').estado, 'cancelado');
+      assert.equal(actualizado.items.find((pedidoItem) => pedidoItem.dia === 'martes').estado, 'pendiente');
+    });
+  });
+});
+
+test('PATCH estado de item admin - 409 si item tiene sin_pedido=true', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{ dia: 'lunes', sin_pedido: true }],
+    });
+    const pedidoAntes = await obtenerPedidoDb(pedido.id);
+    const item = pedidoAntes.items.find((i) => i.dia === 'lunes');
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        `/pedidos/items/${item.id}/estado`,
+        { token, payload: { estado: 'entregado' } },
+      );
+      assert.equal(respuesta.status, 409);
+    });
+  });
+});
+
+test('PATCH estado de item admin - 409 si el pedido esta cancelado', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{ dia: 'lunes', plato_id: fixture.platoConGuarnicion.id, opcion: 'A', guarnicion_id: fixture.guarnicion.id }],
+    });
+    const pedidoAntes = await obtenerPedidoDb(pedido.id);
+    const item = pedidoAntes.items.find((i) => i.dia === 'lunes');
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      await requestJson(servidor.baseUrl, 'PATCH', `/pedidos/${pedido.id}/estado`, { token, payload: { estado: 'cancelado' } });
+
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        `/pedidos/items/${item.id}/estado`,
+        { token, payload: { estado: 'entregado' } },
+      );
+      assert.equal(respuesta.status, 409);
+    });
+  });
+});
+
+test('PATCH estado de item admin - 400 si estado es invalido', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [{ dia: 'lunes', plato_id: fixture.platoConGuarnicion.id, opcion: 'A', guarnicion_id: fixture.guarnicion.id }],
+    });
+    const pedidoAntes = await obtenerPedidoDb(pedido.id);
+    const item = pedidoAntes.items.find((i) => i.dia === 'lunes');
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        `/pedidos/items/${item.id}/estado`,
+        { token, payload: { estado: 'listo' } },
+      );
+      assert.equal(respuesta.status, 400);
+    });
+  });
+});
+
+test('PATCH estado de item admin - 404 si el item no existe', async () => {
+  await conFixture({}, async (fixture) => {
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        '/pedidos/items/999999/estado',
+        { token, payload: { estado: 'entregado' } },
+      );
+      assert.equal(respuesta.status, 404);
+    });
+  });
+});
+
+test('PATCH estado de item admin - pedido completo cuando todos los items de 2 dias son entregados', async () => {
+  await conFixture({}, async (fixture) => {
+    const pedido = await crearPedidoDirecto(fixture, {
+      items: [
+        { dia: 'lunes', plato_id: fixture.platoConGuarnicion.id, opcion: 'A', guarnicion_id: fixture.guarnicion.id },
+        { dia: 'martes', plato_id: fixture.platoConGuarnicion.id, opcion: 'A', guarnicion_id: fixture.guarnicion.id },
+      ],
+    });
+    const pedidoAntes = await obtenerPedidoDb(pedido.id);
+    const itemLunes = pedidoAntes.items.find((i) => i.dia === 'lunes');
+    const itemMartes = pedidoAntes.items.find((i) => i.dia === 'martes');
+
+    await conAdminTest(fixture.prefijo, async ({ token }) => {
+      await requestJson(servidor.baseUrl, 'PATCH', `/pedidos/items/${itemLunes.id}/estado`, { token, payload: { estado: 'entregado' } });
+      const respuesta = await requestJson(
+        servidor.baseUrl,
+        'PATCH',
+        `/pedidos/items/${itemMartes.id}/estado`,
+        { token, payload: { estado: 'entregado' } },
+      );
+
+      assert.equal(respuesta.status, 200);
+      assert.equal(respuesta.body.data.pedido.estado, 'completo');
+
+      const actualizado = await obtenerPedidoDb(pedido.id);
+      assert.equal(actualizado.estado, 'completo');
+      assert.equal(actualizado.items.every((i) => i.estado === 'entregado'), true);
+    });
+  });
+});
+
 test('GET /empresas pagina y busca parcialmente por email', async () => {
   const prefijo = crearPrefijoTest();
   await limpiarDatosTest(prefijo);
@@ -867,8 +1210,8 @@ test('GET /empresas pagina y busca parcialmente por email', async () => {
   try {
     for (let i = 0; i < 55; i += 1) {
       await query(
-        `INSERT INTO empresas (nombre, slug, plan, modo_pedido, activo, codigo_registro, email)
-         VALUES ($1, $2, 'basico', 'semanal', true, $3, $4)`,
+        `INSERT INTO empresas (nombre, slug, modo_pedido, activo, codigo_registro, email)
+         VALUES ($1, $2, 'semanal', true, $3, $4)`,
         [
           `${prefijo} Empresa ${String(i).padStart(2, '0')}`,
           `${prefijo}-empresa-${i}`,

@@ -99,14 +99,26 @@ const EMPRESAS = [
   },
 ];
 
+// Solo semanas que existen en el Excel (la última es la del 06/07). No se fabrica
+// una semana "próxima" con platos aleatorios: los pedidos apuntan a menús reales.
+// Estados de pedidos.estado validos: 'pendiente' | 'en_proceso' | 'completo' | 'cancelado'
+// (los legacy 'listo'/'entregado' ya no existen a nivel pedido, solo a nivel pedido_items).
 const SEMANAS_PEDIDOS = [
-  { offset: -4, key: '-4', probabilidad: 0.78, estados: ['entregado'] },
-  { offset: -3, key: '-3', probabilidad: 0.84, estados: ['entregado'] },
-  { offset: -2, key: '-2', probabilidad: 0.88, estados: ['entregado', 'listo'] },
-  { offset: -1, key: '-1', probabilidad: 0.82, estados: ['entregado', 'en_proceso'] },
-  { offset: 0, key: '0', probabilidad: 0.76, estados: ['pendiente', 'en_proceso', 'listo'] },
-  { offset: 1, key: '+1', probabilidad: 0.62, estados: ['pendiente'] },
+  { offset: -4, key: '-4', probabilidad: 0.78, estados: ['completo'] },
+  { offset: -3, key: '-3', probabilidad: 0.84, estados: ['completo'] },
+  { offset: -2, key: '-2', probabilidad: 0.88, estados: ['completo'] },
+  { offset: -1, key: '-1', probabilidad: 0.82, estados: ['completo', 'en_proceso'] },
+  { offset: 0, key: '0', probabilidad: 0.76, estados: ['pendiente', 'en_proceso'] },
 ];
+
+// Estado de pedido_items.estado representativo para cada estado de pedido,
+// espejando el mapeo real usado en pedidos.service.js (cambiarEstado).
+const ESTADO_ITEM_POR_PEDIDO = {
+  completo: 'entregado',
+  en_proceso: 'preparado',
+  pendiente: 'pendiente',
+  cancelado: 'cancelado',
+};
 
 const NOTAS = [
   null,
@@ -265,7 +277,9 @@ async function cargarMenusPorSemanaConClient(client, semanas) {
 
   const opciones = await client.query(
     `SELECT msd.menu_semanal_id, msd.dia, msd.opcion,
-            p.id AS plato_id, p.nombre, p.tiene_guarnicion
+            msd.guarnicion_fija_override_id,
+            p.id AS plato_id, p.nombre, p.tiene_guarnicion,
+            p.guarnicion_modo, p.guarnicion_fija_id
      FROM menu_semanal_dias msd
      JOIN platos p ON p.id = msd.plato_id
      WHERE msd.menu_semanal_id = ANY($1::int[])
@@ -281,6 +295,9 @@ async function cargarMenusPorSemanaConClient(client, semanas) {
       id: row.plato_id,
       nombre: row.nombre,
       tiene_guarnicion: row.tiene_guarnicion,
+      guarnicion_modo: row.guarnicion_modo,
+      guarnicion_fija_id: row.guarnicion_fija_id,
+      guarnicion_fija_override_id: row.guarnicion_fija_override_id,
       opcion: row.opcion,
     });
   }
@@ -336,6 +353,11 @@ async function asegurarMenusDeTest(client, semanasConfig, platosEspeciales, plat
       resumen.creados++;
     }
 
+    // Solo poblar días con platos de prueba en menús recién creados.
+    // Los menús que ya existen (cargados desde el Excel) NO se tocan: no se
+    // rellenan días vacíos ni feriados con platos aleatorios.
+    if (existente.rows[0]) continue;
+
     for (const dia of DIAS) {
       const platosDia = elegirPlatosParaMenu(platosEspeciales, platosFijos);
       for (const [opcionIndex, plato] of platosDia.entries()) {
@@ -368,27 +390,30 @@ async function main() {
   const semanas = SEMANAS_PEDIDOS.map((semana) => getLunes(semana.offset));
 
   const [platosRes, guarnRes, planesRes] = await Promise.all([
-    query(`SELECT id, nombre, tipo, tiene_guarnicion FROM platos WHERE activo = true ORDER BY tipo, nombre`),
+    query(`SELECT id, nombre, disponibilidad, guarnicion_modo, guarnicion_fija_id, tiene_guarnicion
+           FROM platos WHERE activo = true ORDER BY disponibilidad, nombre`),
     query(`SELECT id, nombre FROM guarniciones WHERE activo = true ORDER BY nombre`),
     query(
       `SELECT id, codigo, nombre, gramaje_min, gramaje_max, incluye_postre, incluye_bebida
-       FROM planes_vianda
+       FROM planes_comerciales
        WHERE activo = true
        ORDER BY orden ASC, id ASC`,
     ),
   ]);
 
-  const platosEspeciales = platosRes.rows.filter((p) => p.tipo === 'especial' || p.tipo === 'ambos');
-  const platosFijos = platosRes.rows.filter((p) => p.tipo === 'fijo' || p.tipo === 'ambos');
+  // Modelo: disponibilidad (especial|fijo_dia|siempre).
+  // Especiales = platos de menú semanal; Fijos = platos fijos por día.
+  const platosEspeciales = platosRes.rows.filter((p) => p.disponibilidad === 'especial' || p.disponibilidad === 'siempre');
+  const platosFijos = platosRes.rows.filter((p) => p.disponibilidad === 'fijo_dia');
   const guarniciones = guarnRes.rows;
   const planesPorCodigo = new Map(planesRes.rows.map((plan) => [plan.codigo, plan]));
 
   if (platosEspeciales.length === 0 && platosFijos.length === 0) {
-    throw new Error('No hay platos activos. Ejecutá npm run seed:catalogo primero.');
+    throw new Error('No hay platos activos. Ejecutá node src/database/seeds/seed-catalogo-menus.js primero.');
   }
 
   if (planesRes.rows.length === 0) {
-    throw new Error('No hay planes de vianda activos. Ejecuta npm run migrate para cargar planes_vianda.');
+    throw new Error('No hay planes comerciales activos. Ejecuta npm run migrate para cargar planes_comerciales.');
   }
 
   const client = await getClient();
@@ -424,11 +449,10 @@ async function main() {
       const plan = planesPorCodigo.get(codigoPlanParaEmpresa(empresaSeed)) || planesRes.rows[0];
       const planPedido = snapshotPlan(plan);
       const empresaRes = await client.query(
-        `INSERT INTO empresas (nombre, slug, plan, plan_id, modo_pedido, email, telefono, codigo_registro)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO empresas (nombre, slug, plan_id, modo_pedido, email, telefono, codigo_registro)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (slug) DO UPDATE SET
            nombre = EXCLUDED.nombre,
-           plan = EXCLUDED.plan,
            plan_id = EXCLUDED.plan_id,
            modo_pedido = EXCLUDED.modo_pedido,
            email = EXCLUDED.email,
@@ -438,7 +462,6 @@ async function main() {
         [
           empresaSeed.nombre,
           empresaSeed.slug,
-          empresaSeed.plan,
           plan.id,
           empresaSeed.modo_pedido,
           `contacto@${empresaSeed.abrev}.test`,
@@ -550,12 +573,13 @@ async function main() {
             [pedidoId, ORIGEN_SEED],
           );
 
+          const estadoItem = ESTADO_ITEM_POR_PEDIDO[estado] || 'pendiente';
           const diasElegidos = shuffle(DIAS).slice(0, cantidadDiasPedido(config));
           for (const [diaIndex, dia] of diasElegidos.entries()) {
             if (debeMarcarSinPedido(config, empleado.index, diaIndex)) {
               await client.query(
-                `INSERT INTO pedido_items (pedido_id, dia, sin_pedido, origen, notas)
-                 VALUES ($1, $2, true, $3, $4)`,
+                `INSERT INTO pedido_items (pedido_id, dia, sin_pedido, origen, notas, estado)
+                 VALUES ($1, $2, true, $3, $4, 'cancelado')`,
                 [pedidoId, dia, ORIGEN_SEED, 'Sin vianda: reunión externa / home office'],
               );
               resumen.items++;
@@ -570,12 +594,24 @@ async function main() {
               platosFijos,
               platosEspeciales,
             });
-            const guarnicionId = plato.tiene_guarnicion && guarniciones.length > 0 ? pick(guarniciones).id : null;
+            // Guarnición del item, en orden de prioridad:
+            //  1) la fijada por el menú publicado esa semana (override real),
+            //  2) la guarnición fija propia del plato (guarnicion_modo='fija'),
+            //  3) una aleatoria si el plato es de guarnición libre,
+            //  4) ninguna (sin_guarnicion).
+            let guarnicionId = null;
+            if (plato.guarnicion_fija_override_id) {
+              guarnicionId = plato.guarnicion_fija_override_id;
+            } else if (plato.guarnicion_modo === 'fija' && plato.guarnicion_fija_id) {
+              guarnicionId = plato.guarnicion_fija_id;
+            } else if ((plato.guarnicion_modo === 'libre' || plato.tiene_guarnicion) && guarniciones.length > 0) {
+              guarnicionId = pick(guarniciones).id;
+            }
             await client.query(
               `INSERT INTO pedido_items
-                 (pedido_id, dia, plato_id, opcion, guarnicion_id, notas, sin_pedido, origen)
-               VALUES ($1, $2, $3, $4, $5, $6, false, $7)`,
-              [pedidoId, dia, plato.id, plato.opcion || null, guarnicionId, pick(NOTAS), ORIGEN_SEED],
+                 (pedido_id, dia, plato_id, opcion, guarnicion_id, notas, sin_pedido, origen, estado)
+               VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8)`,
+              [pedidoId, dia, plato.id, plato.opcion || null, guarnicionId, pick(NOTAS), ORIGEN_SEED, estadoItem],
             );
             resumen.items++;
           }

@@ -1,0 +1,1304 @@
+[
+  {
+    "semana": 1,
+    "fecha_inicio": "2026-01-26",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Arroz con pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa fileto"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Ensalada César",
+          "guarnicion": "Arroz integral"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de papa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hamburguesa de acelga",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Ñoquis",
+          "guarnicion": null
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Bomba de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Cerdo a la barbacoa",
+          "guarnicion": "Puré de papas"
+        }
+      }
+    }
+  },
+  {
+    "semana": 2,
+    "fecha_inicio": "2026-02-02",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pata muslo al champiñón",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Napolitana de carne",
+          "guarnicion": "Papas al horno"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Zapallitos rellenos",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Milanesa de berenjena napolitana",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Lasaña",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Fetuchini",
+          "guarnicion": "Salsa de hongos"
+        },
+        "C": {
+          "plato": "Costeletas de cerdo a la riojana",
+          "guarnicion": null
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Carne a la olla",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Alitas rebozadas",
+          "guarnicion": "Puré de papas"
+        }
+      }
+    }
+  },
+  {
+    "semana": 3,
+    "fecha_inicio": "2026-02-09",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo al verdeo",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Ravioles",
+          "guarnicion": "Salsa bolognesa"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Estofado de albóndigas",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tortilla de verduras",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Berenjenas rellenas",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Salpicón",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Pollo a la portuguesa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Soufflé de espinaca",
+          "guarnicion": "Arroz"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Pan de carne",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Croquetas de papa",
+          "guarnicion": "Ensalada mixta"
+        }
+      }
+    }
+  },
+  {
+    "semana": 4,
+    "fecha_inicio": "2026-02-16",
+    "feriados": [
+      "lunes",
+      "martes"
+    ],
+    "dias": {
+      "miercoles": {
+        "A": {
+          "plato": "Pollo al horno con vegetales",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tallarines",
+          "guarnicion": "Salsa caruso"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Ravioles de acelga y ricota",
+          "guarnicion": "Salsa bolognesa"
+        },
+        "C": {
+          "plato": "Lasaña de zucchini",
+          "guarnicion": null
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Cerdo al horno",
+          "guarnicion": "Papas al horno"
+        },
+        "C": {
+          "plato": "Milanesa de zucchini napolitana",
+          "guarnicion": "Puré de papas"
+        }
+      }
+    }
+  },
+  {
+    "semana": 5,
+    "fecha_inicio": "2026-02-23",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Milanesa de pollo napolitana",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa fileto"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Hamburguesa de acelga",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Salpicón",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de papa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Costeletas de cerdo a la riojana",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Bomba de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Carne al horno",
+          "guarnicion": "Puré de papas"
+        }
+      }
+    }
+  },
+  {
+    "semana": 6,
+    "fecha_inicio": "2026-03-02",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo a la mostaza",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Medallones de merluza",
+          "guarnicion": "Ensalada rusa"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Estofado de albóndigas",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Lasaña de jamón y queso",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hamburguesa de lentejas",
+          "guarnicion": "Puré de zapallo"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Ravioles de jamón y queso",
+          "guarnicion": "Salsa fileto"
+        },
+        "C": {
+          "plato": "Pollo a la crema",
+          "guarnicion": "Arroz primavera"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Cerdo a la barbacoa",
+          "guarnicion": "Puré mixto"
+        },
+        "C": {
+          "plato": "Ensalada César",
+          "guarnicion": null
+        }
+      }
+    }
+  },
+  {
+    "semana": 7,
+    "fecha_inicio": "2026-03-09",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Tarta de verduras",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Pollo al romero",
+          "guarnicion": "Papas rústicas"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa bolognesa"
+        },
+        "C": {
+          "plato": "Zapallitos rellenos",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Wok de cerdo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Ñoquis",
+          "guarnicion": "Salsa bolognesa"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Arroz con calamar",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hamburguesa de acelga a la napolitana",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Pan de carne relleno",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Torrejas de arroz y jamón",
+          "guarnicion": "Puré de zapallo"
+        }
+      }
+    }
+  },
+  {
+    "semana": 8,
+    "fecha_inicio": "2026-03-16",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo al limón",
+          "guarnicion": "Puré de zapallo"
+        },
+        "C": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Papas al horno"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Tortilla de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Estofado de carne",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Ensalada César",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Mil hojas de berenjena y zucchini",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Carne al wok con vegetales",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tallarines",
+          "guarnicion": "Salsa con albóndigas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Costeletas de cerdo",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Tacos de pollo",
+          "guarnicion": "Ensalada mixta"
+        }
+      }
+    }
+  },
+  {
+    "semana": 9,
+    "fecha_inicio": "2026-03-23",
+    "feriados": [
+      "lunes",
+      "martes"
+    ],
+    "dias": {
+      "miercoles": {
+        "A": {
+          "plato": "Pollo al limón",
+          "guarnicion": "Fideos al pesto"
+        },
+        "C": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa blanca"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Rotolo de verdura",
+          "guarnicion": "Salsa bolognesa"
+        },
+        "C": {
+          "plato": "Cerdo a la barbacoa",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Carne a la olla",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Medallones de merluza",
+          "guarnicion": "Ensalada rusa"
+        }
+      }
+    }
+  },
+  {
+    "semana": 10,
+    "fecha_inicio": "2026-04-06",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pata muslo al champiñón",
+          "guarnicion": "Puré de zapallo"
+        },
+        "C": {
+          "plato": "Napolitana de carne",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Zapallitos rellenos",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Lasaña de berenjena",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tarta caprese",
+          "guarnicion": "Puré mixto"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tacos de carne",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Carne al horno",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Ravioles",
+          "guarnicion": "Salsa caruso"
+        }
+      }
+    }
+  },
+  {
+    "semana": 11,
+    "fecha_inicio": "2026-04-13",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Milanesa de pollo napolitana",
+          "guarnicion": "Ensalada rusa"
+        },
+        "C": {
+          "plato": "Medallones de merluza",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Croquetas de vegetales y semillas",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Pan de carne",
+          "guarnicion": "Papas al horno"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Filet de merluza",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa blanca"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Pollo al escabeche con budín de calabaza",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Fetuchini de espinaca",
+          "guarnicion": "Estofado"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Milhojas de papa",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Estofado de albóndigas",
+          "guarnicion": null
+        }
+      }
+    }
+  },
+  {
+    "semana": 12,
+    "fecha_inicio": "2026-04-20",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo al verdeo",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Ravioles",
+          "guarnicion": "Salsa bolognesa"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Guiso de lentejas",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Bife a la criolla",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hamburguesa de acelga a la napolitana",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Pollo a la portuguesa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Ñoquis",
+          "guarnicion": "Salsa bolognesa"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Risotto de cerdo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tallarines",
+          "guarnicion": "Salsa caruso"
+        }
+      }
+    }
+  },
+  {
+    "semana": 13,
+    "fecha_inicio": "2026-04-27",
+    "feriados": [
+      "viernes"
+    ],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Arroz con pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa fileto"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Tortilla de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Ensalada César",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Mil hojas de berenjena y zucchini",
+          "guarnicion": "Arroz integral"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de carne con vegetales y arroz",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Costeletas de cerdo a la riojana",
+          "guarnicion": "Puré de papas"
+        }
+      }
+    }
+  },
+  {
+    "semana": 14,
+    "fecha_inicio": "2026-05-04",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Rollitos de pollo",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Tortilla de verduras",
+          "guarnicion": "Arroz integral"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Lasaña de berenjena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Ravioles",
+          "guarnicion": "Salsa bolognesa"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de papa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hígado encebollado",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Pan de carne",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Pata muslo",
+          "guarnicion": "Arroz primavera"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Hamburguesa casera de pollo",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Spaghetti de espinaca",
+          "guarnicion": "Estofado"
+        }
+      }
+    }
+  },
+  {
+    "semana": 15,
+    "fecha_inicio": "2026-05-11",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pata muslo al champiñón",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Napolitana de carne",
+          "guarnicion": "Papas al horno"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Zapallitos rellenos",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Milanesa de berenjena napolitana",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Lasaña",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Fetuchini",
+          "guarnicion": "Salsa de hongos"
+        },
+        "C": {
+          "plato": "Cerdo a la barbacoa",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Carne a la olla",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Estofado de albóndigas",
+          "guarnicion": null
+        }
+      }
+    }
+  },
+  {
+    "semana": 16,
+    "fecha_inicio": "2026-05-18",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo al limón",
+          "guarnicion": "Puré de zapallo"
+        },
+        "C": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Papas al horno"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Tortilla de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Estofado de carne",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Guiso de mondongo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Mil hojas de berenjena y zucchini",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Carne al wok con vegetales",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tallarines",
+          "guarnicion": "Salsa con albóndigas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Costeletas de cerdo",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Tacos de pollo",
+          "guarnicion": "Ensalada mixta"
+        }
+      }
+    }
+  },
+  {
+    "semana": 17,
+    "fecha_inicio": "2026-05-25",
+    "feriados": [
+      "lunes"
+    ],
+    "dias": {
+      "martes": {
+        "A": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa bolognesa"
+        },
+        "C": {
+          "plato": "Polenta con queso y bolognesa",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Zapallitos rellenos",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Pollo a la portuguesa",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Sorrentinos de calabaza",
+          "guarnicion": "Salsa bolognesa"
+        },
+        "C": {
+          "plato": "Carne al horno",
+          "guarnicion": "Verduras asadas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Costeletas de cerdo a la riojana",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Fetuchini",
+          "guarnicion": "Salsa con albóndigas"
+        }
+      }
+    }
+  },
+  {
+    "semana": 18,
+    "fecha_inicio": "2026-06-01",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Spaghetti con salsa de champiñones",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Milanesa de calabaza napolitana",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Guiso de lentejas",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hamburguesa de pollo napolitana",
+          "guarnicion": "Puré de zapallo"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Tortilla de verduras",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Ñoquis",
+          "guarnicion": "Salsa bolognesa"
+        },
+        "C": {
+          "plato": "Guiso de albóndigas",
+          "guarnicion": null
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Wok de pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Medallones de merluza",
+          "guarnicion": "Ensalada rusa"
+        }
+      }
+    }
+  },
+  {
+    "semana": 19,
+    "fecha_inicio": "2026-06-08",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo al romero",
+          "guarnicion": "Papas rústicas"
+        },
+        "C": {
+          "plato": "Tarta de verduras",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Guiso de fideos",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Croquetas de papa",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Hamburguesa de acelga a la napolitana",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Polenta cremosa con cebolla caramelizada y champiñones",
+          "guarnicion": null
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de cerdo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Puchero",
+          "guarnicion": null
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Pan de carne",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Torrejas de arroz y jamón",
+          "guarnicion": "Puré de zapallo"
+        }
+      }
+    }
+  },
+  {
+    "semana": 20,
+    "fecha_inicio": "2026-06-15",
+    "feriados": [
+      "lunes"
+    ],
+    "dias": {
+      "martes": {
+        "A": {
+          "plato": "Arroz con pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tallarines de espinaca",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Suprema caprese",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de arroz y ternera",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tarta de atún",
+          "guarnicion": "Remolacha y zanahoria"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Pizza de verduras",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Cerdo a la barbacoa",
+          "guarnicion": "Puré mixto"
+        }
+      }
+    }
+  },
+  {
+    "semana": 21,
+    "fecha_inicio": "2026-06-22",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pollo al verdeo",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Ravioles",
+          "guarnicion": "Salsa bolognesa"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Hamburguesa de carne",
+          "guarnicion": "Puré de papas"
+        },
+        "C": {
+          "plato": "Guiso de lentejas",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Tortilla de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Rollitos de pollo",
+          "guarnicion": "Puré de zapallo"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Pastel de papa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Zapallito relleno",
+          "guarnicion": "Salsa fileto"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Tacos de pollo",
+          "guarnicion": "Ensalada mixta"
+        },
+        "C": {
+          "plato": "Bife a la criolla",
+          "guarnicion": null
+        }
+      }
+    }
+  },
+  {
+    "semana": 22,
+    "fecha_inicio": "2026-06-29",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Pata muslo al champiñón",
+          "guarnicion": "Puré de zapallo"
+        },
+        "C": {
+          "plato": "Napolitana de carne",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Hamburguesa de carne a la suiza",
+          "guarnicion": "Arroz"
+        },
+        "C": {
+          "plato": "Lasaña de berenjena",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Papillot de merluza",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Buñuelos de arroz",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Wok de pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Tarta bicolor",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Carne al horno",
+          "guarnicion": "Verduras asadas"
+        },
+        "C": {
+          "plato": "Ravioles",
+          "guarnicion": "Salsa caruso"
+        }
+      }
+    }
+  },
+  {
+    "semana": 23,
+    "fecha_inicio": "2026-07-06",
+    "feriados": [
+      "jueves"
+    ],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Polenta con queso y bolognesa",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Canelones de JyQ",
+          "guarnicion": "Salsa blanca"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Carbonada de pollo",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Estofado de albóndigas",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Pastel de calabaza",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Hígado encebollado",
+          "guarnicion": "Puré de papas"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Bondiola de cerdo braseada",
+          "guarnicion": "Puré de batata"
+        },
+        "C": {
+          "plato": "Fetuchini",
+          "guarnicion": "Salsa de hongos"
+        }
+      }
+    }
+  },
+  {
+    "semana": 24,
+    "fecha_inicio": "2026-07-13",
+    "feriados": [],
+    "dias": {
+      "lunes": {
+        "A": {
+          "plato": "Canelones de pollo",
+          "guarnicion": "Salsa blanca"
+        },
+        "C": {
+          "plato": "Tarta de verduras",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "martes": {
+        "A": {
+          "plato": "Pan de carne",
+          "guarnicion": "Papas al horno"
+        },
+        "C": {
+          "plato": "Guiso de fideos",
+          "guarnicion": null
+        }
+      },
+      "miercoles": {
+        "A": {
+          "plato": "Carne a la olla",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Zapallito relleno",
+          "guarnicion": "Salsa fileto"
+        }
+      },
+      "jueves": {
+        "A": {
+          "plato": "Pastel de camote",
+          "guarnicion": null
+        },
+        "C": {
+          "plato": "Buñuelos de arroz",
+          "guarnicion": "Ensalada mixta"
+        }
+      },
+      "viernes": {
+        "A": {
+          "plato": "Cerdo a la barbacoa",
+          "guarnicion": "Puré mixto"
+        },
+        "C": {
+          "plato": "Bomba de papa rellena",
+          "guarnicion": "Ensalada mixta"
+        }
+      }
+    }
+  }
+]

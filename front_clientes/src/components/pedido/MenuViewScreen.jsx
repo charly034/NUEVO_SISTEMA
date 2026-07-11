@@ -41,6 +41,7 @@ function PlatoMenuCard({ plato }) {
   const foto = plato.foto_url || plato.fotoUrl || plato.photo || "";
   const alergenos = normalizarAlergenos(plato);
   const guarniciones = plato.guarniciones || [];
+  const salsas = plato.salsas || [];
   const vegetariano = Boolean(
     plato.vegetariano ||
       plato.vegetarian ||
@@ -82,6 +83,11 @@ function PlatoMenuCard({ plato }) {
           {guarniciones.length > 0 && (
             <p className="mt-1 text-[11px] font-semibold text-[#5B6B2A]">
               Guarnicion a elegir
+            </p>
+          )}
+          {salsas.length > 0 && (
+            <p className="mt-0.5 text-[11px] font-semibold text-[#A61A1A]">
+              Salsa a elegir
             </p>
           )}
         </div>
@@ -149,7 +155,7 @@ export default function MenuViewScreen({ onBack, onHacerPedido, semana }) {
       <div className="flex-1 overflow-y-auto px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4">
         <div className="mb-3">
           <h2 className="font-serif text-xl font-bold text-[#2A2C1F]">{dia?.dia || "Dia"}</h2>
-          <p className="text-sm text-[#9A9885]">
+          <p className="text-sm text-[#6E6B64]">
             {opciones.length > 0 ? `${opciones.length} opciones disponibles` : "Sin opciones publicadas"}
           </p>
         </div>

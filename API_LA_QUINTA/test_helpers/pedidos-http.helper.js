@@ -102,8 +102,16 @@ export async function limpiarDatosTest(prefijo) {
     [`${prefijo}%`],
   );
   await query('DELETE FROM empresas WHERE slug LIKE $1', [`${prefijo}%`]);
+  await query(
+    `DELETE FROM viandas v
+     USING platos p
+     WHERE v.plato_id = p.id
+       AND p.nombre LIKE $1`,
+    [`${prefijo}%`],
+  );
   await query('DELETE FROM platos WHERE nombre LIKE $1', [`${prefijo}%`]);
   await query('DELETE FROM guarniciones WHERE nombre LIKE $1', [`${prefijo}%`]);
+  await query('DELETE FROM salsas WHERE nombre LIKE $1', [`${prefijo}%`]);
 }
 
 export async function crearFixturePedido({
@@ -121,10 +129,10 @@ export async function crearFixturePedido({
 
   const empresa = (await query(
     `INSERT INTO empresas (
-       nombre, slug, plan, modo_pedido, activo, limite_hora,
+       nombre, slug, modo_pedido, activo, limite_hora,
        limite_dia_semana, limite_anticipacion_dias, dias_laborales, codigo_registro
      )
-     VALUES ($1, $2, 'basico', $3, true, $4, $5, $6, $7, $8)
+     VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       `${prefijo} Empresa`,
@@ -140,10 +148,10 @@ export async function crearFixturePedido({
 
   const otraEmpresa = (await query(
     `INSERT INTO empresas (
-       nombre, slug, plan, modo_pedido, activo, limite_hora,
+       nombre, slug, modo_pedido, activo, limite_hora,
        limite_dia_semana, limite_anticipacion_dias, dias_laborales, codigo_registro
      )
-     VALUES ($1, $2, 'basico', $3, true, $4, $5, $6, $7, $8)
+     VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       `${prefijo} Otra Empresa`,
@@ -206,6 +214,51 @@ export async function crearFixturePedido({
     [`${prefijo} Plato fijo`],
   )).rows[0];
 
+  const platoNoDisponibleVianda = (await query(
+    `INSERT INTO platos (nombre, descripcion, activo, tipo, tiene_guarnicion, disponible_vianda)
+     VALUES ($1, 'Plato solo local test', true, 'fijo', false, false)
+     RETURNING *`,
+    [`${prefijo} Plato solo local`],
+  )).rows[0];
+
+  const salsa = (await query(
+    `INSERT INTO salsas (nombre, activo)
+     VALUES ($1, true)
+     RETURNING *`,
+    [`${prefijo} Salsa fileto`],
+  )).rows[0];
+
+  const platoConGuarnicionYSalsa = (await query(
+    `INSERT INTO platos (nombre, descripcion, activo, tipo, tiene_guarnicion, salsa_modo)
+     VALUES ($1, 'Plato test con guarnicion y salsa a eleccion', true, 'fijo', true, 'libre')
+     RETURNING *`,
+    [`${prefijo} Fideos con salsa y guarnicion libres`],
+  )).rows[0];
+
+  const platoConSalsaFija = (await query(
+    `INSERT INTO platos (nombre, descripcion, activo, tipo, tiene_guarnicion, salsa_modo, salsa_fija_id)
+     VALUES ($1, 'Plato test con salsa fija', true, 'fijo', false, 'fija', $2)
+     RETURNING *`,
+    [`${prefijo} Ñoquis con salsa fija`, salsa.id],
+  )).rows[0];
+
+  // Viandas globales (empresa_id NULL) para cada plato "vianda-eligible" del fixture --
+  // sin esta fila, platos.repository.js/validateItemForMenu los trata como sin vianda
+  // activa (ver create-viandas-table). platoNoDisponibleVianda queda sin vianda a
+  // proposito: es el caso de prueba de "no disponible".
+  await query(
+    `INSERT INTO viandas (plato_id, activo) VALUES ($1, true), ($2, true), ($3, true)`,
+    [platoConGuarnicion.id, platoSinGuarnicion.id, platoFijo.id],
+  );
+  await query(
+    `INSERT INTO viandas (plato_id, salsa_libre, activo) VALUES ($1, true, true)`,
+    [platoConGuarnicionYSalsa.id],
+  );
+  await query(
+    `INSERT INTO viandas (plato_id, salsa_id, activo) VALUES ($1, $2, true)`,
+    [platoConSalsaFija.id, salsa.id],
+  );
+
   const menu = (await query(
     `INSERT INTO menus_semanales (
        nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at
@@ -246,9 +299,13 @@ export async function crearFixturePedido({
     tokenAjeno: crearTokenEmpleado(empleadoAjeno.id),
     tokenOtraEmpresa: crearTokenEmpleado(empleadoOtraEmpresa.id),
     guarnicion,
+    salsa,
     platoConGuarnicion,
     platoSinGuarnicion,
     platoFijo,
+    platoNoDisponibleVianda,
+    platoConGuarnicionYSalsa,
+    platoConSalsaFija,
     menu,
   };
 }
@@ -286,14 +343,15 @@ export async function crearPedidoDirecto(fixture, { empleado = fixture.empleado,
 
   for (const item of items) {
     await query(
-      `INSERT INTO pedido_items (pedido_id, dia, plato_id, opcion, guarnicion_id, sin_pedido, origen)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO pedido_items (pedido_id, dia, plato_id, opcion, guarnicion_id, salsa_id, sin_pedido, origen)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         pedido.id,
         item.dia,
         item.plato_id || null,
         item.opcion || null,
         item.guarnicion_id || null,
+        item.salsa_id || null,
         Boolean(item.sin_pedido),
         item.origen || null,
       ],

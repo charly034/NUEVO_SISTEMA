@@ -7,17 +7,17 @@ const CAMPOS = `
 
 export const findAll = async ({ incluirInactivos = true } = {}) => {
   const where = incluirInactivos ? '' : 'WHERE activo = true';
-  const r = await query(`SELECT ${CAMPOS} FROM planes_vianda ${where} ORDER BY orden ASC, nombre ASC`);
+  const r = await query(`SELECT ${CAMPOS} FROM planes_comerciales ${where} ORDER BY orden ASC, nombre ASC`);
   return r.rows;
 };
 
 export const findById = async (id) => {
-  const r = await query(`SELECT ${CAMPOS} FROM planes_vianda WHERE id = $1`, [id]);
+  const r = await query(`SELECT ${CAMPOS} FROM planes_comerciales WHERE id = $1`, [id]);
   return r.rows[0] || null;
 };
 
 export const findByCodigo = async (codigo) => {
-  const r = await query(`SELECT ${CAMPOS} FROM planes_vianda WHERE codigo = $1`, [codigo]);
+  const r = await query(`SELECT ${CAMPOS} FROM planes_comerciales WHERE codigo = $1`, [codigo]);
   return r.rows[0] || null;
 };
 
@@ -42,7 +42,7 @@ export const create = async ({
   orden = 0,
 }) => {
   const r = await query(
-    `INSERT INTO planes_vianda (
+    `INSERT INTO planes_comerciales (
        codigo, nombre, descripcion, gramaje_min, gramaje_max,
        incluye_postre, incluye_bebida, activo, orden
      )
@@ -69,7 +69,7 @@ export const update = async (id, fields) => {
   const set = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
   vals.push(id);
   const r = await query(
-    `UPDATE planes_vianda SET ${set}, updated_at = NOW()
+    `UPDATE planes_comerciales SET ${set}, updated_at = NOW()
      WHERE id = $${vals.length}
      RETURNING ${CAMPOS}`,
     vals
@@ -79,7 +79,7 @@ export const update = async (id, fields) => {
 
 export const deactivate = async (id) => {
   const r = await query(
-    `UPDATE planes_vianda SET activo = false, updated_at = NOW()
+    `UPDATE planes_comerciales SET activo = false, updated_at = NOW()
      WHERE id = $1
      RETURNING ${CAMPOS}`,
     [id]

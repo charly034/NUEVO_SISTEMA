@@ -65,6 +65,32 @@ export const agregarPlatoDiaSchema = z.object({
     .number({ required_error: 'El plato_id es obligatorio' })
     .int()
     .positive(),
+  guarnicion_modo_override: z.enum(['sin_guarnicion', 'libre', 'fija']).nullable().optional(),
+  guarnicion_fija_override_id: z.number().int().positive().nullable().optional(),
+  salsa_modo_override: z.enum(['sin_salsa', 'libre', 'fija']).nullable().optional(),
+  salsa_fija_override_id: z.number().int().positive().nullable().optional(),
+  allow_duplicate: z.boolean().optional().default(false),
+  // Sin default: distingue "no enviado" (preserva el valor existente al
+  // editar un slot) de "enviado explicitamente". agregarPlato() en el
+  // repositorio aplica el default (true) solo cuando el slot es nuevo.
+  visible_empresas: z.boolean().optional(),
+});
+
+// Actualizar empresas visibles para un slot ([] = todas las empresas)
+export const setEmpresasSlotSchema = z.object({
+  empresa_ids: z.array(z.number().int().positive()).default([]),
+});
+
+// Actualizar guarnición de un slot ya existente
+export const actualizarGuarnicionSlotSchema = z.object({
+  guarnicion_modo_override: z.enum(['sin_guarnicion', 'libre', 'fija']).nullable(),
+  guarnicion_fija_override_id: z.number().int().positive().nullable().optional(),
+});
+
+// Actualizar salsa de un slot ya existente
+export const actualizarSalsaSlotSchema = z.object({
+  salsa_modo_override: z.enum(['sin_salsa', 'libre', 'fija']).nullable(),
+  salsa_fija_override_id: z.number().int().positive().nullable().optional(),
 });
 
 // Params para operar sobre un día + opción específica

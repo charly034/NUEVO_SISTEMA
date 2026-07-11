@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useDeleteGuarnicion, useGuarniciones, useUpdateGuarnicion } from '../hooks/useGuarniciones.js';
 import GuarnicionesPanel from '../components/platos/GuarnicionesPanel.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
-import { IconActionButton, PencilIcon, TrashIcon } from '../components/ui/IconActionButton.jsx';
+import SideDrawer from '../components/ui/SideDrawer.jsx';
+import { PencilIcon, IconActionButton } from '../components/ui/IconActionButton.jsx';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 
@@ -97,7 +98,7 @@ function EmptyState({ titulo, detalle, mostrarLimpiar, onLimpiar }) {
     <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
       <div>
         <p className="text-sm font-medium text-gray-600">{titulo}</p>
-        {detalle ? <p className="mt-1 text-xs text-gray-400">{detalle}</p> : null}
+        {detalle ? <p className="mt-1 text-xs text-gray-500">{detalle}</p> : null}
       </div>
       {mostrarLimpiar ? (
         <button type="button" onClick={onLimpiar} className="btn-secondary text-xs">
@@ -155,16 +156,16 @@ function TipoBadge({ tipo }) {
       {tipoCfg.label}
     </span>
   ) : (
-    <span className="text-xs text-gray-300">-</span>
+    <span className="text-xs text-gray-500">-</span>
   );
 }
 
-function GuarnicionMobileCard({ guarnicion, loading, onToggleActivo, onEdit, onDelete }) {
+function GuarnicionMobileCard({ guarnicion, loading, onOpen, onToggleActivo }) {
   return (
     <div className="bg-white px-4 py-3.5">
-      <div className="flex w-full items-start gap-3 text-left">
+      <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 text-left">
         <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-100">
-          <span className="text-xs text-gray-400">Tipo</span>
+          <span className="text-xs text-gray-500">Tipo</span>
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold leading-snug text-gray-900">{guarnicion.nombre}</p>
@@ -172,21 +173,16 @@ function GuarnicionMobileCard({ guarnicion, loading, onToggleActivo, onEdit, onD
             <TipoBadge tipo={guarnicion.tipo} />
           </div>
         </div>
-      </div>
+      </button>
       <div className="mt-3 flex items-center justify-between gap-2">
         <EstadoBadge
           activo={guarnicion.activo}
           disabled={loading}
           onClick={() => onToggleActivo(guarnicion)}
         />
-        <div className="flex items-center gap-1">
-          <IconActionButton label={`Editar guarnicion ${guarnicion.nombre}`} tooltip="Editar guarnicion" tone="brand" onClick={() => onEdit(guarnicion)}>
-            <PencilIcon />
-          </IconActionButton>
-          <IconActionButton label={`Eliminar guarnicion ${guarnicion.nombre}`} tooltip="Eliminar guarnicion" tone="danger" onClick={() => onDelete(guarnicion)}>
-            <TrashIcon />
-          </IconActionButton>
-        </div>
+        <button type="button" onClick={onOpen} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+          Ver detalle
+        </button>
       </div>
     </div>
   );
@@ -207,7 +203,9 @@ export default function Guarniciones() {
 
   const [modalCreate, setModalCreate] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [detalle, setDetalle] = useState(null);
   const [editError, setEditError] = useState('');
+  const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] = useState(false);
   const editNombreRef = useRef(null);
 
   const updateParams = useCallback((changes) => {
@@ -279,6 +277,7 @@ export default function Guarniciones() {
 
   const startEdit = (guarnicion) => {
     setEditError('');
+    setDetalle(null);
     setEditando({ id: guarnicion.id, nombre: guarnicion.nombre, tipo: guarnicion.tipo });
   };
   const limpiarFiltros = () => setSearchParams(new URLSearchParams(), { replace: true });
@@ -330,7 +329,7 @@ export default function Guarniciones() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-h-[52px]">
           <h1 className="text-2xl font-bold text-gray-900">Guarniciones</h1>
-          <p className="mt-0.5 h-5 text-sm text-gray-400">
+          <p className="mt-0.5 h-5 text-sm text-gray-500">
             {guarniciones.length} guarnicion{guarniciones.length !== 1 ? 'es' : ''}
           </p>
         </div>
@@ -339,7 +338,7 @@ export default function Guarniciones() {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Buscar</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Buscar</span>
           <input
             type="text"
             value={search}
@@ -364,24 +363,37 @@ export default function Guarniciones() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
-        <div className="flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
-          {TIPO_FILTROS.map((f) => (
-            <button
-              key={String(f.value)}
-              type="button"
-              onClick={() => updateParams({ tipo: f.value, page: null })}
-              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                tipoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+      <div className="rounded-xl border border-gray-100 bg-white">
+        <button
+          type="button"
+          onClick={() => setFiltrosAvanzadosAbiertos((open) => !open)}
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-gray-700"
+        >
+          <span>Filtros avanzados</span>
+          <span className="text-xs text-gray-500">{filtrosAvanzadosAbiertos ? 'Ocultar' : 'Mostrar'}</span>
+        </button>
+        {filtrosAvanzadosAbiertos ? (
+          <div className="space-y-3 border-t border-gray-100 px-4 py-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+              <div className="flex flex-shrink-0 gap-1 rounded-lg bg-gray-100 p-1">
+                {TIPO_FILTROS.map((f) => (
+                  <button
+                    key={String(f.value)}
+                    type="button"
+                    onClick={() => updateParams({ tipo: f.value, page: null })}
+                    className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      tipoFilter === f.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <SortSelect value={`${sortBy}:${sortDir}`} onChange={handleMobileSort} />
+          </div>
+        ) : null}
       </div>
-
-      <SortSelect value={`${sortBy}:${sortDir}`} onChange={handleMobileSort} />
 
       <div className="card overflow-hidden">
         {isLoading ? (
@@ -401,9 +413,8 @@ export default function Guarniciones() {
                   key={guarnicion.id}
                   guarnicion={guarnicion}
                   loading={actualizar.isPending}
+                  onOpen={() => setDetalle(guarnicion)}
                   onToggleActivo={handleToggleActivo}
-                  onEdit={startEdit}
-                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -423,7 +434,7 @@ export default function Guarniciones() {
                           onClick={() => handleSort(col)}
                           className="flex items-center gap-1 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-gray-500 transition-colors hover:text-gray-800"
                         >
-                          {label} <span className="text-gray-300">{sortBy === col ? (sortDir === 'asc' ? 'up' : 'down') : '-'}</span>
+                          {label} <span className="text-gray-500">{sortBy === col ? (sortDir === 'asc' ? 'up' : 'down') : '-'}</span>
                         </button>
                       </th>
                     ))}
@@ -443,7 +454,7 @@ export default function Guarniciones() {
                       </td>
                     </tr>
                   ) : paginadas.map((g) => (
-                    <tr key={g.id} className="group transition-colors hover:bg-gray-50/80">
+                    <tr key={g.id} onClick={() => setDetalle(g)} className="group cursor-pointer transition-colors hover:bg-gray-50/80">
                       <td className="px-5 py-3.5">
                         {editando?.id === g.id ? (
                           <form onSubmit={handleGuardarEdit} className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -473,14 +484,14 @@ export default function Guarniciones() {
                               <option value="fria">Fria</option>
                             </select>
                             <button type="submit" className="text-xs font-semibold text-brand-700">Guardar</button>
-                            <button type="button" onClick={() => { setEditando(null); setEditError(''); }} className="text-xs text-gray-400">Cancelar</button>
+                            <button type="button" onClick={() => { setEditando(null); setEditError(''); }} className="text-xs text-gray-500">Cancelar</button>
                           </form>
                         ) : <span className="font-medium text-gray-900">{g.nombre}</span>}
                       </td>
                       <td className="px-5 py-3.5">
                         <TipoBadge tipo={g.tipo} />
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                         <EstadoBadge
                           activo={g.activo}
                           disabled={actualizar.isPending}
@@ -489,11 +500,8 @@ export default function Guarniciones() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center justify-end gap-1">
-                          <IconActionButton label={`Editar guarnicion ${g.nombre}`} tooltip="Editar guarnicion" tone="brand" onClick={() => startEdit(g)}>
+                          <IconActionButton label={`Ver detalle de ${g.nombre}`} tooltip="Ver detalle" onClick={() => setDetalle(g)}>
                             <PencilIcon />
-                          </IconActionButton>
-                          <IconActionButton label={`Eliminar guarnicion ${g.nombre}`} tooltip="Eliminar guarnicion" tone="danger" onClick={() => handleDelete(g)}>
-                            <TrashIcon />
                           </IconActionButton>
                         </div>
                       </td>
@@ -508,7 +516,7 @@ export default function Guarniciones() {
 
       {totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm">
-          <p className="text-gray-400">Página {safePage} de {totalPages}</p>
+          <p className="text-gray-500">Página {safePage} de {totalPages}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => updateParams({ page: safePage - 1 > 1 ? safePage - 1 : null })} disabled={safePage <= 1} className="btn-secondary text-xs disabled:opacity-40">Anterior</button>
             <button type="button" onClick={() => updateParams({ page: safePage + 1 })} disabled={safePage >= totalPages} className="btn-secondary text-xs disabled:opacity-40">Siguiente</button>
@@ -517,6 +525,48 @@ export default function Guarniciones() {
       ) : null}
 
       <GuarnicionesPanel modalOpen={modalCreate} onModalClose={() => setModalCreate(false)} />
+
+      <SideDrawer open={!!detalle} onClose={() => setDetalle(null)} title="Detalle de guarnicion" width="md">
+        {detalle ? (
+          <div className="flex h-full flex-col p-5">
+            <div className="flex-1 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Guarnicion</p>
+                <h2 className="mt-1 text-xl font-bold text-gray-900">{detalle.nombre}</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <TipoBadge tipo={detalle.tipo} />
+                <span className={`badge ${detalle.activo ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {detalle.activo ? 'Activa' : 'Inactiva'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleActivo(detalle)}
+                disabled={actualizar.isPending}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {detalle.activo ? 'Desactivar guarnicion' : 'Activar guarnicion'}
+              </button>
+            </div>
+            <div className="space-y-3 border-t border-gray-100 pt-4">
+              <button type="button" onClick={() => startEdit(detalle)} className="btn-primary w-full">
+                Editar guarnicion
+              </button>
+              <button type="button" onClick={() => setDetalle(null)} className="btn-secondary w-full">
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => { const actual = detalle; setDetalle(null); handleDelete(actual); }}
+                className="w-full rounded-lg border border-red-100 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+              >
+                Eliminar guarnicion
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </SideDrawer>
     </div>
   );
 }

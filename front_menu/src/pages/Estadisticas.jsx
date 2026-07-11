@@ -3,10 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { useResumen, usePlatosmasUsados, useDistribucionTags, useUsoPorDia, useTendencia, useTopPorDia } from '../hooks/useEstadisticas.js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import Spinner from '../components/ui/Spinner.jsx';
+import { DIA_ABREV as DIAS_LABEL, DIA_NOMBRE as DIAS_FULL } from '../lib/dias.js';
 
 const MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const DIAS_LABEL = { lunes: 'Lun', martes: 'Mar', miercoles: 'Mié', jueves: 'Jue', viernes: 'Vie', sabado: 'Sáb', domingo: 'Dom' };
-const DIAS_FULL  = { lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo' };
 
 const TAG_COLORS = {
   Pollo: 'bg-amber-100 text-amber-800', Carnes: 'bg-red-100 text-red-800',
@@ -41,7 +40,7 @@ function EmptyState({ title, detail }) {
   return (
     <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
       <p className="text-sm font-semibold text-gray-700">{title}</p>
-      {detail && <p className="mt-1 text-xs text-gray-400">{detail}</p>}
+      {detail && <p className="mt-1 text-xs text-gray-500">{detail}</p>}
     </div>
   );
 }
@@ -79,7 +78,7 @@ function SeccionResumen() {
         : stats.map(({ label, value, color }) => (
             <div key={label} className="card p-4 text-center">
               <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">{label}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{label}</p>
             </div>
           ))
       }
@@ -104,7 +103,7 @@ function SeccionTopPlatos({ filtros }) {
         <div className="space-y-3">
           {data.map((p, i) => (
             <div key={p.id} className="flex items-center gap-3">
-              <span className="text-xs font-bold text-gray-300 w-5 text-right flex-shrink-0">{i + 1}</span>
+              <span className="text-xs font-bold text-gray-500 w-5 text-right flex-shrink-0">{i + 1}</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
@@ -171,7 +170,7 @@ function SeccionPorDia({ filtros }) {
         <h2 className="font-semibold text-gray-900">Usos por día de la semana</h2>
         <UpdatingBadge show={(fetchingRes || fetchingTop) && !loadingRes && !loadingTop} />
       </div>
-      <p className="text-xs text-gray-400 mb-4">Hacé click en un día para ver los platos más servidos ese día</p>
+      <p className="text-xs text-gray-500 mb-4">Hacé click en un día para ver los platos más servidos ese día</p>
 
       {/* Gráfico de barras */}
       {loadingRes ? <LoadingBlock label="Cargando usos por dia..." /> : resumenDia.length === 0 ? (
@@ -192,10 +191,10 @@ function SeccionPorDia({ filtros }) {
               >
                 <span className={`text-xs font-bold transition-colors ${activo ? 'text-brand-700' : 'text-gray-700'}`}>{usos}</span>
                 <div
-                  className={`w-full rounded-t-lg transition-all ${activo ? 'bg-brand-600' : 'bg-brand-400 group-hover:bg-brand-500'}`}
+                  className={`w-full rounded-t-lg transition-[height,background-color] ${activo ? 'bg-brand-600' : 'bg-brand-400 group-hover:bg-brand-500'}`}
                   style={{ height: `${Math.max(pct, 4)}%` }}
                 />
-                <span className={`text-[10px] transition-colors ${activo ? 'text-brand-700 font-semibold' : 'text-gray-400'}`}>
+                <span className={`text-[10px] transition-colors ${activo ? 'text-brand-700 font-semibold' : 'text-gray-500'}`}>
                   {DIAS_LABEL[dia]}
                 </span>
               </button>
@@ -216,7 +215,7 @@ function SeccionPorDia({ filtros }) {
                 <EmptyState title={`Sin platos para ${DIAS_FULL[diaActivo]}`} detail="El filtro actual no tiene usos para este dia." />
               ) : topDia.map((p, i) => (
                 <div key={p.id} className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-gray-300 w-4 text-right flex-shrink-0">{i + 1}</span>
+                  <span className="text-xs font-bold text-gray-500 w-4 text-right flex-shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <p className="text-sm text-gray-800 truncate">{p.nombre}</p>
@@ -260,7 +259,7 @@ function SeccionTendencia({ filtros }) {
                 <Barra value={usos} max={max} color="bg-brand-500" />
                 <div className="text-right flex-shrink-0 w-20">
                   <p className="text-xs font-bold text-gray-700">{usos} usos</p>
-                  <p className="text-[10px] text-gray-400">{platos_distintos} platos</p>
+                  <p className="text-[10px] text-gray-500">{platos_distintos} platos</p>
                 </div>
               </div>
             );
@@ -304,7 +303,7 @@ export default function Estadisticas() {
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">Estadísticas</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Analizá el uso y rotación del menú</p>
+          <p className="text-sm text-gray-500 mt-0.5">Analizá el uso y rotación del menú</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <select

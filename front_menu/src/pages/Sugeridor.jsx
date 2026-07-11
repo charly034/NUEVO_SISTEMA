@@ -7,16 +7,13 @@ import { menusService } from '../services/menus.service.js';
 import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
+import { DIA_NOMBRE as DIAS_LABEL, DIAS_LABORALES as DIAS } from '../lib/dias.js';
+import { lunesActualISO } from '../lib/fechas.js';
 
-const DIAS_LABEL = { lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes' };
-const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
 const AHORA_TS = Date.now();
 
 function getLunes(offset = 1) {
-  const hoy = new Date();
-  const lunes = new Date(hoy);
-  lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7) + offset * 7);
-  return lunes.toISOString().split('T')[0];
+  return lunesActualISO(offset);
 }
 function getDomingo(lunes) {
   const d = new Date(lunes); d.setDate(d.getDate() + 6);
@@ -210,7 +207,7 @@ function PlatoFila({ opcion, plato, onCambiar, destacado }) {
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-[10px] text-gray-400">{criterio}</p>
+            <p className="mt-0.5 text-[10px] text-gray-500">{criterio}</p>
             <div className="flex gap-1 mt-0.5 flex-wrap">
               {plato.tags?.slice(0, 2).map(t => (
                 <span key={t} className={`text-[10px] px-1 rounded-full ${TAG_COLORS[t] ?? 'bg-gray-100 text-gray-500'}`}>{t}</span>
@@ -218,7 +215,7 @@ function PlatoFila({ opcion, plato, onCambiar, destacado }) {
             </div>
           </>
         ) : (
-          <p className="text-xs text-gray-400 italic">Sin sugerencia</p>
+          <p className="text-xs text-gray-500 italic">Sin sugerencia</p>
         )}
       </div>
       <button
@@ -237,7 +234,7 @@ function PlatoFila({ opcion, plato, onCambiar, destacado }) {
 // ── Card de una variación completa ────────────────────────────────
 function VariacionCard({ variacion, label, criterio, diasFinal, slotsDiferentes, totalDiferencias, duplicadoDe, onCambiar, onSeleccionar, isSelected, creando }) {
   return (
-    <div className={`card flex flex-col transition-all ${isSelected ? 'ring-2 ring-brand-500' : ''} ${duplicadoDe ? 'border-dashed' : ''}`}>
+    <div className={`card flex flex-col transition-[box-shadow,border-color] ${isSelected ? 'ring-2 ring-brand-500' : ''} ${duplicadoDe ? 'border-dashed' : ''}`}>
       <div className={`px-4 py-3 border-b ${isSelected ? 'bg-brand-50' : 'bg-gray-50'}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -278,7 +275,7 @@ function VariacionCard({ variacion, label, criterio, diasFinal, slotsDiferentes,
           <div key={s.dia}>
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
               {DIAS_LABEL[s.dia]}
-              <span className="font-normal text-gray-400">{formatCorto(s.fecha)}</span>
+              <span className="font-normal text-gray-500">{formatCorto(s.fecha)}</span>
             </p>
             <div className="space-y-1">
               <PlatoFila opcion="A" plato={s.opcionA} destacado={slotsDiferentes.has(`${s.dia}:A`)} onCambiar={() => onCambiar(variacion, s.dia, 'A', s.opcionA)} />
@@ -377,7 +374,7 @@ export default function Sugeridor() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Generar menú</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
+        <p className="text-sm text-gray-500 mt-0.5">
           3 opciones basadas en rotación histórica · elegí la que más te guste o mezclá platos
         </p>
       </div>
@@ -431,7 +428,7 @@ export default function Sugeridor() {
           {variacionesComparadas.length === 0 ? (
             <div className="card border-dashed p-10 text-center">
               <p className="text-sm font-semibold text-gray-700">No hay sugerencias para esta semana.</p>
-              <p className="mt-1 text-xs text-gray-400">Proba regenerar o elegir otra fecha de inicio.</p>
+              <p className="mt-1 text-xs text-gray-500">Proba regenerar o elegir otra fecha de inicio.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

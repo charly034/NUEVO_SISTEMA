@@ -2,7 +2,7 @@ import { unirClases } from "../utils/clases.js";
 
 const variantes = {
   primario:
-    "border-transparent bg-[#2d5a27] text-white shadow-[0_10px_20px_rgba(45,90,39,0.12)] hover:bg-[#3d7a35] focus-visible:outline-[#2d5a27]",
+    "border-transparent bg-[#2d5a27] text-white shadow-sm hover:bg-[#3d7a35] focus-visible:outline-[#2d5a27]",
   secundario:
     "border-[#9fb998] bg-white text-[#2d5a27] hover:bg-[#f0f7ee] focus-visible:outline-[#2d5a27]",
   suave:

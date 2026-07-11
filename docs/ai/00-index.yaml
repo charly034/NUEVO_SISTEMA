@@ -1,5 +1,5 @@
 schema: la_quinta_ai_memory_index_v2
-updated_at: "2026-07-04"
+updated_at: "2026-07-06"
 language: es
 
 repo_summary:
@@ -91,6 +91,7 @@ source_of_truth:
     - "package.json de cada app"
     - "API_LA_QUINTA/src/modules/**/*.routes.js"
     - "API_LA_QUINTA/src/database/migrations"
+    - "docs/ai/ux-admin-prompt.md"
   from_chat_summary:
     - "diseno aprobado mobile-first: fondo calido, verde oliva, card semanal centrada, navegacion inferior"
     - "flujo actual posterior a Hacer pedido o Modificar pedido"
@@ -112,6 +113,7 @@ recommended_read_order:
       - "docs/ai/40-flows.yaml"
       - "docs/ai/60-debt.yaml"
     frontend_admin:
+      - "docs/ai/ux-admin-prompt.md"
       - "docs/ai/05-admin.yaml"
       - "docs/ai/20-modules.yaml"
     refactor:
@@ -128,6 +130,7 @@ quick_paths:
     backend_tests: "API_LA_QUINTA/test"
     admin_pages: "front_menu/src/pages"
     admin_hooks: "front_menu/src/hooks"
+    admin_ux_prompt: "docs/ai/ux-admin-prompt.md"
     cliente_pages: "front_clientes/src/pages"
     cliente_pedido_components: "front_clientes/src/components/pedido"
     cliente_services: "front_clientes/src/services"

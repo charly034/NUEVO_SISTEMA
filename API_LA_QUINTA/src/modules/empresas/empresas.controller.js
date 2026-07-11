@@ -4,13 +4,11 @@ import { sendSuccess, sendCreated } from '../../utils/response.js';
 import { ApiError } from '../../utils/ApiError.js';
 import * as planesRepo from '../planes/planes.repository.js';
 
-const PLANES = ['basico', 'con_postre', 'con_postre_bebida'];
 const MODOS = ['semanal', 'diario', 'ambos'];
 const DIAS_LABORALES = ['lunes_viernes', 'lunes_sabado', 'lunes_domingo'];
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 
 function validarEmpresa(fields) {
-  if (fields.plan && !PLANES.includes(fields.plan)) throw ApiError.badRequest('plan inválido');
   if (fields.modo_pedido && !MODOS.includes(fields.modo_pedido)) throw ApiError.badRequest('modo_pedido inválido');
   if (fields.dias_laborales && !DIAS_LABORALES.includes(fields.dias_laborales)) {
     throw ApiError.badRequest('dias_laborales inválido');
@@ -26,24 +24,11 @@ function validarEmpresa(fields) {
   }
 }
 
-function planLegacyDesdeDetalle(plan) {
-  if (plan?.incluye_postre && plan?.incluye_bebida) return 'con_postre_bebida';
-  if (plan?.incluye_postre) return 'con_postre';
-  return 'basico';
-}
-
 async function resolverPlanEmpresa(fields) {
-  if (fields.plan_id) {
-    const plan = await planesRepo.findById(fields.plan_id);
-    if (!plan || !plan.activo) throw ApiError.badRequest('plan_id invalido');
-    fields.plan_id = plan.id;
-    fields.plan = planLegacyDesdeDetalle(plan);
-    return;
-  }
-  if (fields.plan) {
-    const plan = await planesRepo.findDefaultByLegacy(fields.plan);
-    if (plan) fields.plan_id = plan.id;
-  }
+  if (!fields.plan_id) return;
+  const plan = await planesRepo.findById(fields.plan_id);
+  if (!plan || !plan.activo) throw ApiError.badRequest('plan_id invalido o inactivo');
+  fields.plan_id = plan.id;
 }
 
 export const getEmpresas = asyncHandler(async (req, res) => {
@@ -57,7 +42,6 @@ export const getEmpresas = asyncHandler(async (req, res) => {
     repo.findAll({ page, pageSize, search, estado }),
     repo.countAll({ search, estado }),
   ]);
-
   sendSuccess(res, { data, total, page, pageSize }, 'Empresas obtenidas');
 });
 
@@ -75,7 +59,7 @@ export const getDependenciasEmpresa = asyncHandler(async (req, res) => {
 
 export const createEmpresa = asyncHandler(async (req, res) => {
   const {
-    nombre, slug, plan, plan_id, modo_pedido, dias_laborales,
+    nombre, slug, plan_id, modo_pedido, dias_laborales,
     limite_hora, limite_dia_semana, limite_anticipacion_dias,
     email, telefono,
   } = req.body;
@@ -83,8 +67,7 @@ export const createEmpresa = asyncHandler(async (req, res) => {
   const fields = {
     nombre: nombre.trim(),
     slug: slug.trim().toLowerCase(),
-    plan: plan || 'basico',
-    plan_id,
+    plan_id: plan_id || null,
     modo_pedido,
     dias_laborales,
     limite_hora: limite_hora || null,
@@ -104,7 +87,7 @@ export const updateEmpresa = asyncHandler(async (req, res) => {
   const e = await repo.findById(req.params.id);
   if (!e) throw ApiError.notFound('Empresa no encontrada');
   const allowed = [
-    'nombre', 'slug', 'plan', 'plan_id', 'modo_pedido', 'activo',
+    'nombre', 'slug', 'plan_id', 'modo_pedido', 'activo',
     'limite_hora', 'limite_dia_semana', 'limite_anticipacion_dias', 'dias_laborales',
     'email', 'telefono',
   ];
@@ -147,7 +130,6 @@ export const deleteEmpresa = asyncHandler(async (req, res) => {
   sendSuccess(res, { id: e.id, activo: false, deleted_at: new Date().toISOString() }, 'Empresa eliminada');
 });
 
-// Abre una ventana de pedido temporal para la empresa (bypassea el límite horario)
 export const reabrirPlazo = asyncHandler(async (req, res) => {
   const horas = Math.min(Math.max(parseInt(req.body.horas ?? 2, 10), 1), 24);
   const hasta = new Date(Date.now() + horas * 60 * 60 * 1000);

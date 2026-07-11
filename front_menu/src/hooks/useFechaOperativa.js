@@ -1,36 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../lib/apiClient.js';
+import {
+  APP_TIMEZONE,
+  fechaISOEnZona,
+  addDiasISO,
+  indiceDiaSemanaISO,
+  lunesDeSemanaISO,
+} from '../lib/fechas.js';
 
-export const APP_TIMEZONE = 'America/Argentina/Buenos_Aires';
-
-export function fechaISOEnZona(valor = new Date(), timeZone = APP_TIMEZONE) {
-  const fecha = valor instanceof Date ? valor : new Date(valor);
-  const base = Number.isNaN(fecha.getTime()) ? new Date() : fecha;
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(base);
-
-  const porTipo = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
-  return `${porTipo.year}-${porTipo.month}-${porTipo.day}`;
-}
-
-export function addDiasISO(fechaISO, dias) {
-  const base = new Date(`${fechaISO}T12:00:00.000Z`);
-  base.setUTCDate(base.getUTCDate() + dias);
-  return base.toISOString().split('T')[0];
-}
-
-export function indiceDiaSemanaISO(fechaISO) {
-  const base = new Date(`${fechaISO}T12:00:00.000Z`);
-  return (base.getUTCDay() + 6) % 7;
-}
-
-export function lunesDeSemanaISO(fechaISO, offset = 0) {
-  return addDiasISO(fechaISO, -indiceDiaSemanaISO(fechaISO) + offset * 7);
-}
+// Re-export para compatibilidad: las primitivas ahora viven en lib/fechas.js.
+export { APP_TIMEZONE, fechaISOEnZona, addDiasISO, indiceDiaSemanaISO, lunesDeSemanaISO };
 
 export const useFechaOperativa = () =>
   useQuery({

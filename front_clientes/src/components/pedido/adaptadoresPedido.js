@@ -1,15 +1,6 @@
-import { getDiasSemana } from "../../utils/dias.js";
+import { getDiasSemana, DIAS_LABEL } from "../../utils/dias.js";
 import { addDias } from "../../utils/dates.js";
-
-const DIAS_LABEL = {
-  lunes: "Lunes",
-  martes: "Martes",
-  miercoles: "Miércoles",
-  jueves: "Jueves",
-  viernes: "Viernes",
-  sabado: "Sábado",
-  domingo: "Domingo",
-};
+import { formatearFechaPedido } from "../../utils/fechasPedido.js";
 
 function fechaISO(fecha) {
   return String(fecha || "").split("T")[0];
@@ -188,11 +179,42 @@ function estaCerrada(menuSemana, semanaInicio) {
   return limite ? new Date(limite) < ahora : false;
 }
 
-function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible }) {
+function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible, semanaActual }) {
   if (pedidoVisible) return "confirmado";
-  if (!menuSemana?.menu?.id) return semanaInicio > lunesDeSemana() ? "sin_menu" : "sin_pedido";
+  if (!menuSemana?.menu?.id) return semanaInicio > semanaActual ? "sin_menu" : "sin_pedido";
   if (estaCerrada(menuSemana, semanaInicio)) return "cerrado";
   return "pendiente";
+}
+
+function formatearHoraCorte(fecha) {
+  return new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(fecha);
+}
+
+// Traduce limiteEmpresa (calculado por la API en construirInfoLimite) a un
+// mensaje puntual por día: "Editable hasta el..." o "Cerró el...". Evita que
+// el cliente choque contra el plazo sin entender por qué.
+function calcularLimiteDia({ fechaDiaISO, bloqueado, limiteEmpresa }) {
+  if (!limiteEmpresa || limiteEmpresa.tipo === "override") return null;
+
+  if (limiteEmpresa.tipo === "semanal") {
+    if (!limiteEmpresa.fechaCorte) return null;
+    const corte = new Date(limiteEmpresa.fechaCorte);
+    const cuando = `${formatearFechaPedido(corte, { incluirDiaSemana: true })} a las ${formatearHoraCorte(corte)}hs`;
+    return bloqueado ? `Cerró el ${cuando}` : `Editable hasta el ${cuando}`;
+  }
+
+  // 'diario' o 'ambos': cada día cierra por su cuenta, con anticipación desde su propia fecha.
+  const anticipacion = limiteEmpresa.anticipacion_dias ?? 0;
+  const hora = limiteEmpresa.hora || "09:30";
+  const [hh, mm] = hora.split(":").map(Number);
+  const [anio, mes, dia] = fechaDiaISO.split("-").map(Number);
+  const corte = new Date(anio, mes - 1, dia - anticipacion, hh || 0, mm || 0, 0, 0);
+  const cuando = `${formatearFechaPedido(corte, { incluirDiaSemana: true })} a las ${formatearHoraCorte(corte)}hs`;
+  return bloqueado ? `Cerró el ${cuando}` : `Editable hasta el ${cuando}`;
 }
 
 function obtenerTextoDia({ item, estado, motivoSinServicio }) {
@@ -321,6 +343,7 @@ export function adaptarSemanasPedido({
       menuSemana,
       semanaInicio,
       pedidoVisible,
+      semanaActual,
     });
     const itemsPorDia = new Map(
       (pedidoVisible?.items ?? []).map((item) => [item.dia, item]),
@@ -358,12 +381,20 @@ export function adaptarSemanasPedido({
         const fijos = opciones.filter((opcion) => !opcion.destacado);
         const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
 
+        const fechaDia = addDias(semanaInicio, indice);
+        const bloqueadoPorPlazo = (menuSemana.limiteEmpresa?.diasCerrados || []).includes(dia);
+
         return {
           dia: DIAS_LABEL[dia] || dia,
           clave: dia,
-          fecha: addDias(semanaInicio, indice),
-          bloqueado: (menuSemana.limiteEmpresa?.diasCerrados || []).includes(dia),
+          fecha: fechaDia,
+          bloqueado: bloqueadoPorPlazo,
           regla: menuSemana.limiteEmpresa?.tipo === "diario" ? "diario" : "semanal",
+          limiteTexto: calcularLimiteDia({
+            fechaDiaISO: fechaDia,
+            bloqueado: bloqueadoPorPlazo,
+            limiteEmpresa: menuSemana.limiteEmpresa,
+          }),
           opciones,
           seleccion,
           estado: sinPedidoPorDefecto

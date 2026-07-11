@@ -1,5 +1,5 @@
 schema: la_quinta_system_map_v2
-updated_at: "2026-07-03"
+updated_at: "2026-07-06"
 
 runtime_surfaces:
   verified_in_repo:
@@ -135,6 +135,23 @@ storage_owners:
         served_as: "/uploads/platos"
         docker_volume: "api_uploads -> /app/uploads"
         contents: "imagenes de platos convertidas y comprimidas a WebP; archivos reales ignorados por git"
+
+storage_contracts:
+  verified_in_repo:
+    pedido_items_estado:
+      migration: "API_LA_QUINTA/src/database/migrations/1719000048000_pedido-items-estado.js"
+      enum: "pedido_item_estado"
+      values: ["pendiente", "en_proceso", "listo", "entregado", "cancelado"]
+      columns:
+        - "pedido_items.estado pedido_item_estado NOT NULL DEFAULT pendiente"
+        - "pedido_items.estado_updated_at timestamptz"
+      index: "pedido_items_estado_index"
+      note: "La API admin usa como estados operativos normales de vianda pendiente|entregado|cancelado; en_proceso/listo quedan como valores legacy del enum."
+    pedido_estado_completo:
+      migration: "API_LA_QUINTA/src/database/migrations/1719000049000_pedido-estado-completo.js"
+      enum: "pedido_estado"
+      added_value: "completo"
+      note: "Estado agregado de pedido semanal: pendiente, en_proceso, completo o cancelado. completo se alcanza cuando todas las viandas activas estan entregadas."
 
 global_variables_and_env:
   verified_in_repo:

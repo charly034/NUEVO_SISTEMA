@@ -1,14 +1,5 @@
 import { query } from '../../database/connection.js';
-
-const ORDEN_DIA = `CASE dia
-  WHEN 'lunes'     THEN 1
-  WHEN 'martes'    THEN 2
-  WHEN 'miercoles' THEN 3
-  WHEN 'jueves'    THEN 4
-  WHEN 'viernes'   THEN 5
-  WHEN 'sabado'    THEN 6
-  WHEN 'domingo'   THEN 7
-END`;
+import { ORDEN_DIA_SQL as ORDEN_DIA } from '../../utils/fecha.js';
 
 // ── Menús semanales ───────────────────────────────────────────────
 
@@ -210,16 +201,87 @@ export const findPlatosByDia = async (menuSemanalId, dia) => {
   return result.rows;
 };
 
-export const agregarPlato = async (menuSemanalId, dia, opcion, platoId) => {
+export const agregarPlato = async (menuSemanalId, dia, opcion, platoId, {
+  guarnicionModoOverride = null,
+  guarnicionFijaOverrideId = null,
+  salsaModoOverride = null,
+  salsaFijaOverrideId = null,
+  visibleEmpresas = undefined,
+} = {}) => {
   const result = await query(
-    `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id, salsa_modo_override, salsa_fija_override_id, visible_empresas)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, true))
      ON CONFLICT (menu_semanal_id, dia, opcion)
-     DO UPDATE SET plato_id = EXCLUDED.plato_id, created_at = NOW()
-     RETURNING id, dia, opcion, plato_id, created_at`,
-    [menuSemanalId, dia, opcion, platoId]
+     DO UPDATE SET plato_id = EXCLUDED.plato_id,
+       guarnicion_modo_override = EXCLUDED.guarnicion_modo_override,
+       guarnicion_fija_override_id = EXCLUDED.guarnicion_fija_override_id,
+       salsa_modo_override = EXCLUDED.salsa_modo_override,
+       salsa_fija_override_id = EXCLUDED.salsa_fija_override_id,
+       visible_empresas = COALESCE($9, menu_semanal_dias.visible_empresas),
+       created_at = NOW()
+     RETURNING id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id, salsa_modo_override, salsa_fija_override_id, visible_empresas, created_at`,
+    [menuSemanalId, dia, opcion, platoId, guarnicionModoOverride, guarnicionFijaOverrideId, salsaModoOverride, salsaFijaOverrideId, visibleEmpresas ?? null]
   );
   return result.rows[0];
+};
+
+// Reemplaza la visibilidad de empresas de un slot ([] = todas las empresas)
+export const setEmpresasSlot = async (client, slotId, empresaIds) => {
+  await client.query('DELETE FROM menu_empresa_visibilidad WHERE menu_semanal_dia_id = $1', [slotId]);
+  if (empresaIds.length > 0) {
+    const values = empresaIds.map((eid, i) => `($1, $${i + 2})`).join(', ');
+    await client.query(
+      `INSERT INTO menu_empresa_visibilidad (menu_semanal_dia_id, empresa_id) VALUES ${values}`,
+      [slotId, ...empresaIds]
+    );
+  }
+};
+
+// Devuelve los slots donde ya existe ese plato ese día, con sus empresa_ids
+export const findPlatoEnDia = async (menuSemanalId, dia, platoId) => {
+  const result = await query(
+    `SELECT msd.id, msd.opcion,
+       COALESCE(
+         json_agg(mev.empresa_id) FILTER (WHERE mev.empresa_id IS NOT NULL),
+         '[]'::json
+       ) AS empresa_ids
+     FROM menu_semanal_dias msd
+     LEFT JOIN menu_empresa_visibilidad mev ON mev.menu_semanal_dia_id = msd.id
+     WHERE msd.menu_semanal_id = $1 AND msd.dia = $2 AND msd.plato_id = $3
+     GROUP BY msd.id, msd.opcion`,
+    [menuSemanalId, dia, platoId]
+  );
+  return result.rows;
+};
+
+export const findSlotId = async (menuSemanalId, dia, opcion) => {
+  const result = await query(
+    'SELECT id FROM menu_semanal_dias WHERE menu_semanal_id = $1 AND dia = $2 AND opcion = $3',
+    [menuSemanalId, dia, opcion]
+  );
+  return result.rows[0]?.id ?? null;
+};
+
+export const actualizarGuarnicionSlot = async (menuSemanalId, dia, opcion, guarnicionModoOverride, guarnicionFijaOverrideId = null) => {
+  const result = await query(
+    `UPDATE menu_semanal_dias
+     SET guarnicion_modo_override = $4, guarnicion_fija_override_id = $5
+     WHERE menu_semanal_id = $1 AND dia = $2 AND opcion = $3
+     RETURNING id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id`,
+    [menuSemanalId, dia, opcion, guarnicionModoOverride, guarnicionFijaOverrideId]
+  );
+  return result.rows[0] || null;
+};
+
+export const actualizarSalsaSlot = async (menuSemanalId, dia, opcion, salsaModoOverride, salsaFijaOverrideId = null) => {
+  const result = await query(
+    `UPDATE menu_semanal_dias
+     SET salsa_modo_override = $4, salsa_fija_override_id = $5
+     WHERE menu_semanal_id = $1 AND dia = $2 AND opcion = $3
+     RETURNING id, dia, opcion, plato_id, salsa_modo_override, salsa_fija_override_id`,
+    [menuSemanalId, dia, opcion, salsaModoOverride, salsaFijaOverrideId]
+  );
+  return result.rows[0] || null;
 };
 
 export const quitarPlato = async (menuSemanalId, dia, opcion) => {
@@ -265,6 +327,148 @@ export const quitarSinServicio = async (menuSemanalId, dia) => {
     [menuSemanalId, dia]
   );
   return result.rows[0] || null;
+};
+
+// Mapa de dias sin servicio para un menu { lunes: motivo|null, ... }
+export const findSinServicioMap = async (menuSemanalId) => {
+  const result = await query(
+    'SELECT dia, motivo FROM menu_semanal_sin_servicio WHERE menu_semanal_id = $1',
+    [menuSemanalId]
+  );
+  const map = {};
+  for (const r of result.rows) map[r.dia] = r.motivo ?? null;
+  return map;
+};
+
+// ── Vista de diseño ───────────────────────────────────────────────
+// Devuelve el menú con slots programados (enriquecidos con datos de la vianda resuelta:
+// vianda del catálogo > overrides del slot, ver design doc de /office-hours), platos fijos
+// por día del catálogo, y platos siempre disponibles -- candidatos para agregar al menú.
+
+export const findDisenoById = async (id) => {
+  const menuResult = await query(
+    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, created_at, updated_at
+     FROM menus_semanales WHERE id = $1`,
+    [id]
+  );
+  const menu = menuResult.rows[0];
+  if (!menu) return null;
+
+  const [slotsResult, sinServicioResult, fijosResult, siempreResult] = await Promise.all([
+    // Slots programados en este menú. Resolución de guarnición/salsa efectiva:
+    // override del slot > default de la vianda catálogo (ver cocina.repository.js SLOTS_SELECT
+    // para el mismo patrón de precedencia).
+    query(
+      `SELECT
+         msd.id, msd.dia, msd.opcion, msd.created_at,
+         msd.guarnicion_modo_override, msd.guarnicion_fija_override_id,
+         go.nombre     AS guarnicion_fija_override_nombre,
+         msd.salsa_modo_override, msd.salsa_fija_override_id,
+         so.nombre     AS salsa_fija_override_nombre,
+         p.id          AS plato_id,
+         p.nombre      AS plato_nombre,
+         COALESCE(v.nombre_vianda, p.nombre) AS nombre_vianda,
+         p.descripcion AS plato_descripcion,
+         p.disponibilidad,
+         p.vegetariano,
+         p.calorias,
+         p.foto_url,
+         COALESCE(
+           json_agg(e.id ORDER BY e.nombre) FILTER (WHERE e.id IS NOT NULL),
+           '[]'::json
+         ) AS empresa_ids,
+         COALESCE(
+           json_agg(e.nombre ORDER BY e.nombre) FILTER (WHERE e.id IS NOT NULL),
+           '[]'::json
+         ) AS empresa_nombres
+       FROM menu_semanal_dias msd
+       JOIN platos p ON p.id = msd.plato_id
+       LEFT JOIN viandas v ON v.id = msd.vianda_id
+       LEFT JOIN guarniciones go ON go.id = msd.guarnicion_fija_override_id
+       LEFT JOIN salsas so ON so.id = msd.salsa_fija_override_id
+       LEFT JOIN menu_empresa_visibilidad mev ON mev.menu_semanal_dia_id = msd.id
+       LEFT JOIN empresas e ON e.id = mev.empresa_id AND e.activo = true
+       WHERE msd.menu_semanal_id = $1
+       GROUP BY msd.id, msd.dia, msd.opcion, msd.created_at,
+         msd.guarnicion_modo_override, msd.guarnicion_fija_override_id, go.nombre,
+         msd.salsa_modo_override, msd.salsa_fija_override_id, so.nombre,
+         p.id, p.nombre, v.nombre_vianda, p.descripcion, p.disponibilidad,
+         p.vegetariano, p.calorias, p.foto_url
+       ORDER BY ${ORDEN_DIA}, msd.opcion ASC`,
+      [id]
+    ),
+    // Días sin servicio
+    query(
+      `SELECT dia, motivo FROM menu_semanal_sin_servicio WHERE menu_semanal_id = $1`,
+      [id]
+    ),
+    // Platos fijos por día del catálogo con una vianda activa -- candidatos que aparecen
+    // automáticamente para armar el menú (no todo plato fijo es necesariamente una vianda).
+    query(
+      `SELECT DISTINCT
+         p.id, p.nombre, v.nombre_vianda, p.descripcion,
+         p.disponibilidad, p.dia_fijo,
+         v.guarnicion_id, v.salsa_id,
+         p.vegetariano, p.calorias, p.foto_url
+       FROM platos p
+       JOIN viandas v ON v.plato_id = p.id AND v.activo = true
+       WHERE p.activo = true AND p.disponibilidad = 'fijo_dia'
+       ORDER BY p.nombre`,
+      []
+    ),
+    // Platos siempre disponibles del catálogo con una vianda activa
+    query(
+      `SELECT DISTINCT
+         p.id, p.nombre, v.nombre_vianda, p.descripcion,
+         p.disponibilidad,
+         v.guarnicion_id, v.salsa_id,
+         p.vegetariano, p.calorias, p.foto_url
+       FROM platos p
+       JOIN viandas v ON v.plato_id = p.id AND v.activo = true
+       WHERE p.activo = true AND p.disponibilidad = 'siempre'
+       ORDER BY p.nombre`,
+      []
+    ),
+  ]);
+
+  const sinServicioMap = {};
+  for (const r of sinServicioResult.rows) sinServicioMap[r.dia] = r.motivo ?? null;
+
+  // Agrupar slots por día
+  const slotsMap = {};
+  for (const r of slotsResult.rows) {
+    if (!slotsMap[r.dia]) slotsMap[r.dia] = [];
+    slotsMap[r.dia].push({
+      slot_id:                   r.id,
+      opcion:                    r.opcion,
+      guarnicion_modo_override:        r.guarnicion_modo_override,
+      guarnicion_fija_override_id:     r.guarnicion_fija_override_id,
+      guarnicion_fija_override_nombre: r.guarnicion_fija_override_nombre,
+      salsa_modo_override:        r.salsa_modo_override,
+      salsa_fija_override_id:     r.salsa_fija_override_id,
+      salsa_fija_override_nombre: r.salsa_fija_override_nombre,
+      empresa_ids:                     r.empresa_ids ?? [],
+      empresa_nombres:                 r.empresa_nombres ?? [],
+      plato: {
+        id:              r.plato_id,
+        nombre:          r.plato_nombre,
+        nombre_vianda:   r.nombre_vianda,
+        descripcion:     r.plato_descripcion,
+        disponibilidad:  r.disponibilidad,
+        vegetariano:     r.vegetariano,
+        calorias:        r.calorias,
+        foto_url:        r.foto_url,
+      },
+    });
+  }
+
+  return {
+    menu,
+    sin_servicio: sinServicioMap,
+    slots: slotsMap,
+    fijos_por_dia: fijosResult.rows,
+    siempre: siempreResult.rows,
+  };
 };
 
 // ── Historial ─────────────────────────────────────────────────────

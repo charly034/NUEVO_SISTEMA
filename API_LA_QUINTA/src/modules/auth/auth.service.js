@@ -54,13 +54,13 @@ export const login = async (email, password, { remember = false } = {}) => {
     `SELECT e.id, e.nombre, e.apellido, e.email, e.password_hash, e.activo, e.rol,
             e.telefono, e.fecha_nacimiento, e.preferencias_alimentarias,
             emp.activo AS empresa_activa,
-            e.empresa_id, emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido,
+            e.empresa_id, emp.nombre AS empresa_nombre, emp.modo_pedido,
             emp.plan_id, pv.codigo AS plan_codigo, pv.nombre AS plan_nombre,
             pv.gramaje_min AS plan_gramaje_min, pv.gramaje_max AS plan_gramaje_max,
             pv.incluye_postre AS plan_incluye_postre, pv.incluye_bebida AS plan_incluye_bebida
      FROM empleados e
      JOIN empresas emp ON emp.id = e.empresa_id
-     LEFT JOIN planes_vianda pv ON pv.id = emp.plan_id
+     LEFT JOIN planes_comerciales pv ON pv.id = emp.plan_id
      WHERE LOWER(e.email) = LOWER($1)`,
     [email.trim()]
   );
@@ -98,8 +98,8 @@ export const login = async (email, password, { remember = false } = {}) => {
       empresa: {
         id: empleado.empresa_id,
         nombre: empleado.empresa_nombre,
-        plan: empleado.plan,
-        plan_nombre: empleado.plan_nombre || empleado.plan,
+        plan: empleado.plan_codigo || null,
+        plan_nombre: empleado.plan_nombre || null,
         plan_detalle: normalizarPlanSesion(empleado),
         modo_pedido: empleado.modo_pedido,
       },
@@ -158,8 +158,7 @@ export const registro = async ({ codigo, nombre, apellido, email, password, tele
       empresa: {
         id: empresa.id,
         nombre: empresa.nombre,
-        plan: empresa.plan || 'basico',
-        plan_nombre: empresa.plan_nombre || empresa.plan || 'basico',
+        plan_nombre: empresa.plan_nombre || null,
         plan_detalle: normalizarPlanSesion(empresa),
       },
     },
@@ -200,13 +199,13 @@ export const getSession = async (empleadoId) => {
   const result = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.rol, e.activo,
             e.telefono, e.fecha_nacimiento, e.preferencias_alimentarias,
-            e.empresa_id, emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido,
+            e.empresa_id, emp.nombre AS empresa_nombre, emp.modo_pedido,
             emp.plan_id, pv.codigo AS plan_codigo, pv.nombre AS plan_nombre,
             pv.gramaje_min AS plan_gramaje_min, pv.gramaje_max AS plan_gramaje_max,
             pv.incluye_postre AS plan_incluye_postre, pv.incluye_bebida AS plan_incluye_bebida
      FROM empleados e
      JOIN empresas emp ON emp.id = e.empresa_id
-     LEFT JOIN planes_vianda pv ON pv.id = emp.plan_id
+     LEFT JOIN planes_comerciales pv ON pv.id = emp.plan_id
      WHERE e.id = $1 AND e.activo = true AND emp.activo = true`,
     [empleadoId]
   );
@@ -225,8 +224,8 @@ export const getSession = async (empleadoId) => {
     empresa: {
       id:          empleado.empresa_id,
       nombre:      empleado.empresa_nombre,
-      plan:        empleado.plan,
-      plan_nombre: empleado.plan_nombre || empleado.plan,
+      plan:        empleado.plan_codigo || null,
+      plan_nombre: empleado.plan_nombre || null,
       plan_detalle: normalizarPlanSesion(empleado),
       modo_pedido: empleado.modo_pedido,
     },

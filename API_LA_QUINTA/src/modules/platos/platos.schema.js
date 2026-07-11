@@ -42,6 +42,18 @@ const tipoSchema = z.enum(['fijo', 'especial', 'ambos'], {
   errorMap: () => ({ message: "El tipo debe ser 'fijo', 'especial' o 'ambos'" }),
 });
 
+// Disponibilidad del canal "por kilo" (buffet): cuándo entra este plato al checklist de
+// cocina. No tiene relación con si el plato también se vende como vianda -- eso vive
+// en la tabla `viandas` (ver migración create-viandas-table).
+const disponibilidadSchema = z.enum(['especial', 'fijo_dia', 'siempre'], {
+  errorMap: () => ({ message: "La disponibilidad debe ser 'especial', 'fijo_dia' o 'siempre'" }),
+});
+
+const diaSemanaSchema = z.enum(
+  ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
+  { errorMap: () => ({ message: 'Día de semana inválido' }) }
+).nullable().optional();
+
 export const createPlatoSchema = z.object({
   nombre:           z.string({ required_error: 'El nombre es obligatorio' }).min(2).max(150),
   descripcion:      z.string().max(1000).optional(),
@@ -53,7 +65,12 @@ export const createPlatoSchema = z.object({
   foto_url:         z.string().max(1000).nullable().optional(),
   tipo:             tipoSchema.optional().default('especial'),
   tiene_guarnicion: booleanSchema.optional().default(false),
-});
+  disponibilidad:   disponibilidadSchema.optional().default('especial'),
+  dia_fijo:         diaSemanaSchema,
+}).refine(
+  (d) => !(d.disponibilidad === 'fijo_dia' && !d.dia_fijo),
+  { message: "dia_fijo es obligatorio cuando disponibilidad es 'fijo_dia'", path: ['dia_fijo'] }
+);
 
 export const updatePlatoSchema = z.object({
   nombre:           z.string().min(2).max(150).optional(),
@@ -67,6 +84,8 @@ export const updatePlatoSchema = z.object({
   foto_url:         z.string().max(1000).nullable().optional(),
   tipo:             tipoSchema.optional(),
   tiene_guarnicion: booleanSchema.optional(),
+  disponibilidad:   disponibilidadSchema.optional(),
+  dia_fijo:         diaSemanaSchema,
 }).refine((d) => Object.keys(d).length > 0, {
   message: 'Debe enviar al menos un campo para actualizar',
 });
@@ -76,12 +95,40 @@ export const platoParamsSchema = z.object({
 });
 
 export const platosQuerySchema = z.object({
-  page:     z.string().regex(/^\d+$/).optional().default('1'),
-  limit:    z.string().regex(/^\d+$/).optional().default('20'),
-  activo:   z.enum(['true', 'false']).optional(),
-  search:   z.string().max(100).optional(),
-  tag:      z.string().max(50).optional(),
-  tipo:     z.enum(['fijo', 'especial', 'ambos']).optional(),
-  sort_by:  z.enum(['nombre', 'activo', 'created_at', 'ultimo_uso']).optional().default('nombre'),
-  sort_dir: z.enum(['asc', 'desc']).optional().default('asc'),
+  page:           z.string().regex(/^\d+$/).optional().default('1'),
+  limit:          z.string().regex(/^\d+$/).optional().default('20'),
+  activo:         z.enum(['true', 'false']).optional(),
+  search:         z.string().max(100).optional(),
+  tag:            z.string().max(50).optional(),
+  tipo:           z.enum(['fijo', 'especial', 'ambos']).optional(),
+  disponibilidad: z.enum(['especial', 'fijo_dia', 'siempre']).optional(),
+  sort_by:        z.enum(['nombre', 'activo', 'created_at', 'ultimo_uso']).optional().default('nombre'),
+  sort_dir:       z.enum(['asc', 'desc']).optional().default('asc'),
 }).optional();
+
+// Disponibilidad en el Local: calendario por plato (diario / dia(s) de semana / fecha puntual).
+// No genera pedidos ni logica de venta; solo alimenta el checklist de Cocina.
+export const disponibilidadLocalItemSchema = z.object({
+  patron: z.enum(['diario', 'dia_semana', 'fecha'], {
+    errorMap: () => ({ message: "El patron debe ser 'diario', 'dia_semana' o 'fecha'" }),
+  }),
+  dia_semana: z.enum(
+    ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
+    { errorMap: () => ({ message: 'Día de semana inválido' }) }
+  ).nullable().optional(),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido, usar YYYY-MM-DD').nullable().optional(),
+}).refine((d) => !(d.patron === 'dia_semana' && !d.dia_semana), {
+  message: "dia_semana es obligatorio cuando patron es 'dia_semana'", path: ['dia_semana'],
+}).refine((d) => !(d.patron === 'fecha' && !d.fecha), {
+  message: "fecha es obligatoria cuando patron es 'fecha'", path: ['fecha'],
+}).refine((d) => !(d.patron === 'diario' && (d.dia_semana || d.fecha)), {
+  message: "patron 'diario' no admite dia_semana ni fecha", path: ['patron'],
+}).refine((d) => !(d.patron === 'dia_semana' && d.fecha), {
+  message: "patron 'dia_semana' no admite fecha", path: ['fecha'],
+}).refine((d) => !(d.patron === 'fecha' && d.dia_semana), {
+  message: "patron 'fecha' no admite dia_semana", path: ['dia_semana'],
+});
+
+export const setDisponibilidadLocalSchema = z.object({
+  entradas: z.array(disponibilidadLocalItemSchema).max(20).default([]),
+});

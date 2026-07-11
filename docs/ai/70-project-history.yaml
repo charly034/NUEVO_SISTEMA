@@ -1,5 +1,5 @@
 schema: la_quinta_project_history_v2
-updated_at: "2026-07-04"
+updated_at: "2026-07-06"
 
 product_summary:
   from_chat_summary:
@@ -70,6 +70,8 @@ conversation_decisions_or_context:
 
 timeline:
   verified_in_repo:
+    - date: "2026-07-09"
+      event: "Plan de mejoras post-analisis en 5 fases. F0: corregido mojibake telefono en PerfilPage y eliminado PedidosHoy.jsx (codigo muerto). F1: filtro de notificaciones migrado de empresas.plan legacy a plan_id, corrigiendo un bug que dejaba a empleado.plan undefined y excluia a todos los destinatarios de reglas filtradas por plan. F2: consolidacion de fechas/dias en front_menu/src/lib/dias.js y lib/fechas.js (useFechaOperativa re-exporta primitivas) y en front_clientes/src/utils/dias.js; migradas 13 paginas admin + 3 archivos cliente; abreviatura canonica Mie con acento. F3: removido endpoint duplicado /pedidos/menu/semanas/:semanaId/opciones (queda la canonica /menu/semanas/:semanaId/opciones) y unificado vocabulario de sugerencias a Clientes. F4: reconciliados 60-debt/30-contracts/20-modules y memoria con el codigo real. Validacion completa (API lint+64 tests, front_menu lint+build, front_clientes lint+build+test+e2e)."
     - date: "2026-07-04"
       event: "PedidosHoy mejora UX operativa: filtros empresa/plato persistidos en URL, opciones de plato acotadas por empresa seleccionada, estado vacio contextual para filtros sin coincidencias, alerta textual/visual de Sin plato asignado y mejoras de accesibilidad del header/drawer movil."
     - date: "2026-07-04"
@@ -222,6 +224,16 @@ timeline:
       event: "Limpieza pre-produccion de datos QA: seed-full-reset deja de crear empresa TEST/test@test.com y se agrega limpiar-datos-prueba.js con dry-run/apply para remover empresas, empleados, pedidos y menus seed de prueba conocidos."
     - date: "2026-07-04"
       event: "PedidosAdmin elimina la funcionalidad visible de observaciones/notas de pedidos: ya no aparecen indicadores, alertas por dia, detalle por item ni bloques imprimibles; el backend mantiene los campos por compatibilidad historica."
+    - date: "2026-07-06"
+      event: "Se registra docs/ai/ux-admin-prompt.md como memoria durable de normalizacion UX para front_menu: Simplicidad Radical, header/filtros/lista/drawer, limite de filtros visibles, acciones destructivas fuera de tablas, SideDrawer como patron de detalle y chequeo mobile-first."
+    - date: "2026-07-06"
+      event: "Se aplican mejoras UX admin en front_menu: Platos y Guarniciones reducen acciones visibles y llevan eliminar al detalle; Notificaciones y Administradores mueven eliminar/desactivar a formularios/drawers; PedidosPagos compacta filtros/tabla y mueve acciones al detalle; SemanaDetalle reemplaza la X directa por detalle con confirmacion. Validacion: front_menu lint sin errores y build OK; smoke navegador post-cambio parcial por timeout del runtime integrado."
+    - date: "2026-07-06"
+      event: "Pedidos admin unifica Seguimiento, Produccion semanal, Produccion diaria y Despacho hoy en /pedidos mediante PedidosPanel; /pedidos-hoy redirige a /pedidos?vista=despacho-hoy. API agrega pedido_items.estado con PATCH /api/v1/pedidos/items/:itemId/estado para marcar viandas individuales como entregadas y recalcular pedidos.estado. Validacion: migracion OK, API lint/test OK, front_menu lint/build OK."
+    - date: "2026-07-06"
+      event: "PedidosPanel reemplaza Dashboard por Produccion semanal y agrega resumen semanal de cocina por tipo de vianda/preparacion: total semanal, desglose por dia y tamanos, calculado localmente desde GET /api/v1/pedidos sin cambiar contratos API."
+    - date: "2026-07-06"
+      event: "Se redefine el tratamiento operativo de estados: pedidos semanales usan pendiente/en_proceso/completo/cancelado como feedback agregado; viandas diarias usan pendiente/entregado/cancelado, pueden cancelarse desde admin y las canceladas quedan trazables pero excluidas de cocina/despacho activo."
 
 needs_user_confirmation:
   - "Confirmar si se debe reestructurar API_LA_QUINTA/src/modules/menu y menus-semanales bajo una carpeta contenedora comun."

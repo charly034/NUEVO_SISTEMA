@@ -1,5 +1,5 @@
 schema: la_quinta_modules_v2
-updated_at: "2026-07-04"
+updated_at: "2026-07-10"
 
 modules:
   - owner_module: "API_LA_QUINTA.auth"
@@ -50,7 +50,8 @@ modules:
     routes_file: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
     owns: ["semanas de pedido", "menu activo/hoy/semana legacy", "crear pedido", "modificar pedido", "confirmar", "sugerencias cliente para semanas sin menu", "opciones configurables de sugerencias por semana", "listar sugerencias cliente para admin", "cancelar mi pedido completo o parcial", "cancelar dia de mi pedido", "historial", "estado admin"]
     boundaries:
-      - "Reglas de plazo, empresa, empleado, dia laboral, plato y guarnicion deben vivir en backend."
+      - "Reglas de plazo, empresa, empleado, dia laboral, plato, guarnicion y salsa deben vivir en backend."
+      - "pedido_items.salsa_id (2026-07-10) se resuelve igual que guarnicion_id: modo sin_salsa/fija/libre por plato, independiente del modo de guarnicion."
       - "Un dia marcado sin servicio en el menu bloquea la edicion cliente y el guardado backend: queda como sin_pedido por defecto y no debe enviarse como item editable."
       - "Crear/modificar usa transacciones y upsert por empleado + semana."
 
@@ -76,6 +77,7 @@ modules:
     boundaries:
       - "No debe asumir identidad de empleado cliente."
       - "Publicacion/cierre de menu afecta opciones vistas por cliente."
+      - "menu_semanal_dias.canal fue eliminado (2026-07-10): todo lo que entra al diseño de menú es vianda por definición. agregarPlatoDia rechaza platos con disponible_vianda=false."
 
   - owner_module: "API_LA_QUINTA.platos"
     status: verified_in_repo
@@ -85,10 +87,12 @@ modules:
       - "API_LA_QUINTA/src/middlewares/upload-plato-image.middleware.js"
       - "API_LA_QUINTA/uploads/platos"
     routes_file: "API_LA_QUINTA/src/modules/platos/platos.routes.js"
-    owns: ["CRUD platos", "tags", "tipo fijo/especial/ambos", "tiene_guarnicion", "metadata nutricional aproximada", "foto_url", "upload y compresion WebP de imagenes de platos"]
+    owns: ["CRUD platos", "tags", "tipo fijo/especial/ambos", "tiene_guarnicion", "metadata nutricional aproximada", "foto_url", "upload y compresion WebP de imagenes de platos", "disponible_vianda", "calendario de disponibilidad en el Local (GET/PUT /:id/disponibilidad-local)"]
     boundaries:
       - "Las imagenes se reciben como multipart field foto, se validan JPG/PNG/WebP <=5MB y se guardan como WebP en uploads/platos."
       - "Los archivos subidos se sirven por /uploads/platos y no se versionan en git."
+      - "El campo `canal` (vianda/local/ambos) fue eliminado (2026-07-10, Fase 3 del replanteo de dominio). Se reemplaza por `disponible_vianda` (bool, gatea si el plato aparece en el circuito de vianda que gestiona este sistema) y la tabla `plato_disponibilidad_local` (calendario diario/dia_semana/fecha para el Local — venta por kilo, sin pedidos ni precio en este sistema, solo alimenta el futuro checklist de Cocina)."
+      - "GET/PUT /api/v1/platos/:id/disponibilidad-local reemplaza toda la lista de entradas del plato (delete+insert), igual que visibilidad-empresas. Ver docs/ai/90-redesign-dominio-borrador.md."
 
   - owner_module: "API_LA_QUINTA.guarniciones"
     status: verified_in_repo
@@ -96,6 +100,19 @@ modules:
     paths: ["API_LA_QUINTA/src/modules/guarniciones"]
     routes_file: "API_LA_QUINTA/src/modules/guarniciones/guarniciones.routes.js"
     owns: ["listado publico de guarniciones", "CRUD admin de guarniciones"]
+
+  - owner_module: "API_LA_QUINTA.salsas"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/salsas"
+      - "API_LA_QUINTA/src/database/migrations/1719000058000_salsas.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000059000_platos-salsa-modo.js"
+    routes_file: "API_LA_QUINTA/src/modules/salsas/salsas.routes.js"
+    owns: ["listado publico de salsas", "CRUD admin de salsas"]
+    boundaries:
+      - "Entidad independiente de guarniciones (replanteo de dominio 2026-07-10): un plato puede tener guarnicion y salsa a la vez, una sola, o ninguna, cada una con su propio modo (sin_X/fija/libre)."
+      - "Ver docs/ai/90-redesign-dominio-borrador.md para el modelo completo (Vianda = Plato + Guarnicion opcional + Salsa opcional)."
 
   - owner_module: "API_LA_QUINTA.empresas"
     status: verified_in_repo
@@ -112,11 +129,26 @@ modules:
     paths:
       - "API_LA_QUINTA/src/modules/planes"
       - "API_LA_QUINTA/src/database/migrations/1719000043000_planes-vianda.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000062000_planes-comerciales-rename.js"
     routes_file: "API_LA_QUINTA/src/modules/planes/planes.routes.js"
-    owns: ["CRUD admin de planes de vianda", "gramaje minimo/maximo", "incluye_postre", "incluye_bebida", "estado activo"]
+    owns: ["CRUD admin de planes comerciales", "gramaje minimo/maximo", "incluye_postre", "incluye_bebida", "estado activo"]
     boundaries:
-      - "empresas.plan se conserva como compatibilidad legacy; empresas.plan_id apunta a planes_vianda."
+      - "Tabla renombrada de planes_vianda a planes_comerciales (2026-07-10, Fase 2 del replanteo de dominio) para liberar la palabra vianda; empresas.plan_id sigue apuntando al mismo id."
+      - "empresas.plan se conserva como compatibilidad legacy; empresas.plan_id apunta a planes_comerciales."
       - "pedidos guarda snapshot del plan para cocina y trazabilidad historica."
+
+  - owner_module: "API_LA_QUINTA.cocina"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/cocina"
+      - "API_LA_QUINTA/test/cocina.http-db.test.js"
+    routes_file: "API_LA_QUINTA/src/modules/cocina/cocina.routes.js"
+    owns: ["vista de cocina del dia (GET /hoy)", "vista de cocina de la semana (GET /semana/:menuId)", "oferta semanal por empresa (GET /oferta/:menuId)", "etiquetas para imprimir (GET /etiquetas/:menuId/:dia)", "checklist del Local por fecha"]
+    boundaries:
+      - "Solo lectura: no crea ni modifica pedidos ni menus, consume datos de pedidos/menus-semanales/platos."
+      - "GET /hoy y GET /semana/:menuId devuelven checklist_local (2026-07-10, Fase 4 del replanteo de dominio): platos programados en el Local para esa fecha, via platosRepository.findParaFecha (plato_disponibilidad_local). Sin cantidades — el Local no genera pedidos ni ventas en este sistema, ver docs/ai/90-redesign-dominio-borrador.md."
+      - "conteos_vianda y las etiquetas (findDetalleEtiquetas) ya incluyen salsa (salsa_modo/salsa_nombre) igual que guarnicion."
 
   - owner_module: "API_LA_QUINTA.finanzas"
     status: verified_in_repo
@@ -178,14 +210,11 @@ modules:
       - "menus-semanales, pedidos y auth.registro disparan eventos que se resuelven contra reglas activas; si la tabla nueva falta, se conserva fallback interno legacy."
 
   - owner_module: "API_LA_QUINTA.sugerencias-empleados"
-    status: verified_in_repo
-    kind: api_module
+    status: removed
+    kind: api_module_removed
     paths:
-      - "API_LA_QUINTA/src/modules/sugerencias-empleados"
-      - "API_LA_QUINTA/src/database/migrations/1719000036000_sugerencias-empleados.js"
-    routes_file: "API_LA_QUINTA/src/modules/sugerencias-empleados/sugerencias-empleados.routes.js"
-    owns: ["sugerencias libres por empleado en tabla sugerencias_empleados"]
-    note: "El flujo cliente de semanas sin menu usa el contrato canonico POST /api/v1/pedidos/sugerencias para alimentar pedido_sugerencias y admin."
+      - "eliminado 2026-07-09 (controller/repository/routes borrados)"
+    note: "Modulo eliminado. La tabla sugerencias_empleados y su migracion 1719000036000 permanecen sin consumidores; drop opcional a futuro. El unico flujo de sugerencias es POST /api/v1/pedidos/sugerencias (tabla pedido_sugerencias)."
 
   - owner_module: "API_LA_QUINTA.users"
     status: retired
@@ -203,7 +232,7 @@ modules:
       - "front_menu/src"
       - "front_menu/public"
       - "front_menu/nginx/default.conf.template"
-    owns: ["dashboard", "clientes como solapa canonica de administracion de empresas", "sugerencias de clientes en /recomendaciones-menu dentro del grupo Clientes", "platos con metadata/foto", "semanas", "historial", "estadisticas", "generar menu en /sugeridor", "pedidos", "pedidos de hoy", "pedidos y pagos dentro de clientes", "resumen de viandas en cuenta corriente", "notificaciones dentro de clientes", "empresas", "planes de vianda", "guarniciones", "auditoria", "administradores", "sidebar admin con grupos desplegables Clientes, Catalogo y Menu semanal agrupado por Planificacion/Analisis"]
+    owns: ["dashboard", "clientes como solapa canonica de administracion de empresas", "sugerencias de clientes en /recomendaciones-menu dentro del grupo Clientes", "platos con metadata/foto/disponible_vianda/salsa", "calendario de disponibilidad en el Local por plato (/platos, DetallePlatoModal)", "semanas", "diseno de menu semanal con guarnicion y salsa por slot (/semanas/:id/diseno)", "historial", "estadisticas", "generar menu en /sugeridor", "pedidos", "pedidos de hoy", "pedidos y pagos dentro de clientes", "resumen de viandas en cuenta corriente", "notificaciones dentro de clientes", "empresas", "planes comerciales", "guarniciones", "salsas", "cockpit de cocina con checklist de Local (/cocina)", "auditoria", "administradores", "sidebar admin con grupos desplegables Clientes, Catalogo y Menu semanal agrupado por Planificacion/Analisis"]
     boundaries:
       - "Sesion admin debe pasar por front_menu/src/auth.js y front_menu/src/lib/apiClient.js."
 
@@ -250,7 +279,9 @@ modules:
       - "front_clientes/src/components/pedido/SuggestionSheet.jsx"
       - "front_clientes/src/pages/NavMapScreen.jsx"
       - "front_clientes/src/pages/SugerenciasPage.jsx"
-    owns: ["home Inicio de pedido", "lectura de menu semanal", "pedido semanal mobile", "seleccion por dia", "guarniciones", "crear/modificar/confirmar", "sugerencias de semana sin menu en bottom sheet", "estado local de semana", "mapa de navegacion cliente"]
+    owns: ["home Inicio de pedido", "lectura de menu semanal", "pedido semanal mobile (WeeklyOrderView.jsx, unico componente vivo del flujo)", "seleccion por dia", "guarniciones", "salsa a eleccion en paralelo a guarnicion", "crear/modificar/confirmar", "sugerencias de semana sin menu en bottom sheet", "estado local de semana", "mapa de navegacion cliente"]
+    boundaries:
+      - "reglasSeleccionPedido.js, useSeleccionDia.js, SemanaCardMenuInteractivo.jsx, BottomSheetSeleccionDia.jsx, SemanaCardEditable.jsx, SemanaContainer.jsx, SemanaPedidoCard.jsx, SelectorGuarnicion.jsx y OpcionPlatoCard.jsx son codigo muerto (no se llega a ellos desde PedidoPage.jsx) — no invertir tiempo en mantenerlos sincronizados con cambios de dominio."
 
 safe_refactor_zones:
   verified_in_repo:

@@ -1,0 +1,25 @@
+{
+  "_doc": "Hoja FIJOS del Excel: platos fijos por dia para el LOCAL. Si el mismo plato tambien aparece en menus semanales de vianda, el build lo marca canal='ambos'. guarnicion_modo por defecto 'sin_guarnicion' salvo que se indique.",
+  "platos": [
+    { "plato": "Arroz con pollo",          "dia": "lunes",     "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Torre de piononos",        "dia": "martes",    "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Hamburguesa de carne",     "dia": "martes",    "guarnicion_modo": "libre" },
+    { "plato": "Estofado de albóndigas",   "dia": "martes",    "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Filet romana",             "dia": "martes",    "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Filet suiza",              "dia": "martes",    "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Pastel de papa",           "dia": "miercoles", "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Pastel de camote",         "dia": "miercoles", "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Sorrentinos de JyQ",       "dia": "jueves",    "guarnicion_modo": "libre" },
+    { "plato": "Sorrentinos de calabaza",  "dia": "jueves",    "guarnicion_modo": "libre" },
+    { "plato": "Ñoquis",                   "dia": "jueves",    "guarnicion_modo": "libre" },
+    { "plato": "Ravioles",                 "dia": "jueves",    "guarnicion_modo": "libre" },
+    { "plato": "Fideos con estofado",      "dia": "jueves",    "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Costillar de cerdo",       "dia": "viernes",   "guarnicion_modo": "libre" },
+    { "plato": "Carne a la olla",          "dia": "viernes",   "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Cerdo al chimichurri",     "dia": "viernes",   "guarnicion_modo": "libre" },
+    { "plato": "Canastitas de pollo",      "dia": "viernes",   "guarnicion_modo": "libre" },
+    { "plato": "Arrollado de matambre",    "dia": "sabado",    "guarnicion_modo": "libre" },
+    { "plato": "Empanadas",                "dia": "sabado",    "guarnicion_modo": "sin_guarnicion" },
+    { "plato": "Matambre al roquefort",    "dia": "sabado",    "guarnicion_modo": "sin_guarnicion" }
+  ]
+}

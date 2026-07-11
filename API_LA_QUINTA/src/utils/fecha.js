@@ -14,3 +14,16 @@ export const calcularFechaServicio = (fechaInicio, dia) => {
   fecha.setUTCDate(fecha.getUTCDate() + OFFSET_DIA[dia]);
   return fecha.toISOString().split('T')[0]; // YYYY-MM-DD
 };
+
+// Fragmento SQL para ordenar filas por día de semana (lunes..domingo).
+// Fuente única compartida por los repositorios que ordenan por `dia`
+// (menus-semanales, cocina) para evitar que la regla de orden diverja.
+export const ORDEN_DIA_SQL = `CASE dia
+  WHEN 'lunes'     THEN 1
+  WHEN 'martes'    THEN 2
+  WHEN 'miercoles' THEN 3
+  WHEN 'jueves'    THEN 4
+  WHEN 'viernes'   THEN 5
+  WHEN 'sabado'    THEN 6
+  WHEN 'domingo'   THEN 7
+END`;

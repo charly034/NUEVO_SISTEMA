@@ -1,5 +1,5 @@
 schema: la_quinta_contracts_v2
-updated_at: "2026-07-04"
+updated_at: "2026-07-06"
 
 api_base:
   verified_in_repo: "/api/v1"
@@ -86,7 +86,6 @@ endpoints:
       - "GET /api/v1/pedidos/menu-hoy"
       - "GET /api/v1/pedidos/menu-semana?fecha_inicio=YYYY-MM-DD"
       - "GET /api/v1/pedidos/menu-activo"
-      - "GET /api/v1/pedidos/menu/semanas/:semanaId/opciones"
       - "GET /api/v1/pedidos/semanas"
       - "GET /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
       - "POST /api/v1/pedidos"
@@ -102,6 +101,7 @@ endpoints:
       - "GET /api/v1/pedidos"
       - "GET /api/v1/pedidos/:id"
       - "PATCH /api/v1/pedidos/:id/estado"
+      - "PATCH /api/v1/pedidos/items/:itemId/estado"
     menu:
       - "GET /api/v1/menu/semanas/:semanaId/opciones"
     menus_semanales:
@@ -187,9 +187,8 @@ endpoints:
       - "GET /api/v1/notificaciones/no-leidas/count"
       - "PATCH /api/v1/notificaciones/leer-todas"
       - "PATCH /api/v1/notificaciones/:id/leer"
-    mis_sugerencias:
-      - "GET /api/v1/mis-sugerencias?semana_inicio=YYYY-MM-DD"
-      - "POST /api/v1/mis-sugerencias"
+    mis_sugerencias_removed_2026_07_09:
+      - "Modulo sugerencias-empleados eliminado; rutas /api/v1/mis-sugerencias retiradas. Usar /api/v1/pedidos/sugerencias."
     users_legacy:
       - "ALL /api/v1/users -> 410 Gone"
       - "ALL /api/v1/users/:id -> 410 Gone"
@@ -214,13 +213,18 @@ payload_formats:
         - "plato_id: integer positivo requerido si sin_pedido=false"
         - "opcion: letra A-Z para plato especial; null para fijo"
         - "guarnicion_id: integer|null"
+        - "salsa_id: integer|null (2026-07-10, independiente de guarnicion_id; ver salsa_modo del plato)"
         - "sin_pedido: boolean"
         - "origen: usuario|default opcional si sin_pedido=true"
         - "notas: string <=300 opcional"
+        - "estado: pendiente|entregado|cancelado expuesto en respuestas admin; no aceptado en create/update cliente. en_proceso/listo pueden existir como valores legacy de base."
+        - "estado_updated_at: timestamptz|null expuesto en respuestas"
       invariants:
         - "items debe tener 1 a 7 dias"
         - "dias no pueden repetirse"
-        - "sin_pedido=true exige plato_id null/undefined y guarnicion_id null/undefined"
+        - "sin_pedido=true exige plato_id null/undefined, guarnicion_id null/undefined y salsa_id null/undefined"
+        - "guarnicion_id y salsa_id se validan de forma independiente segun guarnicion_modo/salsa_modo del plato (sin_X prohibe, fija ignora el valor enviado y usa el fijo del plato, libre lo exige y valida que este activo)"
+        - "un plato con disponible_vianda=false no puede usarse en POST/PUT de pedidos (422), aunque siga activo=true; tampoco aparece como fijo/siempre en GET /pedidos/semanas"
         - "un pedido por empleado y semana: UNIQUE (empleado_id, semana_inicio)"
         - "pedido_items unico por pedido_id + dia"
         - "el plazo de POST/PUT se valida con la configuracion de empresa; menus_semanales.fecha_limite_pedidos no debe bloquear el pedido cliente"
@@ -231,7 +235,28 @@ payload_formats:
         - "POST/PUT guarda snapshot del plan vigente de la empresa en pedidos: plan_id, plan_codigo, plan_nombre, plan_gramaje_min/max, plan_incluye_postre y plan_incluye_bebida."
     pedido_estado_admin:
       endpoint: "PATCH /api/v1/pedidos/:id/estado"
-      body: "{ estado: pendiente|en_proceso|listo|entregado|cancelado }"
+      body: "{ estado: pendiente|en_proceso|completo|cancelado }"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "actualiza pedidos.estado; si estado=pendiente/cancelado sincroniza viandas activas a ese estado, y si estado=completo las sincroniza como entregadas."
+        - "registra pedido_eventos tipo estado_cambiado, admin_auditoria accion=cambiar_estado y notificacion al empleado"
+    pedido_item_estado_admin:
+      endpoint: "PATCH /api/v1/pedidos/items/:itemId/estado"
+      body: "{ estado: pendiente|entregado|cancelado }"
+      response_data: "{ item, pedido }"
+      storage:
+        - "pedido_items.estado"
+        - "pedido_items.estado_updated_at"
+        - "pedidos.estado recalculado por agregacion de items activos"
+      invariants:
+        - "requiere Authorization Bearer admin"
+        - "rechaza item inexistente, sin_pedido=true o pedido padre cancelado"
+        - "pedido queda cancelado si no quedan viandas activas porque todas fueron canceladas o sin_pedido"
+        - "pedido queda completo si todas sus viandas activas estan entregadas"
+        - "pedido queda en_proceso si hay viandas entregadas o canceladas pero aun quedan viandas activas pendientes"
+        - "pedido queda pendiente si todas las viandas activas estan pendientes"
+        - "registra pedido_eventos tipo estado_item_cambiado y admin_auditoria accion=cambiar_estado_item"
+        - "notifica al empleado solo si cambia el estado agregado del pedido"
     pedido_cancelar_cliente:
       endpoints:
         - "DELETE /api/v1/pedidos/mi-pedido?semana_inicio=YYYY-MM-DD"
@@ -428,11 +453,10 @@ payload_formats:
         - "pedido-semanal-pendiente:<semana_inicio>:<run_key>:regla:<regla_id>:<empleado_id>"
       fallback:
         - "Si notificacion_reglas todavia no existe, el service conserva comportamiento interno legacy para no romper bases parcialmente migradas."
-    mis_sugerencias_cliente:
-      endpoint: "POST /api/v1/mis-sugerencias"
-      body: "{ semana_inicio: YYYY-MM-DD, ideas: string, comentario?: string }"
-      storage: "sugerencias_empleados"
-      note: "Modulo expuesto pero no usado por el flujo principal de pedido cliente al 2026-07-02."
+    mis_sugerencias_cliente_removed:
+      endpoint: "eliminado 2026-07-09 (era POST /api/v1/mis-sugerencias)"
+      storage: "sugerencias_empleados (tabla sin consumidores; drop opcional a futuro)"
+      note: "Modulo sugerencias-empleados eliminado. El unico flujo de sugerencias es POST /api/v1/pedidos/sugerencias."
     pedido_sugerencias_admin:
       endpoint: "GET /api/v1/pedidos/sugerencias"
       query: "{ semana_inicio?: YYYY-MM-DD, empresa_id?: integer, limit?: integer, offset?: integer }"
@@ -635,9 +659,9 @@ contract_audit_2026_06_27:
     legacy_or_compat:
       - method: "GET"
         endpoint: "/api/v1/pedidos/menu/semanas/:semanaId/opciones"
-        backend: "API_LA_QUINTA/src/modules/pedidos/pedidos.routes.js"
-        note: "Duplica el endpoint canonico /api/v1/menu/semanas/:semanaId/opciones para compatibilidad."
-        estado: "legacy"
+        backend: "eliminado 2026-07-09"
+        note: "Ruta duplicada removida; usar la canonica /api/v1/menu/semanas/:semanaId/opciones."
+        estado: "removed"
       - method: "GET"
         endpoint: "/api/v1/users"
         backend: "API_LA_QUINTA/src/modules/users/users.routes.js"

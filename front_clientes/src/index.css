@@ -15,7 +15,7 @@
   --muted:        #F0EDE6;
   --muted-fg:     #7A7868;
   --border:       #E8E5DC;
-  --subtexto:     #9A9885;
+  --subtexto:     #6E6B64;
   --error:        #C83030;
 
   /* aliases para compatibilidad con código legacy */
@@ -62,4 +62,13 @@ input, textarea, select { font-family: inherit; }
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

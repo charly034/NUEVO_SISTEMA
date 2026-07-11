@@ -46,9 +46,9 @@ function FilaNotificacion({ notif, onMarcarLeida }) {
           )}
         </div>
         {notif.cuerpo && (
-          <p className="text-xs text-[#9A9885] mt-0.5 leading-relaxed">{notif.cuerpo}</p>
+          <p className="text-xs text-[#6E6B64] mt-0.5 leading-relaxed">{notif.cuerpo}</p>
         )}
-        <p className="text-[10px] text-[#C4C2B4] mt-1">{tiempoRelativo(notif.created_at)}</p>
+        <p className="text-[10px] text-[#6E6B64] mt-1">{tiempoRelativo(notif.created_at)}</p>
       </div>
     </button>
   );
@@ -92,7 +92,7 @@ export default function NotificacionesPage() {
           <div className="flex-1">
             <h1 className="text-lg font-bold text-[#2A2C1F] font-serif">Notificaciones</h1>
             {noLeidas > 0 && (
-              <p className="text-xs text-[#9A9885]">{noLeidas} sin leer</p>
+              <p className="text-xs text-[#6E6B64]">{noLeidas} sin leer</p>
             )}
           </div>
           {noLeidas > 0 && (
@@ -125,9 +125,9 @@ export default function NotificacionesPage() {
         {!isLoading && notificaciones.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-16 h-16 bg-[#EDF0E4] rounded-full flex items-center justify-center">
-              <Bell size={28} className="text-[#9A9885]" />
+              <Bell size={28} className="text-[#6E6B64]" />
             </div>
-            <p className="text-sm text-[#9A9885] font-semibold">Sin notificaciones</p>
+            <p className="text-sm text-[#6E6B64] font-semibold">Sin notificaciones</p>
           </div>
         )}
 

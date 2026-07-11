@@ -182,7 +182,7 @@ function SemanaActualCard({ onHacerPedido, onSugerir, onVerMenu, semana }) {
             <EstadoPunto estado={estado} />
           </div>
 
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#9A9885]">
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#6E6B64]">
             <Clock3 size={11} aria-hidden="true" />
             {textoCierre(semana)}
           </div>
@@ -274,7 +274,7 @@ function FilaSemanaProxima({ onHacerPedido, onSugerir, onVerMenu, semana }) {
             <EstadoPunto estado={estado} />
           </div>
 
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#9A9885]">
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#6E6B64]">
             <Clock3 size={11} aria-hidden="true" />
             {textoCierre(semana)}
           </div>
@@ -345,11 +345,11 @@ function FilaSemanaProxima({ onHacerPedido, onSugerir, onVerMenu, semana }) {
           <CalendarDays size={15} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-bold text-[#9A9885]">{rangoSemana(semana.id)}</p>
+          <p className="text-[12px] font-bold text-[#6E6B64]">{rangoSemana(semana.id)}</p>
           <h3 className="mt-0.5 text-[13px] font-black leading-tight text-[#2A2C1F]">
             {semana.tipo === "proxima" ? "Proxima semana" : "Semana"}
           </h3>
-          <p className="mt-0.5 text-[11px] font-semibold text-[#9A9885]">{estado.label}</p>
+          <p className="mt-0.5 text-[11px] font-semibold text-[#6E6B64]">{estado.label}</p>
         </div>
 
         <button
@@ -462,7 +462,7 @@ export default function PedidoPage({ empleado }) {
 
         {!cargando && !error && semanas.length === 0 && (
           <div className="mx-4 mt-4 rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center">
-            <p className="text-sm text-[#9A9885]">No hay semanas disponibles.</p>
+            <p className="text-sm text-[#6E6B64]">No hay semanas disponibles.</p>
           </div>
         )}
 

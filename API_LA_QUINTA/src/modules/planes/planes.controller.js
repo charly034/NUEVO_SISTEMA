@@ -31,7 +31,7 @@ function normalizarPlan(payload = {}, parcial = false) {
     data.gramaje_min = gramajeMin;
   }
   if (!parcial || payload.gramaje_max !== undefined) {
-    const gramajeMax = payload.gramaje_max === null || payload.gramaje_max === ''
+    const gramajeMax = payload.gramaje_max === null || payload.gramaje_max === '' || payload.gramaje_max === undefined
       ? null
       : Number(payload.gramaje_max);
     if (gramajeMax !== null && (!Number.isInteger(gramajeMax) || gramajeMax <= 0)) {

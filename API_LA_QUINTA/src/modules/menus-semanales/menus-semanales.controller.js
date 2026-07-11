@@ -14,6 +14,11 @@ export const getMenuSemanal = asyncHandler(async (req, res) => {
   sendSuccess(res, menu, 'Menú semanal obtenido exitosamente');
 });
 
+export const getDisenoMenuSemanal = asyncHandler(async (req, res) => {
+  const diseno = await service.getDisenoMenuSemanal(req.params.id);
+  sendSuccess(res, diseno, 'Diseño del menú semanal obtenido exitosamente');
+});
+
 export const createMenuSemanal = asyncHandler(async (req, res) => {
   const admin_id = req.adminUser?.sub ?? null;
   const menu = await service.createMenuSemanal(req.body, admin_id, req.adminUser);
@@ -46,6 +51,24 @@ export const getPlatosByDia = asyncHandler(async (req, res) => {
 export const agregarPlatoDia = asyncHandler(async (req, res) => {
   const resultado = await service.agregarPlatoDia(req.params.id, req.body, req.adminUser);
   sendCreated(res, resultado, `Plato agregado al ${req.body.dia} opción ${req.body.opcion ?? 'A'}`);
+});
+
+export const setEmpresasSlot = asyncHandler(async (req, res) => {
+  const { id, dia, opcion } = req.params;
+  const result = await service.setEmpresasSlot(id, dia, opcion, req.body, req.adminUser);
+  sendSuccess(res, result, 'Visibilidad de empresas actualizada');
+});
+
+export const actualizarGuarnicionSlot = asyncHandler(async (req, res) => {
+  const { id, dia, opcion } = req.params;
+  const slot = await service.actualizarGuarnicionSlot(id, dia, opcion, req.body, req.adminUser);
+  sendSuccess(res, slot, 'Guarnición del slot actualizada');
+});
+
+export const actualizarSalsaSlot = asyncHandler(async (req, res) => {
+  const { id, dia, opcion } = req.params;
+  const slot = await service.actualizarSalsaSlot(id, dia, opcion, req.body, req.adminUser);
+  sendSuccess(res, slot, 'Salsa del slot actualizada');
 });
 
 export const quitarPlatoDia = asyncHandler(async (req, res) => {

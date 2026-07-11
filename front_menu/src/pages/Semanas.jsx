@@ -6,13 +6,13 @@ import SideDrawer from '../components/ui/SideDrawer.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
+import { DIAS_ORDEN as DIAS_SEMANA, DIA_ABREV as DIA_LABEL } from '../lib/dias.js';
+import { lunesActualISO } from '../lib/fechas.js';
 
 // ── helpers de fecha ──────────────────────────────────────────────────
 const MESES_LARGO  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MESES_CORTO  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const DIAS_SEMANA  = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
 const DIAS_HEADER  = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-const DIA_LABEL    = { lunes:'Lun', martes:'Mar', miercoles:'Mié', jueves:'Jue', viernes:'Vie', sabado:'Sáb', domingo:'Dom' };
 
 function soloFecha(str) { return str ? str.split('T')[0] : ''; }
 function localISO(d) {
@@ -24,9 +24,7 @@ function addDias(iso, n) {
 }
 function addSemanas(iso, n) { return addDias(iso, n * 7); }
 function getLunesActual() {
-  const hoy = new Date();
-  const offset = (hoy.getDay() + 6) % 7;
-  return localISO(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - offset));
+  return lunesActualISO();
 }
 function formatCorto(iso) {
   if (!iso) return '—';
@@ -69,7 +67,7 @@ const ESTADO_CFG = {
   borrador:  { label: 'Borrador',  accentCls: 'bg-gray-400',   chipCls: 'bg-gray-100 text-gray-600 border-gray-200',   rowTint: '' },
   publicado: { label: 'Publicado', accentCls: 'bg-green-500',  chipCls: 'bg-green-100 text-green-700 border-green-200',  rowTint: 'bg-green-50/60' },
   cerrado:   { label: 'Cerrado',   accentCls: 'bg-orange-400', chipCls: 'bg-orange-100 text-orange-700 border-orange-200',rowTint: 'bg-orange-50/40' },
-  vacio:     { label: 'Sin menu',  accentCls: 'bg-gray-200',   chipCls: 'bg-gray-50 text-gray-300 border-gray-100',      rowTint: '' },
+  vacio:     { label: 'Sin menu',  accentCls: 'bg-gray-200',   chipCls: 'bg-gray-50 text-gray-500 border-gray-100',      rowTint: '' },
 };
 
 // ── Celda de un dia en el calendario ─────────────────────────────────
@@ -101,7 +99,7 @@ function CeldaDia({ lunesIso, diaIdx, menu, esHoy }) {
         <span className={`inline-flex items-center justify-center shrink-0 text-[11px] font-bold leading-none
           ${esHoy
             ? 'w-5 h-5 rounded-full bg-green-600 text-white'
-            : esFDS ? 'text-gray-300' : 'text-gray-500'
+            : esFDS ? 'text-gray-500' : 'text-gray-500'
           }`}>
           {diaNum}
         </span>
@@ -122,7 +120,7 @@ function CeldaDia({ lunesIso, diaIdx, menu, esHoy }) {
             </div>
           ))}
           {platos.length > 2 && (
-            <span className="text-[8px] text-gray-300 leading-none">+{platos.length - 2} más</span>
+            <span className="text-[8px] text-gray-500 leading-none">+{platos.length - 2} más</span>
           )}
         </div>
       ) : null}
@@ -143,7 +141,7 @@ function FilaSemana({ lunesIso, menu, isActiva, onClick, hoyIso, lunesActual }) 
 
   return (
     <div
-      className={`grid cursor-pointer select-none group transition-all duration-150
+      className={`grid cursor-pointer select-none group transition-colors duration-150
         ${isActiva ? 'ring-2 ring-inset ring-green-400' : 'hover:brightness-[0.97]'}
         ${cfg.rowTint}`}
       style={{ gridTemplateColumns: '80px repeat(7, minmax(0,1fr))' }}
@@ -158,7 +156,7 @@ function FilaSemana({ lunesIso, menu, isActiva, onClick, hoyIso, lunesActual }) 
           <div className="text-[10px] font-bold text-gray-700 leading-tight">
             {formatCorto(lunesIso)}
           </div>
-          <div className="text-[9px] text-gray-400 leading-tight">
+          <div className="text-[9px] text-gray-500 leading-tight">
             {formatCorto(addDias(lunesIso, 6))}
           </div>
         </div>
@@ -212,7 +210,7 @@ function GrillaDias({ menu }) {
           return (
             <div key={dia} className={`rounded-xl border ${borderCls} p-2 min-h-[76px]`}>
               <div className="text-[11px] font-bold text-gray-700">{DIA_LABEL[dia]}</div>
-              <div className="text-[10px] text-gray-400 mb-1.5">{formatCorto(fechaDia)}</div>
+              <div className="text-[10px] text-gray-500 mb-1.5">{formatCorto(fechaDia)}</div>
               {esSin ? (
                 <div className="text-[10px] font-semibold text-red-500">Sin servicio</div>
               ) : platos.length > 0 ? (
@@ -224,11 +222,11 @@ function GrillaDias({ menu }) {
                     </div>
                   ))}
                   {platos.length > 3 && (
-                    <div className="text-[10px] text-gray-400">+{platos.length - 3} más</div>
+                    <div className="text-[10px] text-gray-500">+{platos.length - 3} más</div>
                   )}
                 </div>
               ) : (
-                <div className="text-[10px] text-gray-300">Sin platos</div>
+                <div className="text-[10px] text-gray-500">Sin platos</div>
               )}
             </div>
           );
@@ -240,8 +238,11 @@ function GrillaDias({ menu }) {
 
 // ── Contenido del SideDrawer ──────────────────────────────────────────
 function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, onDelete, estadoMut, estadoPending, totalPedidos, onClose }) {
-  const [creando, setCreando] = useState(false);
-  const [nombre, setNombre]   = useState('');
+  const [creando, setCreando]               = useState(false);
+  const [nombre, setNombre]                 = useState('');
+  const [editandoFecha, setEditandoFecha]   = useState(false);
+  const [fechaLimite, setFechaLimite]       = useState('');
+  const [horaLimite, setHoraLimite]         = useState('10:00');
   const createMut = useCreateMenu();
   const domingo   = addDias(lunesIso, 6);
 
@@ -261,7 +262,7 @@ function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, on
     return (
       <div className="p-5 flex flex-col items-center justify-center text-center py-12">
         <p className="text-sm font-semibold text-gray-700 mb-1">{formatCorto(lunesIso)} — {formatCorto(domingo)}</p>
-        <p className="text-sm text-gray-400 mb-6">No hay menu registrado para esta semana.</p>
+        <p className="text-sm text-gray-500 mb-6">No hay menu registrado para esta semana.</p>
         {creando ? (
           <div className="w-full max-w-xs text-left">
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre del menu</label>
@@ -321,7 +322,7 @@ function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, on
           Editar grilla &rarr;
         </Link>
         {estado === 'borrador' && (
-          <button onClick={onPublicar} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors">
+          <button onClick={onPublicar} disabled={estadoPending} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
             Publicar
           </button>
         )}
@@ -340,7 +341,7 @@ function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, on
             Ver estadisticas
           </Link>
         )}
-        {(estado === 'publicado' || estado === 'borrador') && (<div className="w-full border-t border-gray-100 my-1" />)}
+        {estado === 'publicado' && (<div className="w-full border-t border-gray-100 my-1" />)}
         {estado === 'publicado' && (
           <>
             <button onClick={() => estadoMut({ estado: 'cerrado' })} disabled={estadoPending}
@@ -360,8 +361,65 @@ function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, on
         )}
       </div>
 
+      {estado === 'publicado' && (
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-gray-600">Fecha limite de pedidos</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {fechaLimiteStr ? fechaLimiteStr : 'Sin fecha limite — los pedidos quedan abiertos.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditandoFecha(v => !v)}
+              className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              {editandoFecha ? 'Cancelar' : fechaLimiteStr ? 'Editar' : 'Agregar'}
+            </button>
+          </div>
+          {editandoFecha && (
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input type="date" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)}
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <input type="time" value={horaLimite} onChange={e => setHoraLimite(e.target.value)}
+                  className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={estadoPending}
+                  onClick={async () => {
+                    const fl = fechaLimite ? `${fechaLimite}T${horaLimite}:00` : null;
+                    await estadoMut({ estado: 'publicado', extra: { fecha_limite_pedidos: fl } });
+                    setEditandoFecha(false);
+                  }}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  Guardar
+                </button>
+                {fechaLimiteStr && (
+                  <button
+                    type="button"
+                    disabled={estadoPending}
+                    onClick={async () => {
+                      await estadoMut({ estado: 'publicado', extra: { fecha_limite_pedidos: null } });
+                      setEditandoFecha(false);
+                    }}
+                    className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    Quitar fecha
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Detalle diario</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Detalle diario</p>
         <GrillaDias menu={menu} />
       </div>
     </div>
@@ -377,7 +435,7 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
       <p className="text-sm text-gray-600">Publicar <strong>{menu?.nombre}</strong> lo hara visible para que los empleados puedan hacer su pedido.</p>
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          Fecha limite de pedidos <span className="font-normal text-gray-400">(opcional)</span>
+          Fecha limite de pedidos <span className="font-normal text-gray-500">(opcional)</span>
         </label>
         <div className="flex gap-2">
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
@@ -385,7 +443,7 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
           <input type="time" value={hora} onChange={e => setHora(e.target.value)}
             className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
         </div>
-        <p className="text-xs text-gray-400 mt-1.5">Sin fecha: los pedidos quedan abiertos hasta cerrarlos manualmente.</p>
+        <p className="text-xs text-gray-500 mt-1.5">Sin fecha: los pedidos quedan abiertos hasta cerrarlos manualmente.</p>
       </div>
       <div className="flex gap-2 justify-end pt-1">
         <button onClick={onCancel} className="btn-secondary">Cancelar</button>
@@ -419,7 +477,7 @@ function ModalDuplicarForm({ menu, onConfirm, onCancel, loading }) {
         <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none" required />
       </label>
-      <p className="text-xs text-gray-400">Rango: {formatCorto(fechaInicio)} &mdash; {formatCorto(fechaFin)}</p>
+      <p className="text-xs text-gray-500">Rango: {formatCorto(fechaInicio)} &mdash; {formatCorto(fechaFin)}</p>
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="btn-secondary">Cancelar</button>
         <button type="submit" disabled={loading} className="btn-primary flex items-center gap-1.5">
@@ -478,7 +536,7 @@ export default function Semanas() {
         toast.success(`${vencidas.length} semanas cerradas automáticamente`);
       }
     }).catch(() => {});
-  }, [menus]);
+  }, [menus, estadoMutHook]);
 
   const semanasVisibles = useMemo(() => semanasDelMes(navYear, navMonth), [navYear, navMonth]);
   const menuActivo   = semanaActiva ? (menuByLunes.get(semanaActiva) ?? null) : null;
@@ -515,6 +573,10 @@ export default function Semanas() {
     }
   };
 
+  const handlePublicar = async (fechaLimite) => {
+    await handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: fechaLimite ?? null } });
+  };
+
   const handleReabrir = async () => {
     const ok = await handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: null } });
     if (ok) setConfirmReabrir(false);
@@ -549,11 +611,11 @@ export default function Semanas() {
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-4 py-3 md:px-6">
         <div className="mx-auto max-w-[920px] flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Gestion de menus</p>
-            <h1 className="text-2xl font-bold text-gray-900">Menus semanales</h1>
+            <p className="text-xs font-medium text-gray-500">Gestión de menús</p>
+            <h1 className="text-2xl font-bold text-gray-900">Menús semanales</h1>
           </div>
-          <button onClick={irAHoy} className="shrink-0 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors">
-            Hoy
+          <button onClick={irAHoy} className="shrink-0 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+            Semana actual
           </button>
         </div>
       </div>
@@ -579,9 +641,9 @@ export default function Semanas() {
             {/* Cabecera columnas */}
             <div className="bg-gray-50 border-b border-gray-200"
               style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, minmax(0,1fr))' }}>
-              <div className="px-3 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Semana</div>
+              <div className="px-3 py-2.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Semana</div>
               {DIAS_HEADER.map((d, i) => (
-                <div key={i} className={`py-2.5 text-[10px] font-semibold uppercase tracking-wide text-center border-l border-gray-200 ${i >= 5 ? 'text-gray-300' : 'text-gray-500'}`}>
+                <div key={i} className={`py-2.5 text-[10px] font-semibold uppercase tracking-wide text-center border-l border-gray-200 ${i >= 5 ? 'text-gray-500' : 'text-gray-500'}`}>
                   {d}
                 </div>
               ))}
@@ -609,7 +671,7 @@ export default function Semanas() {
                   <span className={`inline-flex text-[8px] font-bold px-1.5 py-px rounded-full border uppercase tracking-wide ${v.chipCls}`}>{v.label}</span>
                 </div>
               ))}
-              <div className="flex items-center gap-1 text-[9px] text-gray-400">
+              <div className="flex items-center gap-1 text-[9px] text-gray-500">
                 <div className="w-2 h-2 rounded-full bg-red-300" /> Sin servicio
               </div>
             </div>
@@ -644,7 +706,7 @@ export default function Semanas() {
         {menuActivo && (
           <ModalPublicarForm
             menu={menuActivo}
-            onConfirm={fl => handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: fl } })}
+            onConfirm={handlePublicar}
             onCancel={() => setModalPublicar(false)}
             loading={estadoMutHook.isPending}
           />

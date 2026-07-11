@@ -1,9 +1,11 @@
+import { cloneElement } from 'react';
+
 export function Tabs({ value, onChange, children }) {
   return (
     <div className="border-b border-gray-200">
       <nav className="flex gap-0" role="tablist">
         {children && (Array.isArray(children) ? children : [children]).map((child) =>
-          child ? { ...child, props: { ...child.props, _active: child.props.value === value, _onChange: onChange } } : null
+          child ? cloneElement(child, { _active: child.props.value === value, _onChange: onChange }) : null
         )}
       </nav>
     </div>

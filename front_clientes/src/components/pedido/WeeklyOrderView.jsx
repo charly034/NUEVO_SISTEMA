@@ -9,10 +9,13 @@ import {
   diaEsEditablePedido,
   obtenerDiasEditablesPedido,
 } from '../../utils/permisosPedido.js';
+import { DIA_ABREV } from '../../utils/dias.js';
 
 function cn(...a) { return a.filter(Boolean).join(' '); }
 
-const ABBR = { lunes: 'LUN', martes: 'MAR', miercoles: 'MIÉ', jueves: 'JUE', viernes: 'VIE', sabado: 'SÁB', domingo: 'DOM' };
+const ABBR = Object.fromEntries(
+  Object.entries(DIA_ABREV).map(([dia, corto]) => [dia, corto.toUpperCase()]),
+);
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
 function parseFecha(fechaISO) {
@@ -37,19 +40,22 @@ function ordenInicial(dia) {
       platoNombre: sel.plato.nombre || '',
       guarnicion: sel.guarnicion?.nombre || sel.nombreGuarnicion || null,
       guarnicionId: sel.guarnicion?.id ?? sel.guarnicionId ?? null,
+      salsa: sel.salsa?.nombre || sel.nombreSalsa || null,
+      salsaId: sel.salsa?.id ?? sel.salsaId ?? null,
       noVianda: false,
     };
   }
   if (sel?.sinPedido || dia.estado === 'sin_pedido_por_defecto') {
-    return { platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, noVianda: true };
+    return { platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, salsa: null, salsaId: null, noVianda: true };
   }
-  return { platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, noVianda: false };
+  return { platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, salsa: null, salsaId: null, noVianda: false };
 }
 
 function normalizarOrdenParaComparar(orden = {}) {
   return {
     platoId: orden.platoId == null ? null : String(orden.platoId),
     guarnicionId: orden.guarnicionId == null ? null : String(orden.guarnicionId),
+    salsaId: orden.salsaId == null ? null : String(orden.salsaId),
     noVianda: Boolean(orden.noVianda),
   };
 }
@@ -60,6 +66,7 @@ function ordenTieneCambios(ordenActual, ordenOriginal) {
   return (
     actual.platoId !== original.platoId ||
     actual.guarnicionId !== original.guarnicionId ||
+    actual.salsaId !== original.salsaId ||
     actual.noVianda !== original.noVianda
   );
 }
@@ -77,7 +84,7 @@ function DayProgress({ dias, orders, showV }) {
         const { num } = parseFecha(day.fecha);
         return (
           <div key={k} className="flex-1 flex flex-col items-center gap-1">
-            <div className={cn('w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300',
+            <div className={cn('w-9 h-9 rounded-full flex items-center justify-center transition-[background-color,box-shadow] duration-300 ease-out',
               feriado ? 'bg-[#F5F3EE]'
                 : done && !o.noVianda ? 'bg-[#5B6B2A] shadow-[0_2px_8px_rgba(91,107,42,0.28)]'
                 : done && o.noVianda ? 'bg-[#E8E5DC]'
@@ -85,7 +92,7 @@ function DayProgress({ dias, orders, showV }) {
             )}>
               {feriado ? <span className="text-[11px]">🏛</span>
                 : done && !o.noVianda ? <span className="text-[13px] font-bold text-white font-serif">{num}</span>
-                : done && o.noVianda ? <X size={13} className="text-[#9A9885]" />
+                : done && o.noVianda ? <X size={13} className="text-[#6E6B64]" />
                 : <span className={cn('text-[13px] font-bold', err ? 'text-red-300' : 'text-[#C8C5BC]')}>{num}</span>}
             </div>
             <span className={cn('text-[9px] font-bold tracking-wide',
@@ -104,6 +111,7 @@ function PlateDetailSheet({ plate, onClose, onSelect }) {
   const calorias = plate.calorias || plate.calories || null;
   const foto = plate.foto_url || plate.fotoUrl || plate.photo || null;
   const guarniciones = (plate.guarniciones || []).map(g => g.nombre || g);
+  const salsas = (plate.salsas || []).map(s => s.nombre || s);
   const vegetariano = Boolean(plate.vegetariano || plate.vegetarian || (plate.etiquetas || []).includes('vegetariano'));
 
   return (
@@ -141,17 +149,17 @@ function PlateDetailSheet({ plate, onClose, onSelect }) {
               {calorias && (
                 <div className="flex-1 bg-[#F5F3EE] rounded-2xl px-4 py-3 text-center">
                   <p className="text-[22px] font-bold text-[#2A2C1F] font-serif">{calorias}</p>
-                  <p className="text-[11px] text-[#9A9885] font-semibold">kcal aprox.</p>
+                  <p className="text-[11px] text-[#6E6B64] font-semibold">kcal aprox.</p>
                 </div>
               )}
               <div className="flex-1 bg-[#F5F3EE] rounded-2xl px-4 py-3 text-center">
                 <p className="text-[22px] font-bold text-[#2A2C1F] font-serif">{alergenos.length === 0 ? '✓' : alergenos.length}</p>
-                <p className="text-[11px] text-[#9A9885] font-semibold">{alergenos.length === 0 ? 'Sin alérgenos' : 'Alérgenos'}</p>
+                <p className="text-[11px] text-[#6E6B64] font-semibold">{alergenos.length === 0 ? 'Sin alérgenos' : 'Alérgenos'}</p>
               </div>
             </div>
             {alergenos.length > 0 && (
               <div>
-                <p className="text-[12px] font-bold text-[#9A9885] mb-2.5 uppercase tracking-wider">Contiene</p>
+                <p className="text-[12px] font-bold text-[#6E6B64] mb-2.5 uppercase tracking-wider">Contiene</p>
                 <div className="flex flex-wrap gap-2">
                   {alergenos.map((a) => (
                     <span key={a} className="text-[12px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">{a}</span>
@@ -161,10 +169,20 @@ function PlateDetailSheet({ plate, onClose, onSelect }) {
             )}
             {guarniciones.length > 0 && (
               <div>
-                <p className="text-[12px] font-bold text-[#9A9885] mb-2.5 uppercase tracking-wider">Incluye elección de guarnición</p>
+                <p className="text-[12px] font-bold text-[#6E6B64] mb-2.5 uppercase tracking-wider">Incluye elección de guarnición</p>
                 <div className="flex flex-wrap gap-2">
                   {guarniciones.map((g) => (
                     <span key={g} className="text-[12px] text-[#3A4A1A] bg-[#EDF0E4] px-2.5 py-1 rounded-full">{g}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {salsas.length > 0 && (
+              <div>
+                <p className="text-[12px] font-bold text-[#6E6B64] mb-2.5 uppercase tracking-wider">Incluye elección de salsa</p>
+                <div className="flex flex-wrap gap-2">
+                  {salsas.map((s) => (
+                    <span key={s} className="text-[12px] text-[#7A1A1A] bg-[#F5E5E0] px-2.5 py-1 rounded-full">{s}</span>
                   ))}
                 </div>
               </div>
@@ -185,6 +203,9 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
   const [garnish, setGarnish] = useState(currentOrder.guarnicionId != null
     ? { id: currentOrder.guarnicionId, nombre: currentOrder.guarnicion }
     : null);
+  const [sauce, setSauce] = useState(currentOrder.salsaId != null
+    ? { id: currentOrder.salsaId, nombre: currentOrder.salsa }
+    : null);
   const [noV, setNoV] = useState(currentOrder.noVianda);
   const [detail, setDetail] = useState(null);
 
@@ -201,7 +222,8 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
 
   const selPlate = platos.find(p => p.id === selId) || null;
   const needsG = (selPlate?.guarniciones?.length ?? 0) > 0;
-  const canConfirm = noV || (selId != null && (!needsG || garnish));
+  const needsS = (selPlate?.salsas?.length ?? 0) > 0;
+  const canConfirm = noV || (selId != null && (!needsG || garnish) && (!needsS || sauce));
   const { num, mes } = parseFecha(dia.fecha);
 
   return (
@@ -211,9 +233,9 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
         <div className="flex justify-center pt-3 pb-1 shrink-0"><div className="w-10 h-1 bg-[#D8D5C8] rounded-full" /></div>
         <div className="flex items-center justify-between px-5 pb-3 shrink-0">
           <div>
-            <p className="text-[11px] text-[#9A9885] font-semibold mb-0.5">Elegir plato para</p>
+            <p className="text-[11px] text-[#6E6B64] font-semibold mb-0.5">Elegir plato para</p>
             <h3 className="text-[18px] font-bold text-[#2A2C1F] font-serif">
-              {dia.dia} <span className="text-[#9A9885] font-normal text-base">{num} {mes}</span>
+              {dia.dia} <span className="text-[#6E6B64] font-normal text-base">{num} {mes}</span>
             </h3>
           </div>
           <button onClick={onClose} className="w-9 h-9 bg-[#F0EDE6] rounded-full flex items-center justify-center">
@@ -227,7 +249,7 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
         </div>
 
         <button
-          onClick={() => { setNoV(v => !v); setSelId(null); setGarnish(null); }}
+          onClick={() => { setNoV(v => !v); setSelId(null); setGarnish(null); setSauce(null); }}
           className={cn('mx-5 flex items-center gap-3 px-4 py-3 rounded-xl border mb-3 transition-colors shrink-0',
             noV ? 'bg-[#F0EDE6] border-[#9A9885]/30' : 'bg-white border-[#E8E5DC]')}
         >
@@ -239,7 +261,7 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
         </button>
 
         <div className="mx-5 relative mb-3 shrink-0">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#B8B6A8]" />
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6E6B64]" />
           <input
             type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar platos..."
             className="w-full py-2.5 pl-9 pr-4 rounded-xl border border-[#E8E5DC] bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#5B6B2A]/15 focus:border-[#5B6B2A]"
@@ -263,19 +285,21 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
             const isSel = selId === plate.id;
             const vegetariano = Boolean(plate.vegetariano || (plate.etiquetas || []).includes('vegetariano'));
             const tieneGuarnicion = (plate.guarniciones?.length ?? 0) > 0;
-            const seleccionar = () => { setNoV(false); setSelId(isSel ? null : plate.id); setGarnish(null); };
+            const tieneSalsa = (plate.salsas?.length ?? 0) > 0;
+            const seleccionar = () => { setNoV(false); setSelId(isSel ? null : plate.id); setGarnish(null); setSauce(null); };
             return (
               <div key={plate.id}>
-                <div className={cn('flex items-center gap-2 px-4 py-3.5 rounded-xl border transition-all',
+                <div className={cn('flex items-center gap-2 px-4 py-3.5 rounded-xl border transition-colors',
                   isSel ? 'bg-white border-[#5B6B2A]/25 border-l-[3px] border-l-[#5B6B2A] shadow-sm' : 'bg-white border-[#E8E5DC]')}>
                   <button onClick={seleccionar} className="flex-1 text-left min-w-0">
                     <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                       <p className="text-[14px] font-bold text-[#2A2C1F]">{plate.nombre}</p>
                       {vegetariano && <Leaf size={12} className="text-emerald-600 shrink-0" />}
                       {tieneGuarnicion && <span className="text-[10px] font-bold text-[#C8782A] bg-orange-50 px-1.5 py-0.5 rounded-full">+ guarnición</span>}
+                      {tieneSalsa && <span className="text-[10px] font-bold text-[#A61A1A] bg-red-50 px-1.5 py-0.5 rounded-full">+ salsa</span>}
                       {plate.destacado && <span className="text-[10px] font-bold text-[#5B6B2A] bg-[#EDF0E4] px-1.5 py-0.5 rounded-full">Especial</span>}
                     </div>
-                    <p className="text-[12px] text-[#9A9885]">{plate.descripcion}</p>
+                    <p className="text-[12px] text-[#6E6B64]">{plate.descripcion}</p>
                   </button>
                   <button onClick={() => setDetail(plate)} className="w-7 h-7 flex items-center justify-center text-[#C8C5BC] hover:text-[#5B6B2A] shrink-0 transition-colors">
                     <Info size={16} />
@@ -288,7 +312,7 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
                 </div>
                 {isSel && tieneGuarnicion && (
                   <div className="ml-3 mt-1 bg-white border border-[#E8E5DC] rounded-xl px-4 py-3 overflow-hidden">
-                    <p className="text-[11px] font-bold text-[#9A9885] mb-2.5 uppercase tracking-wider">Guarnición</p>
+                    <p className="text-[11px] font-bold text-[#6E6B64] mb-2.5 uppercase tracking-wider">Guarnición</p>
                     <div className="space-y-1">
                       {plate.guarniciones.map((g) => {
                         const activa = garnish?.id === g.id;
@@ -307,13 +331,34 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
                     </div>
                   </div>
                 )}
+                {isSel && tieneSalsa && (
+                  <div className="ml-3 mt-1 bg-white border border-[#E8E5DC] rounded-xl px-4 py-3 overflow-hidden">
+                    <p className="text-[11px] font-bold text-[#6E6B64] mb-2.5 uppercase tracking-wider">Salsa</p>
+                    <div className="space-y-1">
+                      {plate.salsas.map((s) => {
+                        const activa = sauce?.id === s.id;
+                        return (
+                          <button key={s.id} onClick={() => setSauce(activa ? null : s)}
+                            className={cn('w-full text-left px-3 py-2 rounded-lg text-[13px] transition-colors flex items-center gap-2',
+                              activa ? 'bg-[#F5E5E0] font-semibold text-[#7A1A1A]' : 'text-[#2A2C1F] hover:bg-[#F5F3EE]')}>
+                            <div className={cn('w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center',
+                              activa ? 'border-[#A61A1A] bg-[#A61A1A]' : 'border-[#D8D5C8]')}>
+                              {activa && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                            </div>
+                            {s.nombre}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
           {filtered.length === 0 && (
             <div className="text-center py-10">
               <UtensilsCrossed size={26} className="text-[#D8D5C8] mx-auto mb-2" />
-              <p className="text-[#B8B6A8] text-sm">No se encontraron platos</p>
+              <p className="text-[#6E6B64] text-sm">No se encontraron platos</p>
             </div>
           )}
         </div>
@@ -321,13 +366,15 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
         <div className="px-5 py-4 bg-white border-t border-[#E8E5DC] shrink-0">
           <BtnPrimary
             onClick={() => {
-              if (noV) onConfirm({ platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, noVianda: true });
+              if (noV) onConfirm({ platoId: null, plato: null, platoNombre: '', guarnicion: null, guarnicionId: null, salsa: null, salsaId: null, noVianda: true });
               else if (selPlate) onConfirm({
                 platoId: selPlate.platoId ?? selPlate.id,
                 plato: selPlate,
                 platoNombre: selPlate.nombre,
                 guarnicion: garnish?.nombre || null,
                 guarnicionId: garnish?.id ?? null,
+                salsa: sauce?.nombre || null,
+                salsaId: sauce?.id ?? null,
                 noVianda: false,
               });
             }}
@@ -343,7 +390,7 @@ function PlateSelectorSheet({ dia, currentOrder, onConfirm, onClose }) {
         <PlateDetailSheet
           plate={detail}
           onClose={() => setDetail(null)}
-          onSelect={() => { setNoV(false); setSelId(detail.id); setGarnish(null); setDetail(null); }}
+          onSelect={() => { setNoV(false); setSelId(detail.id); setGarnish(null); setSauce(null); setDetail(null); }}
         />
       )}
     </>
@@ -406,6 +453,8 @@ export default function WeeklyOrderView({ readOnly = false, semana, onBack, onGu
                 platoId: o.plato?.platoId ?? o.platoId,
                 guarnicionId: o.guarnicionId,
                 guarnicion: o.guarnicion ? { id: o.guarnicionId, nombre: o.guarnicion } : null,
+                salsaId: o.salsaId,
+                salsa: o.salsa ? { id: o.salsaId, nombre: o.salsa } : null,
                 sinPedido: false,
               },
             };
@@ -465,7 +514,7 @@ export default function WeeklyOrderView({ readOnly = false, semana, onBack, onGu
       )}
 
       <div className="px-5 pt-3 pb-1 shrink-0">
-        <p className="text-[12px] text-[#9A9885]">
+        <p className="text-[12px] text-[#6E6B64]">
           {readOnly ? "Semana cerrada: este pedido se muestra en solo lectura." : "Elegí un plato por día y confirmá todo junto."}
         </p>
       </div>
@@ -505,7 +554,7 @@ export default function WeeklyOrderView({ readOnly = false, semana, onBack, onGu
               <button
                 key={k}
                 onClick={() => !saved && !readOnly && editableDia && setSelDay(k)}
-                className={cn('w-full text-left rounded-2xl transition-all active:scale-[0.99]',
+                className={cn('w-full text-left rounded-2xl transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.99]',
                   done ? 'bg-white border-l-[3px] border-l-[#5B6B2A] border border-[#5B6B2A]/12 shadow-sm py-3.5 px-4'
                     : err ? 'bg-red-50/60 border border-red-200 border-l-[3px] border-l-red-400 py-3 px-4'
                     : 'bg-transparent py-3 px-4 hover:bg-white/60',
@@ -516,7 +565,7 @@ export default function WeeklyOrderView({ readOnly = false, semana, onBack, onGu
                     <span className={cn('text-[22px] font-bold leading-none font-serif',
                       done && !o.noVianda ? 'text-[#5B6B2A]' : err ? 'text-red-300' : 'text-[#D8D5C8]')}>{num}</span>
                     <span className={cn('text-[9px] font-bold tracking-wider mt-0.5',
-                      done ? 'text-[#9A9885]' : err ? 'text-red-300' : 'text-[#D8D5C8]')}>{ABBR[k] || ''}</span>
+                      done ? 'text-[#6E6B64]' : err ? 'text-red-300' : 'text-[#D8D5C8]')}>{ABBR[k] || ''}</span>
                   </div>
                   <div className={cn('w-px h-8 shrink-0', done ? 'bg-[#5B6B2A]/20' : err ? 'bg-red-200' : 'bg-[#E8E5DC]')} />
                   <div className="flex-1 min-w-0">
@@ -524,22 +573,28 @@ export default function WeeklyOrderView({ readOnly = false, semana, onBack, onGu
                     {done && !o.noVianda ? (
                       <p className="text-[13px] text-[#5B6B2A] font-semibold truncate mt-0.5">
                         {o.platoNombre}
-                        {o.guarnicion && <span className="text-[#9A9885] font-normal"> · {o.guarnicion}</span>}
+                        {o.guarnicion && <span className="text-[#6E6B64] font-normal"> · {o.guarnicion}</span>}
+                        {o.salsa && <span className="text-[#6E6B64] font-normal"> · {o.salsa}</span>}
                       </p>
                     ) : done && o.noVianda ? (
-                      <p className="text-[13px] text-[#9A9885] italic">
+                      <p className="text-[13px] text-[#6E6B64] italic">
                         {day.motivo ? "Sin servicio" : "Sin vianda este día"}
                       </p>
                     ) : !editableDia ? (
-                      <p className="text-[13px] text-[#B8B6A8]">Fuera de plazo</p>
+                      <p className="text-[13px] text-[#6E6B64]">{day.limiteTexto || 'Fuera de plazo'}</p>
                     ) : (
-                      <p className={cn('text-[13px]', err ? 'text-red-400' : 'text-[#C4C2B4]')}>
-                        {err ? 'Requerido — tocá para completar' : 'Tocá para elegir'}
-                      </p>
+                      <>
+                        <p className={cn('text-[13px]', err ? 'text-red-400' : 'text-[#6E6B64]')}>
+                          {err ? 'Requerido — tocá para completar' : 'Tocá para elegir'}
+                        </p>
+                        {day.limiteTexto && (
+                          <p className="text-[11px] text-[#6E6B64] mt-0.5">{day.limiteTexto}</p>
+                        )}
+                      </>
                     )}
                   </div>
                   {editableDia && !saved && !readOnly ? (
-                    <ChevronRight size={15} className={cn('shrink-0', done ? 'text-[#9A9885]' : 'text-[#D8D5C8]')} />
+                    <ChevronRight size={15} className={cn('shrink-0', done ? 'text-[#6E6B64]' : 'text-[#D8D5C8]')} />
                   ) : (
                     <span className="w-[15px] shrink-0" aria-hidden="true" />
                   )}

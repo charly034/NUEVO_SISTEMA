@@ -38,7 +38,7 @@ function FilaToggle({ label, sublabel, Icon, active, onChange, disabled }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[#2A2C1F]">{label}</p>
-        {sublabel && <p className="text-xs text-[#9A9885] mt-0.5">{sublabel}</p>}
+        {sublabel && <p className="text-xs text-[#6E6B64] mt-0.5">{sublabel}</p>}
       </div>
       <Toggle active={active} onChange={onChange} disabled={disabled} />
     </div>
@@ -47,7 +47,7 @@ function FilaToggle({ label, sublabel, Icon, active, onChange, disabled }) {
 
 function SectionHeader({ title }) {
   return (
-    <p className="px-4 text-xs font-bold text-[#9A9885] uppercase tracking-wider mt-6 mb-2">{title}</p>
+    <p className="px-4 text-xs font-bold text-[#6E6B64] uppercase tracking-wider mt-6 mb-2">{title}</p>
   );
 }
 
@@ -66,9 +66,9 @@ function FilaConfig({ label, sublabel, onPress, right }) {
     >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[#2A2C1F]">{label}</p>
-        {sublabel && <p className="text-xs text-[#9A9885] mt-0.5">{sublabel}</p>}
+        {sublabel && <p className="text-xs text-[#6E6B64] mt-0.5">{sublabel}</p>}
       </div>
-      {right || <ChevronRight size={16} className="text-[#C4C2B4] shrink-0" />}
+      {right || <ChevronRight size={16} className="text-[#6E6B64] shrink-0" />}
     </button>
   );
 }
@@ -203,7 +203,7 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
         <div className="mx-4 bg-white rounded-2xl border border-[#E8E5DC] overflow-hidden">
           <FilaToggle
             label="Recibir recordatorios"
-            sublabel="Avisos al telÃ©fono cargado por WhatsApp"
+            sublabel="Avisos al teléfono cargado por WhatsApp"
             Icon={MessageCircle}
             active={recibeRecordatoriosWhatsapp}
             onChange={() => togglePref('recibir_recordatorios_whatsapp', !recibeRecordatoriosWhatsapp)}
@@ -232,7 +232,7 @@ export default function PerfilPage({ empleado, onLogout, onEmpleadoUpdate }) {
           <FilaConfig
             label="Cambiar contraseña"
             onPress={() => setShowPassword(true)}
-            right={<Lock size={16} className="text-[#9A9885]" />}
+            right={<Lock size={16} className="text-[#6E6B64]" />}
           />
         </div>
 

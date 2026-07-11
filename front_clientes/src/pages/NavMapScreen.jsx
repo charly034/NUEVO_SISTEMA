@@ -59,7 +59,7 @@ export default function NavMapScreen() {
 
       <div className="flex-1 overflow-y-auto px-5 py-5">
         <section className="mb-5 rounded-2xl border border-[#E8E5DC] bg-white p-4">
-          <p className="mb-3 text-sm font-black uppercase tracking-wide text-[#9A9885]">Referencias</p>
+          <p className="mb-3 text-sm font-black uppercase tracking-wide text-[#6E6B64]">Referencias</p>
           <div className="flex flex-wrap gap-2">
             {grupos.map((grupo) => (
               <Chip key={grupo.label} className={grupo.color}>{grupo.label}</Chip>
@@ -90,7 +90,7 @@ export default function NavMapScreen() {
           ].map(([valor, label]) => (
             <div key={label} className="rounded-2xl border border-[#E8E5DC] bg-white px-3 py-4 text-center">
               <p className="font-serif text-2xl font-bold text-[#5B6B2A]">{valor}</p>
-              <p className="text-[11px] font-black uppercase tracking-wide text-[#9A9885]">{label}</p>
+              <p className="text-[11px] font-black uppercase tracking-wide text-[#6E6B64]">{label}</p>
             </div>
           ))}
         </section>

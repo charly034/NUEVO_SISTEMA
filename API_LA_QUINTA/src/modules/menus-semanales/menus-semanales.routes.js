@@ -8,6 +8,9 @@ import {
   menuSemanalParamsSchema,
   menusSemanalesQuerySchema,
   agregarPlatoDiaSchema,
+  actualizarGuarnicionSlotSchema,
+  actualizarSalsaSlotSchema,
+  setEmpresasSlotSchema,
   diaOpcionParamsSchema,
   sinServicioSchema,
   sinServicioParamsSchema,
@@ -17,11 +20,15 @@ import {
 import {
   getMenusSemanales,
   getMenuSemanal,
+  getDisenoMenuSemanal,
   createMenuSemanal,
   updateMenuSemanal,
   deleteMenuSemanal,
   getPlatosByDia,
   agregarPlatoDia,
+  actualizarGuarnicionSlot,
+  actualizarSalsaSlot,
+  setEmpresasSlot,
   quitarPlatoDia,
   marcarSinServicio,
   quitarSinServicio,
@@ -51,8 +58,9 @@ router.get('/historial/usados',         validate({ query: historialFiltrosSchema
 router.get('/historial/no-usados',      validate({ query: historialFiltrosSchema }),                            getPlatosNoUsados);
 
 // ── CRUD menús semanales ──────────────────────────────────────────
-router.get('/',    validate({ query: menusSemanalesQuerySchema }), getMenusSemanales);
-router.get('/:id', validate({ params: menuSemanalParamsSchema }), getMenuSemanal);
+router.get('/',         validate({ query: menusSemanalesQuerySchema }),  getMenusSemanales);
+router.get('/:id',      validate({ params: menuSemanalParamsSchema }),   getMenuSemanal);
+router.get('/:id/diseno', validate({ params: menuSemanalParamsSchema }), getDisenoMenuSemanal);
 router.post('/',   validate({ body: createMenuSemanalSchema }),   createMenuSemanal);
 router.post('/:id/duplicar', validate({ params: menuSemanalParamsSchema, body: duplicarMenuSemanalSchema }), duplicarMenuSemanal);
 router.put('/:id', validate({ params: menuSemanalParamsSchema, body: updateMenuSemanalSchema }), updateMenuSemanal);
@@ -68,6 +76,21 @@ router.get('/:id/dias/:dia',
 router.post('/:id/dias',
   validate({ params: menuSemanalParamsSchema, body: agregarPlatoDiaSchema }),
   agregarPlatoDia
+);
+
+router.patch('/:id/dias/:dia/:opcion/guarnicion',
+  validate({ params: diaOpcionParamsSchema, body: actualizarGuarnicionSlotSchema }),
+  actualizarGuarnicionSlot
+);
+
+router.patch('/:id/dias/:dia/:opcion/salsa',
+  validate({ params: diaOpcionParamsSchema, body: actualizarSalsaSlotSchema }),
+  actualizarSalsaSlot
+);
+
+router.put('/:id/dias/:dia/:opcion/empresas',
+  validate({ params: diaOpcionParamsSchema, body: setEmpresasSlotSchema }),
+  setEmpresasSlot
 );
 
 router.delete('/:id/dias/:dia/:opcion',

@@ -18,7 +18,7 @@ export const findAll = async (empresa_id) => {
 export const findById = async (id) => {
   const r = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.activo, e.rol, e.empresa_id,
-            e.telefono, e.fecha_nacimiento, emp.nombre AS empresa_nombre, emp.plan, emp.modo_pedido
+            e.telefono, e.fecha_nacimiento, emp.nombre AS empresa_nombre, emp.modo_pedido
      FROM empleados e JOIN empresas emp ON emp.id = e.empresa_id
      WHERE e.id = $1`,
     [id]

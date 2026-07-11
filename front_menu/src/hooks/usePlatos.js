@@ -49,3 +49,35 @@ export const usePlatoTags = () =>
     select: (res) => res.data,
     staleTime: 1000 * 60 * 5,
   });
+
+export const useVisibilidadEmpresas = (id) =>
+  useQuery({
+    queryKey: [PLATOS_KEY, id, 'visibilidad'],
+    queryFn: () => platosService.getVisibilidadEmpresas(id),
+    select: (res) => res.data,
+    enabled: !!id,
+  });
+
+export const useSetVisibilidadEmpresas = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, empresa_ids }) => platosService.setVisibilidadEmpresas(id, empresa_ids),
+    onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: [PLATOS_KEY, id, 'visibilidad'] }),
+  });
+};
+
+export const useDisponibilidadLocal = (id) =>
+  useQuery({
+    queryKey: [PLATOS_KEY, id, 'disponibilidad-local'],
+    queryFn: () => platosService.getDisponibilidadLocal(id),
+    select: (res) => res.data,
+    enabled: !!id,
+  });
+
+export const useSetDisponibilidadLocal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, entradas }) => platosService.setDisponibilidadLocal(id, entradas),
+    onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: [PLATOS_KEY, id, 'disponibilidad-local'] }),
+  });
+};

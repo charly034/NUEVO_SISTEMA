@@ -1,4 +1,9 @@
+import { z } from 'zod';
 import { ApiError } from '../../utils/ApiError.js';
+
+export const cambiarEstadoItemSchema = z.object({
+  estado: z.enum(['pendiente', 'preparado', 'entregado', 'cancelado']),
+});
 
 export const DIAS_PEDIDO = [
   'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo',
@@ -37,6 +42,9 @@ export function validarPedidoInput({ semana_inicio, menu_semanal_id, items }) {
       }
       if (item.guarnicion_id !== null && item.guarnicion_id !== undefined) {
         throw ApiError.unprocessable(`Si el ${item.dia} esta marcado sin pedido no debe enviar guarnicion`);
+      }
+      if (item.salsa_id !== null && item.salsa_id !== undefined) {
+        throw ApiError.unprocessable(`Si el ${item.dia} esta marcado sin pedido no debe enviar salsa`);
       }
       if (item.origen && !['usuario', 'default'].includes(item.origen)) {
         throw ApiError.badRequest(`Origen invalido en dia ${item.dia}`);

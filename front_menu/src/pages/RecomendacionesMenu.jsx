@@ -3,6 +3,7 @@ import { useGuardarPedidoSugerenciaOpciones, usePedidoSugerenciaOpciones, usePed
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import { usePlatos } from '../hooks/usePlatos.js';
 import { toast } from '../lib/toast.js';
+import { lunesActualISO } from '../lib/fechas.js';
 
 function isoLocal(date) {
   const y = date.getFullYear();
@@ -12,11 +13,7 @@ function isoLocal(date) {
 }
 
 function getLunes() {
-  const hoy = new Date();
-  const diff = hoy.getDay() === 0 ? -6 : 1 - hoy.getDay();
-  const lunes = new Date(hoy);
-  lunes.setDate(hoy.getDate() + diff);
-  return isoLocal(lunes);
+  return lunesActualISO();
 }
 
 function addDias(iso, dias) {
@@ -121,7 +118,7 @@ export default function RecomendacionesMenu() {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sugerencias de clientes</h1>
-          <p className="text-sm text-gray-500 mt-1">Sugerencias enviadas por clientes para semanas sin menu publicado.</p>
+          <p className="text-sm text-gray-500 mt-1">Sugerencias enviadas por clientes para semanas sin menú publicado.</p>
         </div>
         <button
           onClick={() => refetch()}
@@ -245,7 +242,7 @@ export default function RecomendacionesMenu() {
                     {sugerencia.empresa_nombre || 'Sin empresa'} - Semana {fmtFecha(sugerencia.semana_inicio)}
                   </p>
                 </div>
-                <p className="text-xs text-gray-400">Actualizado {fmtFechaHora(sugerencia.updated_at || sugerencia.created_at)}</p>
+                <p className="text-xs text-gray-500">Actualizado {fmtFechaHora(sugerencia.updated_at || sugerencia.created_at)}</p>
               </div>
 
               {sugerencia.ideas?.length > 0 && (

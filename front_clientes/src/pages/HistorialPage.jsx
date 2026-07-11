@@ -19,15 +19,16 @@ import { apiGet, apiDelete } from '../services/apiCliente.js';
 import { finanzasApi } from '../services/api.js';
 import { confirmar, toast } from '../lib/swal.js';
 import { unirClases } from '../compartido/utils/clases.js';
+import { DIA_ABREV as DIAS_LABEL } from '../utils/dias.js';
 
 const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const DIAS_LABEL = { lunes:'Lun', martes:'Mar', miercoles:'Mie', jueves:'Jue', viernes:'Vie', sabado: 'Sab', domingo: 'Dom' };
 const DIA_OFFSET = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4, sabado: 5, domingo: 6 };
 
 const ESTADO_CFG = {
   confirmado:   { label: 'Confirmado',   Icon: CheckCircle2, color: '#1B7B5E', bg: '#E6F6F0' },
   pendiente:    { label: 'Pendiente',    Icon: Clock,        color: '#C8782A', bg: '#FEF3E8' },
   en_proceso:   { label: 'Pendiente',    Icon: Clock,        color: '#C8782A', bg: '#FEF3E8' },
+  completo:      { label: 'Completo',     Icon: CheckCircle2, color: '#1B7B5E', bg: '#E6F6F0' },
   listo:         { label: 'Listo',        Icon: CheckCircle2, color: '#1B7B5E', bg: '#E6F6F0' },
   entregado:     { label: 'Entregado',    Icon: CheckCircle2, color: '#1B7B5E', bg: '#E6F6F0' },
   fuera_de_plazo:{ label: 'Fuera de plazo', Icon: XCircle,    color: '#9A9885', bg: '#F0EDE6' },
@@ -141,7 +142,7 @@ function Tabs({ activo, onChange }) {
           onClick={() => onChange(id)}
           className={unirClases(
             'flex min-h-10 items-center justify-center gap-2 rounded-xl px-3 text-xs font-black transition',
-            activo === id ? 'bg-[#EDF0E4] text-[#5B6B2A]' : 'text-[#9A9885]',
+            activo === id ? 'bg-[#EDF0E4] text-[#5B6B2A]' : 'text-[#6E6B64]',
           )}
         >
           <Icon size={15} />
@@ -185,15 +186,15 @@ function FilaPedido({ cancelando, cancelandoDia, pedido, onCancelarDia, onElimin
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[#9A9885]">{items.length} dias</span>
-          {abierto ? <ChevronUp size={16} className="text-[#9A9885]" /> : <ChevronDown size={16} className="text-[#9A9885]" />}
+          <span className="text-xs font-semibold text-[#6E6B64]">{items.length} dias</span>
+          {abierto ? <ChevronUp size={16} className="text-[#6E6B64]" /> : <ChevronDown size={16} className="text-[#6E6B64]" />}
         </div>
       </button>
 
       {abierto && (
         <div className="space-y-1 border-t border-[#F0EDE6] px-4 pt-3 pb-4">
           {items.length === 0 && (
-            <p className="py-2 text-sm text-[#9A9885]">Sin dias registrados.</p>
+            <p className="py-2 text-sm text-[#6E6B64]">Sin dias registrados.</p>
           )}
           {items.map((item, index) => {
             const dia = item.dia || item.diaId || item.clave;
@@ -203,8 +204,8 @@ function FilaPedido({ cancelando, cancelandoDia, pedido, onCancelarDia, onElimin
             const diaKey = `${pedido.id}:${dia}`;
             return (
               <div key={`${dia || 'dia'}-${index}`} className="flex items-center gap-3 border-b border-[#F5F3EE] py-2 last:border-0">
-                <span className="w-8 text-xs font-bold text-[#9A9885]">{DIAS_LABEL[dia] || dia}</span>
-                <p className={unirClases('flex-1 text-sm', sinVianda ? 'text-[#C4C2B4] italic' : 'text-[#2A2C1F]')}>
+                <span className="w-8 text-xs font-bold text-[#6E6B64]">{DIAS_LABEL[dia] || dia}</span>
+                <p className={unirClases('flex-1 text-sm', sinVianda ? 'text-[#6E6B64] italic' : 'text-[#2A2C1F]')}>
                   {sinVianda ? 'Sin vianda' : platoNombre}
                 </p>
                 {puedeCancelarDia && (
@@ -249,7 +250,7 @@ function Metrica({ label, value, Icon, tone = 'verde' }) {
       <div className={unirClases('mb-2 flex h-8 w-8 items-center justify-center rounded-xl', tonos[tone])}>
         <Icon size={16} />
       </div>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[#9A9885]">{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[#6E6B64]">{label}</p>
       <p className="mt-1 text-base font-black text-[#2A2C1F]">{value}</p>
     </div>
   );
@@ -284,19 +285,19 @@ function PedidoFinanciero({ pedido, empresa }) {
             {empresa ? nombrePersona(pedido) : principal}
           </p>
           {empresa && (
-            <p className="mt-0.5 truncate text-xs text-[#9A9885]">{principal}</p>
+            <p className="mt-0.5 truncate text-xs text-[#6E6B64]">{principal}</p>
           )}
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             <div>
-              <p className="font-bold text-[#9A9885]">Total</p>
+              <p className="font-bold text-[#6E6B64]">Total</p>
               <p className="font-black text-[#2A2C1F]">{formatMoney(pedido.importe_total)}</p>
             </div>
             <div>
-              <p className="font-bold text-[#9A9885]">Pagado</p>
+              <p className="font-bold text-[#6E6B64]">Pagado</p>
               <p className="font-black text-[#1B7B5E]">{formatMoney(pedido.importe_pagado)}</p>
             </div>
             <div>
-              <p className="font-bold text-[#9A9885]">Saldo</p>
+              <p className="font-bold text-[#6E6B64]">Saldo</p>
               <p className="font-black text-[#C8782A]">{formatMoney(Math.max(0, toNumber(pedido.saldo)))}</p>
             </div>
           </div>
@@ -348,11 +349,11 @@ function PagoItem({ pago }) {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <p className="font-bold text-[#9A9885]">Aplicado</p>
+              <p className="font-bold text-[#6E6B64]">Aplicado</p>
               <p className="font-black text-[#1B7B5E]">{formatMoney(pago.monto_aplicado)}</p>
             </div>
             <div>
-              <p className="font-bold text-[#9A9885]">Sin aplicar</p>
+              <p className="font-bold text-[#6E6B64]">Sin aplicar</p>
               <p className="font-black text-[#4A6EA9]">{formatMoney(saldo)}</p>
             </div>
           </div>
@@ -456,10 +457,10 @@ function CuentaFinanciera({ cuenta, loading, error, onRetry }) {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-black text-[#2A2C1F]">{esEmpresa ? 'Pedidos de empleados' : 'Mis pedidos'}</h2>
-          <span className="text-xs font-bold text-[#9A9885]">{pedidos.length}</span>
+          <span className="text-xs font-bold text-[#6E6B64]">{pedidos.length}</span>
         </div>
         {pedidos.length === 0 ? (
-          <p className="rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center text-sm font-semibold text-[#9A9885]">
+          <p className="rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center text-sm font-semibold text-[#6E6B64]">
             Sin pedidos con datos financieros.
           </p>
         ) : (
@@ -472,10 +473,10 @@ function CuentaFinanciera({ cuenta, loading, error, onRetry }) {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-black text-[#2A2C1F]">{esEmpresa ? 'Pagos de empresa' : 'Mis pagos'}</h2>
-          <span className="text-xs font-bold text-[#9A9885]">{pagos.length}</span>
+          <span className="text-xs font-bold text-[#6E6B64]">{pagos.length}</span>
         </div>
         {pagos.length === 0 ? (
-          <p className="rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center text-sm font-semibold text-[#9A9885]">
+          <p className="rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center text-sm font-semibold text-[#6E6B64]">
             Todavia no hay pagos registrados.
           </p>
         ) : (
@@ -487,10 +488,10 @@ function CuentaFinanciera({ cuenta, loading, error, onRetry }) {
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-black text-[#2A2C1F]">Comprobantes</h2>
-            <span className="text-xs font-bold text-[#9A9885]">{pagosConComprobante.length}</span>
+            <span className="text-xs font-bold text-[#6E6B64]">{pagosConComprobante.length}</span>
           </div>
           {pagosConComprobante.length === 0 ? (
-            <p className="rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center text-sm font-semibold text-[#9A9885]">
+            <p className="rounded-2xl border border-[#E8E5DC] bg-white px-4 py-5 text-center text-sm font-semibold text-[#6E6B64]">
               Sin comprobantes cargados.
             </p>
           ) : (
@@ -622,9 +623,9 @@ export default function HistorialPage({ empleado }) {
             {!isLoading && !error && cantidadPedidos === 0 && (
               <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#EDF0E4]">
-                  <CheckCircle2 size={24} className="text-[#9A9885]" />
+                  <CheckCircle2 size={24} className="text-[#6E6B64]" />
                 </div>
-                <p className="text-sm font-semibold text-[#9A9885]">Todavia no tenes pedidos</p>
+                <p className="text-sm font-semibold text-[#6E6B64]">Todavia no tenes pedidos</p>
               </div>
             )}
 

@@ -1,5 +1,6 @@
 import * as repo from './menus-semanales.repository.js';
 import * as platosRepository from '../platos/platos.repository.js';
+import * as viandasRepository from '../viandas/viandas.repository.js';
 import * as historialRepo from './historial.repository.js';
 import * as notificacionesService from '../notificaciones/notificaciones.service.js';
 import * as auditoriaService from '../admin-auditoria/admin-auditoria.service.js';
@@ -203,7 +204,13 @@ export const cambiarEstadoMenu = async (id, estado, extra = {}, adminUser = null
 
 // ── Platos por día ────────────────────────────────────────────────
 
-export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_id }, adminUser = null) => {
+export const getDisenoMenuSemanal = async (id) => {
+  const diseno = await repo.findDisenoById(id);
+  if (!diseno) throw ApiError.notFound(`Menú semanal con id ${id} no encontrado`);
+  return diseno;
+};
+
+export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_id, guarnicion_modo_override = null, guarnicion_fija_override_id = null, salsa_modo_override = null, salsa_fija_override_id = null, allow_duplicate = false, visible_empresas }, adminUser = null) => {
   const menu = await repo.findById(menuSemanalId);
   if (!menu) throw ApiError.notFound(`Menú semanal con id ${menuSemanalId} no encontrado`);
 
@@ -217,10 +224,30 @@ export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_
   const plato = await platosRepository.findById(plato_id);
   if (!plato) throw ApiError.notFound(`Plato con id ${plato_id} no encontrado`);
   if (!plato.activo) throw ApiError.conflict(`El plato "${plato.nombre}" está inactivo`);
+  const tieneVianda = await viandasRepository.existsActivaParaPlato(plato_id);
+  if (!tieneVianda) throw ApiError.conflict(`El plato "${plato.nombre}" no tiene una vianda activa`);
+
+  if (!allow_duplicate) {
+    const existentes = await repo.findPlatoEnDia(menuSemanalId, dia, plato_id);
+    if (existentes.length > 0) {
+      const err = ApiError.conflict(
+        `"${plato.nombre}" ya está en el menú del ${dia}. Podés agregarlo de nuevo solo si lo limitás a empresas específicas que no se solapan con los slots existentes.`
+      );
+      err.code = 'PLATO_DUPLICADO';
+      err.existentes = existentes;
+      throw err;
+    }
+  }
 
   const fecha_servicio = calcularFechaServicio(menu.fecha_inicio, dia);
 
-  const resultado = await repo.agregarPlato(menuSemanalId, dia, opcion, plato_id);
+  const resultado = await repo.agregarPlato(menuSemanalId, dia, opcion, plato_id, {
+    guarnicionModoOverride: guarnicion_modo_override,
+    guarnicionFijaOverrideId: guarnicion_fija_override_id,
+    salsaModoOverride: salsa_modo_override,
+    salsaFijaOverrideId: salsa_fija_override_id,
+    visibleEmpresas: visible_empresas,
+  });
 
   // Registrar en el historial permanente
   await historialRepo.registrar({
@@ -242,6 +269,75 @@ export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_
     despues: agregado,
   });
   return agregado;
+};
+
+export const setEmpresasSlot = async (menuSemanalId, dia, opcion, { empresa_ids = [] }, adminUser = null) => {
+  const menu = await repo.findById(menuSemanalId);
+  if (!menu) throw ApiError.notFound(`Menú semanal con id ${menuSemanalId} no encontrado`);
+
+  const slotId = await repo.findSlotId(menuSemanalId, dia, opcion);
+  if (!slotId) throw ApiError.notFound(`No hay plato en opción ${opcion} del ${dia} para este menú`);
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await repo.setEmpresasSlot(client, slotId, empresa_ids);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'actualizar_empresas_slot',
+    entidad_tipo: 'menu_semanal',
+    entidad_id: menuSemanalId,
+    resumen: empresa_ids.length === 0
+      ? `Slot ${dia} op. ${opcion}: visible para todas las empresas`
+      : `Slot ${dia} op. ${opcion}: restringido a ${empresa_ids.length} empresa(s)`,
+    despues: { slotId, empresa_ids },
+  });
+
+  return { slotId, empresa_ids };
+};
+
+export const actualizarGuarnicionSlot = async (menuSemanalId, dia, opcion, { guarnicion_modo_override, guarnicion_fija_override_id = null }, adminUser = null) => {
+  const menu = await repo.findById(menuSemanalId);
+  if (!menu) throw ApiError.notFound(`Menú semanal con id ${menuSemanalId} no encontrado`);
+
+  const slot = await repo.actualizarGuarnicionSlot(menuSemanalId, dia, opcion, guarnicion_modo_override, guarnicion_fija_override_id);
+  if (!slot) throw ApiError.notFound(`No hay plato en opción ${opcion} del ${dia} para este menú`);
+
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'actualizar_guarnicion_slot',
+    entidad_tipo: 'menu_semanal',
+    entidad_id: menuSemanalId,
+    resumen: `Actualizó guarnición del ${dia} opción ${opcion}: ${guarnicion_modo_override ?? 'default'}`,
+    despues: slot,
+  });
+  return slot;
+};
+
+export const actualizarSalsaSlot = async (menuSemanalId, dia, opcion, { salsa_modo_override, salsa_fija_override_id = null }, adminUser = null) => {
+  const menu = await repo.findById(menuSemanalId);
+  if (!menu) throw ApiError.notFound(`Menú semanal con id ${menuSemanalId} no encontrado`);
+
+  const slot = await repo.actualizarSalsaSlot(menuSemanalId, dia, opcion, salsa_modo_override, salsa_fija_override_id);
+  if (!slot) throw ApiError.notFound(`No hay plato en opción ${opcion} del ${dia} para este menú`);
+
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'actualizar_salsa_slot',
+    entidad_tipo: 'menu_semanal',
+    entidad_id: menuSemanalId,
+    resumen: `Actualizó salsa del ${dia} opción ${opcion}: ${salsa_modo_override ?? 'default'}`,
+    despues: slot,
+  });
+  return slot;
 };
 
 export const quitarPlatoDia = async (menuSemanalId, dia, opcion, adminUser = null) => {

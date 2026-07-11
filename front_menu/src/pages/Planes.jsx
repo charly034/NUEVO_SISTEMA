@@ -12,9 +12,11 @@ const input = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:
 function Campo({ label, children, hint }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-semibold text-gray-700">{label}</label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold text-gray-700">{label}</span>
+        {children}
+      </label>
+      {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
     </div>
   );
 }
@@ -41,14 +43,14 @@ function ExtrasChips({ plan, size = 'sm' }) {
         <span className={`${cls} bg-blue-50 text-blue-700 border-blue-200`}>Bebida</span>
       )}
       {!plan.incluye_postre && !plan.incluye_bebida && (
-        <span className={`${cls} bg-gray-50 text-gray-400 border-gray-100`}>Solo vianda</span>
+        <span className={`${cls} bg-gray-50 text-gray-500 border-gray-100`}>Solo vianda</span>
       )}
     </div>
   );
 }
 
 // ── Formulario del plan (en SideDrawer) ───────────────────────────────
-function FormPlan({ plan, onGuardado, onCancelar }) {
+function FormPlan({ plan, puedeDesactivar, onGuardado, onCancelar, onDesactivar }) {
   const createPlan = useCreatePlan();
   const updatePlan = useUpdatePlan();
 
@@ -194,6 +196,18 @@ function FormPlan({ plan, onGuardado, onCancelar }) {
           {plan ? 'Guardar cambios' : 'Crear plan'}
         </button>
       </div>
+
+      {plan && puedeDesactivar && (
+        <div className="pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => onDesactivar(plan)}
+            className="w-full rounded-lg border border-red-100 px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors"
+          >
+            Desactivar plan
+          </button>
+        </div>
+      )}
     </form>
   );
 }
@@ -229,6 +243,7 @@ export default function Planes() {
       await deletePlan.mutateAsync(plan.id);
       toast.success('Plan desactivado');
       setConfirmDel(null);
+      setDrawerPlan(null);
     } catch (e) {
       toast.error(e?.message || 'No se pudo desactivar');
     }
@@ -282,7 +297,7 @@ export default function Planes() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner size="lg" /></div>
         ) : planesFiltrados.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center text-sm text-gray-400">
+          <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center text-sm text-gray-500">
             No hay planes {filtro === 'activos' ? 'activos' : filtro === 'inactivos' ? 'inactivos' : ''}.
           </div>
         ) : (
@@ -312,14 +327,14 @@ export default function Planes() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-gray-900">{plan.nombre}</span>
                         {!plan.activo && (
-                          <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400 bg-gray-100 px-1.5 py-px rounded">Inactivo</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-1.5 py-px rounded">Inactivo</span>
                         )}
                       </div>
                       {plan.descripcion && (
-                        <p className="text-xs text-gray-400 truncate mt-0.5">{plan.descripcion}</p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{plan.descripcion}</p>
                       )}
                       {plan.codigo && (
-                        <span className="text-[10px] text-gray-300 font-mono">{plan.codigo}</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{plan.codigo}</span>
                       )}
                     </div>
 
@@ -338,7 +353,7 @@ export default function Planes() {
                       {numEmpresas > 0 ? (
                         <span className="text-sm font-semibold text-green-700">{numEmpresas}</span>
                       ) : (
-                        <span className="text-sm text-gray-300">—</span>
+                        <span className="text-sm text-gray-500">—</span>
                       )}
                     </div>
 
@@ -350,14 +365,6 @@ export default function Planes() {
                       >
                         Editar
                       </button>
-                      {plan.activo && numEmpresas === 0 && (
-                        <button
-                          onClick={() => setConfirmDel(plan)}
-                          className="px-2.5 py-1.5 rounded-lg border border-red-100 text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          ✕
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -365,7 +372,7 @@ export default function Planes() {
             </div>
 
             {/* Footer resumen */}
-            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 flex items-center gap-4 text-xs text-gray-400">
+            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50 flex items-center gap-4 text-xs text-gray-500">
               <span>{planes.filter(p => p.activo).length} activos</span>
               {planes.filter(p => !p.activo).length > 0 && (
                 <span>{planes.filter(p => !p.activo).length} inactivos</span>
@@ -386,8 +393,10 @@ export default function Planes() {
         {drawerPlan && (
           <FormPlan
             plan={planActivo}
+            puedeDesactivar={Boolean(planActivo?.activo && (cuentaPorPlan[planActivo.id] ?? 0) === 0)}
             onGuardado={cerrarDrawer}
             onCancelar={cerrarDrawer}
+            onDesactivar={(plan) => setConfirmDel(plan)}
           />
         )}
       </SideDrawer>

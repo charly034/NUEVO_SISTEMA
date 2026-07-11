@@ -77,7 +77,7 @@ function Separador() {
   return (
     <div className="flex items-center gap-3 py-1">
       <div className="h-px flex-1 bg-[#E8E5DC]" />
-      <span className="text-xs text-[#C4C2B4]">o</span>
+      <span className="text-xs text-[#6E6B64]">o</span>
       <div className="h-px flex-1 bg-[#E8E5DC]" />
     </div>
   );
@@ -88,7 +88,7 @@ function PasswordToggle({ activo, onToggle }) {
     <button
       type="button"
       onClick={onToggle}
-      className="p-1 text-[#9A9885]"
+      className="p-1 text-[#6E6B64]"
       aria-label={activo ? "Ocultar contrasena" : "Mostrar contrasena"}
     >
       {activo ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -248,7 +248,7 @@ function RegistroScreen({ onRegistroExitoso, onVolver }) {
           value={formulario.codigo}
           onChange={(valor) => registro.actualizarCampo("codigo", valor)}
         />
-        <p className="text-xs leading-relaxed text-[#9A9885]">
+        <p className="text-xs leading-relaxed text-[#6E6B64]">
           El codigo de empresa te lo proporciona tu administrador.
         </p>
         <BtnPrimary type="submit" loading={registro.cargando} className="mt-2 w-full">

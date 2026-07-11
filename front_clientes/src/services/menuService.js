@@ -17,6 +17,16 @@ function normalizarGuarnicion(guarnicion) {
   };
 }
 
+function normalizarSalsa(salsa) {
+  if (!salsa) return null;
+  if (typeof salsa === "string") return { id: crearIdDesdeTexto(salsa), nombre: salsa };
+
+  return {
+    id: salsa.id ?? salsa.salsaId ?? salsa.salsa_id ?? crearIdDesdeTexto(salsa.nombre),
+    nombre: salsa.nombre ?? salsa.nombreSalsa ?? salsa.salsa_nombre ?? String(salsa.id || ""),
+  };
+}
+
 function normalizarPlato(plato) {
   if (!plato) return null;
   const requiereGuarnicion = Boolean(
@@ -54,6 +64,9 @@ function normalizarPlato(plato) {
         : [],
     guarniciones: (plato.guarniciones || [])
       .map(normalizarGuarnicion)
+      .filter(Boolean),
+    salsas: (plato.salsas || [])
+      .map(normalizarSalsa)
       .filter(Boolean),
   };
 }

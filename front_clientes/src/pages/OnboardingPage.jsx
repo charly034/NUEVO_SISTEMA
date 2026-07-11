@@ -59,7 +59,7 @@ export default function OnboardingPage() {
           {PASOS.map((_, i) => (
             <div
               key={i}
-              className="h-1.5 rounded-full transition-all duration-300"
+              className="h-1.5 rounded-full transition-[width] duration-300"
               style={{ width: i === idx ? 24 : 6, background: i === idx ? '#5B6B2A' : '#D8D5C8' }}
             />
           ))}
@@ -75,7 +75,7 @@ export default function OnboardingPage() {
         {!esUltimo && (
           <button
             onClick={irAlLogin}
-            className="w-full text-center text-sm text-[#9A9885] font-semibold py-1"
+            className="w-full text-center text-sm text-[#6E6B64] font-semibold py-1"
           >
             Omitir
           </button>

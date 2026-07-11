@@ -42,6 +42,8 @@
 |       |   Deuda tecnica y cortes recomendados.
 |       |-- 70-project-history.yaml
 |       |   Historia del producto, estado y proximos pasos.
+|       |-- ux-admin-prompt.md
+|       |   Criterios de normalizacion UX para auditar o modificar vistas de front_menu.
 |       `-- project-structure.txt
 |           Arbol conciso del repo.
 |
@@ -116,9 +118,9 @@
 |       |   apiClient, confirm, queryClient, toast.
 |       |-- pages/
 |       |   Dashboard, Platos, Semanas, SemanaDetalle, Historial, Estadisticas,
-|       |   Sugeridor, PedidosAdmin, PedidosHoy, Clientes, PedidosPagos,
+|       |   Sugeridor, PedidosPanel, PedidosAdmin, PedidosHoy, Clientes, PedidosPagos,
 |       |   NotificacionesAdmin, Empresas, Guarniciones, Auditoria, Administradores.
-|       |   Clientes centraliza Empresas, PedidosPagos y NotificacionesAdmin; Empresas tambien administra planes de vianda.
+|       |   PedidosPanel centraliza Seguimiento, Produccion semanal, Produccion diaria y Despacho hoy. Clientes centraliza Empresas, PedidosPagos y NotificacionesAdmin; Empresas tambien administra planes de vianda.
 |       `-- services/
 |
 `-- front_clientes/

@@ -1,15 +1,18 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-07-03"
+updated_at: "2026-07-06"
 
 technical_debt:
   - id: "debt-notificaciones-filtro-plan-legacy"
-    status: open
+    status: resolved
     area: "notificaciones"
     evidence:
-      - "planes_vianda agrega planes configurables con plan_id."
-      - "notificacion_reglas aun filtra por empresas.plan legacy basico/con_postre/con_postre_bebida."
-    risk: "Si se crean planes nuevos, los filtros de notificaciones por plan no distinguen gramaje ni bebida sin postre."
-    recommended_cut: "Migrar filtros de notificaciones a plan_id o permitir ambos campos con compatibilidad legacy."
+      - "2026-07-09: el filtro de reglas de notificacion migro de empresas.plan legacy a plan_id."
+      - "notificaciones.repository.js findDestinatarios/findEmpleadosSinPedidoSemanal seleccionan emp.plan_id."
+      - "notificaciones.service.js filtrarEmpleadosPorParametros compara por plan_id; normalizarFiltros guarda plan_id."
+      - "front_menu NotificacionesAdmin.jsx usa selector dinamico de planes por plan_id (usePlanes) en lugar de opciones legacy hardcodeadas."
+      - "Corrige el bug introducido al dropear emp.plan: empleado.plan quedaba undefined y excluia a todos los destinatarios en reglas filtradas por plan."
+    risk: "Bajo. Reglas legacy en BD con filtros.plan de texto degradan seguro: dejan de filtrar por plan (llegan a todo el alcance) hasta re-guardarlas."
+    recommended_cut: "Completado. Re-guardar desde el panel cualquier regla legacy con filtros.plan para migrarla a plan_id."
 
   - id: "debt-admin-auditoria-cobertura-parcial"
     status: open
@@ -21,13 +24,14 @@ technical_debt:
     recommended_cut: "Extender registrarAdminAction a empresas, platos, guarniciones, usuarios_admin y notificaciones en una tanda especifica."
 
   - id: "platos-fotos-reales-pendientes"
-    status: open
+    status: resolved
     area: "API_LA_QUINTA.platos"
     evidence:
-      - "API/admin ya permite subir imagenes de platos y las comprime a WebP en uploads/platos."
-      - "backfill-platos-metadata-aproximada.js actualiza descripcion, descripcion_larga, kcal, alergenos y vegetariano, pero no carga foto_url para los platos existentes."
-    risk: "El cliente ve placeholders en MenuViewScreen hasta que admin cargue fotos reales."
-    recommended_cut: "Cargar fotos propias desde front_menu /platos o preparar import de imagenes con derechos claros; no usar URLs externas sin validar licencia."
+      - "2026-07-09: migracion 1719000057000 agrega platos.foto_url; pipeline completo de upload WebP en uploads/platos servido en /uploads/platos."
+      - "front_clientes OpcionPlatoCard.jsx muestra la miniatura de foto_url en las opciones de pedido; pedidos.repository/service exponen foto_url."
+      - "Queda solo la tarea operativa de cargar fotos reales por plato desde front_menu /platos; no es deuda de codigo."
+    risk: "Bajo. Sin foto cargada el cliente ve el plato sin imagen, no un placeholder roto."
+    recommended_cut: "Completado a nivel tecnico. Cargar fotos propias por plato desde el panel; no usar URLs externas sin validar licencia."
 
   - id: "debt-users-module-legacy"
     status: resolved
@@ -95,8 +99,21 @@ technical_debt:
     area: "documentacion"
     evidence:
       - "Varias lecturas de README/docs muestran caracteres mojibake para acentos."
+      - "docs/ai/ux-admin-prompt.md fue normalizado a texto ASCII legible el 2026-07-06, pero no implica que el resto de la documentacion haya sido normalizada."
     risk: "Documentacion dificil de leer o copiar."
     recommended_cut: "Normalizar encoding a UTF-8 en una tarea separada sin tocar codigo funcional."
+
+  - id: "debt-admin-ux-audit-pending"
+    status: partially_resolved
+    area: "front_menu"
+    evidence:
+      - "El 2026-07-06 se agrego docs/ai/ux-admin-prompt.md como criterio durable de normalizacion UX del panel admin."
+      - "El 2026-07-06 se auditaron rutas admin principales contra esos criterios en navegador: dashboard, clientes/notificaciones/pagos, pedidos, pedidos-hoy, catalogo, semanas, sugeridor, historial, estadisticas, recomendaciones, auditoria, administradores y semana detalle."
+      - "El 2026-07-06 se aplicaron mejoras en Platos, Guarniciones, NotificacionesAdmin, Administradores, PedidosPagos y SemanaDetalle: menos acciones por fila, destructivas dentro de detalle/drawer, filtros avanzados colapsables y tablas mas compactas."
+      - "front_menu npm run lint paso sin errores y npm run build paso el 2026-07-06."
+      - "Smoke automatizado posterior en navegador integrado quedo parcial: /platos respondio sin overflow ni texto Eliminar plato visible, pero lecturas DOM adicionales hicieron timeout del runtime de navegador."
+    risk: "Queda riesgo residual de inconsistencias visuales no cubiertas por smoke automatizado completo post-cambio, especialmente en mobile y vistas no tocadas directamente."
+    recommended_cut: "Ejecutar una pasada manual/mobile por las rutas auditadas y cerrar ajustes menores de Semanas/Sugeridor/Historial/Estadisticas si aparecen fricciones visuales nuevas."
 
   - id: "debt-qa-regresion-outdated"
     status: resolved
@@ -214,14 +231,14 @@ technical_debt:
     recommended_cut: "Mantener --pool=threads; si reaparece, revisar Vitest/Node/OneDrive antes de atribuirlo a fallas funcionales."
 
   - id: "debt-mis-sugerencias-parallel-flow"
-    status: open
+    status: resolved
     area: "API_LA_QUINTA"
     evidence:
-      - "API_LA_QUINTA/src/modules/sugerencias-empleados expone /api/v1/mis-sugerencias y usa tabla sugerencias_empleados."
-      - "El flujo principal de pedido cliente y admin usa /api/v1/pedidos/sugerencias y tabla pedido_sugerencias."
-      - "front_clientes/src/pages/SugerenciasPage.jsx fue alineado el 2026-07-02 para usar /api/v1/pedidos/sugerencias."
-    risk: "Medio: mantener dos sistemas de sugerencias puede fragmentar datos si un consumidor nuevo usa /mis-sugerencias."
-    recommended_cut: "Confirmar si /mis-sugerencias se conserva como feature separada o se elimina/consolida antes de exponerlo a usuarios."
+      - "2026-07-09: se elimino el modulo sugerencias-empleados (controller/repository/routes) y la ruta /api/v1/mis-sugerencias."
+      - "El unico flujo de sugerencias es /api/v1/pedidos/sugerencias con tabla pedido_sugerencias."
+      - "Se agrego GET /api/v1/pedidos/sugerencias/resumen (admin) y PanelSugerencias en DisenoMenu."
+    risk: "Sin riesgo residual. La tabla sugerencias_empleados queda sin consumidores."
+    recommended_cut: "Completado. Evaluar drop de la tabla sugerencias_empleados en una migracion aparte si se desea limpiar el schema."
 
   - id: "debt-notificaciones-origen-admin"
     status: resolved
@@ -243,9 +260,8 @@ deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."
   - "Precisar payloads de todos los endpoints admin solo si se van a tocar."
   - "Separar o consolidar menu vs menus-semanales solo con decision de arquitectura."
-  - "Revisar duplicidad de endpoint opciones: /pedidos/menu/semanas/:semanaId/opciones y /menu/semanas/:semanaId/opciones."
+  - "2026-07-09 RESUELTO: duplicidad de endpoint opciones eliminada; se quito /pedidos/menu/semanas/:semanaId/opciones y quedo la canonica /menu/semanas/:semanaId/opciones."
   - "Definir si API_LA_QUINTA/scripts/seed-full-reset.js debe renombrarse como dev-only; hoy ya bloquea NODE_ENV=production y requiere confirmacion explicita."
-  - "Confirmar destino de /api/v1/mis-sugerencias frente al flujo canonico /api/v1/pedidos/sugerencias."
 
 do_not_mix_with_functional_changes:
   - "Normalizacion de encoding en docs."

@@ -1,13 +1,15 @@
 import * as repo from './pedidos.repository.js';
 import * as empresasRepo from '../empresas/empresas.repository.js';
 import * as guarnicionesRepo from '../guarniciones/guarniciones.repository.js';
+import * as salsasRepo from '../salsas/salsas.repository.js';
 import * as notificacionesService from '../notificaciones/notificaciones.service.js';
 import * as auditoriaService from '../admin-auditoria/admin-auditoria.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { getClient } from '../../database/connection.js';
 import { validarPedidoInput } from './pedidos.validation.js';
 
-const ESTADOS = ['pendiente', 'en_proceso', 'listo', 'entregado', 'cancelado'];
+const ESTADOS_PEDIDO = ['pendiente', 'en_proceso', 'completo', 'cancelado'];
+const ESTADOS_ITEM = ['pendiente', 'preparado', 'entregado', 'cancelado'];
 const DIAS_LABORALES = {
   lunes_viernes: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
   lunes_sabado: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'],
@@ -85,6 +87,13 @@ function normalizarGuarniciones(guarniciones) {
   }));
 }
 
+function normalizarSalsas(salsas) {
+  return salsas.map((salsa) => ({
+    id: salsa.id,
+    nombre: salsa.nombre,
+  }));
+}
+
 function crearEtiquetasPlato(plato, extra = []) {
   const tags = Array.isArray(plato.tags)
     ? plato.tags
@@ -100,7 +109,32 @@ function crearEtiquetasPlato(plato, extra = []) {
   ].filter(Boolean);
 }
 
-function mapearPlatoEspecial(plato, guarniciones) {
+// Modo efectivo de guarnicion de un plato/slot ya resuelto por el repositorio
+// (override de slot > vianda del catalogo > legacy tiene_guarnicion="libre").
+// 'fija' es una eleccion deliberada del modelo nuevo y siempre gana.
+function modoGuarnicionPlato(plato) {
+  if (plato.guarnicion_modo === 'fija') return 'fija';
+  if (plato.tiene_guarnicion) return 'libre';
+  return plato.guarnicion_modo || 'sin_guarnicion';
+}
+
+// Modo efectivo de salsa. Analogo a modoGuarnicionPlato, pero sin booleano legacy:
+// salsa_modo es un concepto nuevo, no tiene arrastre historico.
+function modoSalsaPlato(plato) {
+  if (plato.salsa_modo === 'fija') return 'fija';
+  return plato.salsa_modo || 'sin_salsa';
+}
+
+// Un plato de disponibilidad='fijo_dia' solo esta disponible su dia_fijo;
+// 'siempre' y el legacy tipo='fijo' estan disponibles todos los dias.
+function platoFijoDisponibleEnDia(plato, dia) {
+  if (plato.disponibilidad === 'fijo_dia') return plato.dia_fijo === dia;
+  return true;
+}
+
+function mapearPlatoEspecial(plato, guarniciones, salsas) {
+  const modo = modoGuarnicionPlato(plato);
+  const modoSalsa = modoSalsaPlato(plato);
   return {
     id: `menu-${plato.plato_id}-${plato.dia}-${plato.opcion || 'sin-opcion'}`,
     platoId: plato.plato_id,
@@ -109,8 +143,9 @@ function mapearPlatoEspecial(plato, guarniciones) {
     descripcion: plato.descripcion || plato.descripcion_larga || 'Menu publicado',
     descripcionLarga: plato.descripcion_larga || null,
     categoria: 'menu',
-    tipo: plato.tiene_guarnicion ? 'principal_con_guarnicion' : 'plato_completo',
-    requiereGuarnicion: Boolean(plato.tiene_guarnicion),
+    tipo: modo !== 'sin_guarnicion' ? 'principal_con_guarnicion' : 'plato_completo',
+    requiereGuarnicion: modo === 'libre',
+    requiereSalsa: modoSalsa === 'libre',
     destacado: true,
     grupo: 'especiales',
     estado: 'disponible',
@@ -119,11 +154,18 @@ function mapearPlatoEspecial(plato, guarniciones) {
     foto_url: plato.foto_url || null,
     vegetariano: Boolean(plato.vegetariano),
     etiquetas: crearEtiquetasPlato(plato, [`Opcion ${plato.opcion || ''}`.trim()]),
-    guarniciones: plato.tiene_guarnicion ? guarniciones : [],
+    guarniciones: modo === 'libre' ? guarniciones : [],
+    guarnicionModo: modo,
+    guarnicionFija: modo === 'fija' ? { id: plato.guarnicion_fija_id, nombre: plato.guarnicion_fija_nombre } : null,
+    salsas: modoSalsa === 'libre' ? salsas : [],
+    salsaModo: modoSalsa,
+    salsaFija: modoSalsa === 'fija' ? { id: plato.salsa_fija_id, nombre: plato.salsa_fija_nombre } : null,
   };
 }
 
-function mapearPlatoFijo(plato, guarniciones) {
+function mapearPlatoFijo(plato, guarniciones, salsas) {
+  const modo = modoGuarnicionPlato(plato);
+  const modoSalsa = modoSalsaPlato(plato);
   return {
     id: `fijo-${plato.plato_id}`,
     platoId: plato.plato_id,
@@ -132,8 +174,9 @@ function mapearPlatoFijo(plato, guarniciones) {
     descripcion: plato.descripcion || plato.descripcion_larga || 'Plato fijo',
     descripcionLarga: plato.descripcion_larga || null,
     categoria: 'fijo',
-    tipo: plato.tiene_guarnicion ? 'principal_con_guarnicion' : 'plato_completo',
-    requiereGuarnicion: Boolean(plato.tiene_guarnicion),
+    tipo: modo !== 'sin_guarnicion' ? 'principal_con_guarnicion' : 'plato_completo',
+    requiereGuarnicion: modo === 'libre',
+    requiereSalsa: modoSalsa === 'libre',
     destacado: false,
     grupo: 'fijos',
     estado: 'disponible',
@@ -142,7 +185,12 @@ function mapearPlatoFijo(plato, guarniciones) {
     foto_url: plato.foto_url || null,
     vegetariano: Boolean(plato.vegetariano),
     etiquetas: crearEtiquetasPlato(plato, ['Fijo']),
-    guarniciones: plato.tiene_guarnicion ? guarniciones : [],
+    guarniciones: modo === 'libre' ? guarniciones : [],
+    guarnicionModo: modo,
+    guarnicionFija: modo === 'fija' ? { id: plato.guarnicion_fija_id, nombre: plato.guarnicion_fija_nombre } : null,
+    salsas: modoSalsa === 'libre' ? salsas : [],
+    salsaModo: modoSalsa,
+    salsaFija: modoSalsa === 'fija' ? { id: plato.salsa_fija_id, nombre: plato.salsa_fija_nombre } : null,
     diasDisponibles: plato.dias_disponibles || null,
   };
 }
@@ -179,8 +227,11 @@ function obtenerEstadoSemana({ menuSemana, semanaInicio, pedidoVisible, diasPedi
 function construirTextoItem(item) {
   if (item?.sin_pedido) return 'Sin pedido';
   if (!item?.plato_nombre) return null;
-  return item.guarnicion_nombre
-    ? `${item.plato_nombre} con ${String(item.guarnicion_nombre).toLowerCase()}`
+  const extras = [item.guarnicion_nombre, item.salsa_nombre]
+    .filter(Boolean)
+    .map((nombre) => String(nombre).toLowerCase());
+  return extras.length > 0
+    ? `${item.plato_nombre} con ${extras.join(' y ')}`
     : item.plato_nombre;
 }
 
@@ -190,10 +241,13 @@ function construirSeleccionItem(item, opciones) {
     return {
       plato: null,
       guarnicion: '',
+      salsa: '',
       platoId: null,
       nombrePlato: '',
       guarnicionId: null,
       nombreGuarnicion: '',
+      salsaId: null,
+      nombreSalsa: '',
       origenSinPedido: item.origen || 'usuario',
       sinPedido: true,
     };
@@ -210,10 +264,15 @@ function construirSeleccionItem(item, opciones) {
     guarnicion: item.guarnicion_id
       ? { id: item.guarnicion_id, nombre: item.guarnicion_nombre }
       : '',
+    salsa: item.salsa_id
+      ? { id: item.salsa_id, nombre: item.salsa_nombre }
+      : '',
     platoId: plato.platoId,
     nombrePlato: plato.nombre,
     guarnicionId: item.guarnicion_id || null,
     nombreGuarnicion: item.guarnicion_nombre || '',
+    salsaId: item.salsa_id || null,
+    nombreSalsa: item.salsa_nombre || '',
     sinPedido: false,
   };
 }
@@ -238,6 +297,7 @@ function normalizarDiaPedido(dia) {
     plato_id: sinPedido ? null : normalizarEnteroOpcional(dia.platoId ?? dia.plato_id),
     opcion: sinPedido ? null : (dia.opcion || dia.opcionMenu || null),
     guarnicion_id: sinPedido ? null : normalizarEnteroOpcional(dia.guarnicionId ?? dia.guarnicion_id),
+    salsa_id: sinPedido ? null : normalizarEnteroOpcional(dia.salsaId ?? dia.salsa_id),
     sin_pedido: sinPedido,
     origen: sinPedido ? dia.origen || 'usuario' : null,
     notas: dia.notas || null,
@@ -294,6 +354,12 @@ function normalizarPedidoGuardado(pedido, mensaje = 'Pedido guardado correctamen
           ? {
               id: item.guarnicion_id,
               nombre: item.guarnicion_nombre,
+            }
+          : null,
+        salsa: item.salsa_id
+          ? {
+              id: item.salsa_id,
+              nombre: item.salsa_nombre,
             }
           : null,
       })),
@@ -473,7 +539,7 @@ export const getMenuSemana = (semanaInicio) => {
 };
 
 export const getMenuActivo = async (empresaId = null) => {
-  const menus = await repo.menusPublicadosList();
+  const menus = await repo.menusPublicadosList(empresaId);
   const ahora = new Date();
 
   let empresa = null;
@@ -506,12 +572,13 @@ export const getMenuActivo = async (empresaId = null) => {
 export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia = new Date() }) => {
   if (!empresaId) throw ApiError.badRequest('empresaId es requerido');
 
-  const [empresa, menus, historial, sugerenciasUsuario, guarnicionesActivas] = await Promise.all([
+  const [empresa, menus, historial, sugerenciasUsuario, guarnicionesActivas, salsasActivas] = await Promise.all([
     empresasRepo.findById(empresaId),
-    repo.menusPublicadosList(),
+    repo.menusPublicadosList(empresaId),
     empleadoId ? repo.findHistorialByEmpleado(empleadoId, 24) : Promise.resolve([]),
     empleadoId ? repo.findSugerenciasByEmpleado(empleadoId) : Promise.resolve([]),
     guarnicionesRepo.findAll(true),
+    salsasRepo.findAll(true),
   ]);
 
   if (!empresa) throw ApiError.notFound(`Empresa ${empresaId} no encontrada`);
@@ -519,6 +586,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
   const diasPedido = DIAS_LABORALES[empresa.dias_laborales] ?? DIAS_LABORALES.lunes_viernes;
   const diasPorDefectoSinPedido = obtenerDiasPorDefectoSinPedido(empresa);
   const guarniciones = normalizarGuarniciones(guarnicionesActivas);
+  const salsas = normalizarSalsas(salsasActivas);
   const semanaActual = lunesDeSemana(fechaReferencia);
   const menusPorSemana = new Map(menus.map((menu) => {
     const semanaInicio = fechaISO(menu.fecha_inicio);
@@ -602,8 +670,10 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
         const item = itemsPorDia.get(dia);
         const especiales = (menuSemana.menu?.variables || [])
           .filter((plato) => plato.dia === dia)
-          .map((plato) => mapearPlatoEspecial(plato, guarniciones));
-        const fijos = (menuSemana.menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
+          .map((plato) => mapearPlatoEspecial(plato, guarniciones, salsas));
+        const fijos = (menuSemana.menu?.fijos || [])
+          .filter((plato) => platoFijoDisponibleEnDia(plato, dia))
+          .map((plato) => mapearPlatoFijo(plato, guarniciones, salsas));
         const opciones = [...especiales, ...fijos];
         const tieneSinServicio = sinServicioPorDia.has(dia);
         const motivoSinServicio = sinServicioPorDia.get(dia) || null;
@@ -614,12 +684,13 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
         );
         const seleccion = construirSeleccionItem(item, opciones);
         const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
+        const fechaDia = addDias(semanaInicio, indice);
 
         return {
           id: dia,
           clave: dia,
           dia: DIAS_LABEL[dia] || dia,
-          fecha: addDias(semanaInicio, indice),
+          fecha: fechaDia,
           estado: sinPedidoGuardado || sinPedidoPorDefecto
               ? 'sin_pedido_por_defecto'
               : seleccion
@@ -628,6 +699,7 @@ export const getSemanasPedido = async ({ empleadoId, empresaId, fechaReferencia 
                   ? 'sin_menu'
                   : 'sin_seleccionar',
           bloqueado: (menuSemana.limiteEmpresa?.diasCerrados || []).includes(dia),
+          limiteTexto: textoLimiteDia(dia, fechaDia, menuSemana.limiteEmpresa),
           motivo: tieneSinServicio ? `No hay servicio este dia: ${motivoSinServicio}` : null,
           mensajeMenu: tieneSinServicio
             ? 'Este dia no tiene servicio. Queda sin vianda por defecto y no se puede editar.'
@@ -698,10 +770,11 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
   if (!semanaId) throw ApiError.badRequest('semanaId es requerido');
   if (!empresaId) throw ApiError.badRequest('empresaId es requerido');
 
-  const [empresa, menus, guarnicionesActivas] = await Promise.all([
+  const [empresa, menus, guarnicionesActivas, salsasActivas] = await Promise.all([
     empresasRepo.findById(empresaId),
-    repo.menusPublicadosList(),
+    repo.menusPublicadosList(empresaId),
     guarnicionesRepo.findAll(true),
+    salsasRepo.findAll(true),
   ]);
 
   if (!empresa) throw ApiError.notFound(`Empresa ${empresaId} no encontrada`);
@@ -712,6 +785,7 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
     fechaISO(item.fecha_inicio) === fechaISO(semanaId),
   );
   const guarniciones = normalizarGuarniciones(guarnicionesActivas);
+  const salsas = normalizarSalsas(salsasActivas);
 
   return {
     semanaId,
@@ -720,8 +794,10 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
       const motivoSinServicio = sinServicio?.motivo || 'Sin servicio';
       const especiales = (menu?.variables || [])
           .filter((plato) => plato.dia === dia)
-          .map((plato) => mapearPlatoEspecial(plato, guarniciones));
-      const fijos = (menu?.fijos || []).map((plato) => mapearPlatoFijo(plato, guarniciones));
+          .map((plato) => mapearPlatoEspecial(plato, guarniciones, salsas));
+      const fijos = (menu?.fijos || [])
+          .filter((plato) => platoFijoDisponibleEnDia(plato, dia))
+          .map((plato) => mapearPlatoFijo(plato, guarniciones, salsas));
       const sinMenuEspecial = especiales.length === 0 && fijos.length > 0;
 
       return {
@@ -748,6 +824,44 @@ export const getOpcionesMenuSemana = async ({ empresaId, semanaId }) => {
     }),
   };
 };
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const DIAS_SEMANA_TEXTO = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
+function formatearFechaHoraLimite(fecha) {
+  const diaSemana = DIAS_SEMANA_TEXTO[fecha.getDay()];
+  const dia = fecha.getDate();
+  const mes = MESES_CORTOS[fecha.getMonth()];
+  const hh = String(fecha.getHours()).padStart(2, '0');
+  const mm = String(fecha.getMinutes()).padStart(2, '0');
+  return `${diaSemana} ${dia} ${mes} a las ${hh}:${mm}hs`;
+}
+
+/**
+ * Traduce limiteEmpresa (construirInfoLimite) a un mensaje puntual por dia:
+ * "Editable hasta el..." o "Cerro el...". Evita que el cliente choque contra
+ * el plazo sin entender por que quedo bloqueado.
+ */
+function textoLimiteDia(diaClave, fechaDiaISO, limiteEmpresa) {
+  if (!limiteEmpresa || limiteEmpresa.tipo === 'override') return null;
+
+  if (limiteEmpresa.tipo === 'semanal') {
+    if (!limiteEmpresa.fechaCorte) return null;
+    const corte = new Date(limiteEmpresa.fechaCorte);
+    const cuando = formatearFechaHoraLimite(corte);
+    return limiteEmpresa.vencido ? `Cerro el ${cuando}` : `Editable hasta el ${cuando}`;
+  }
+
+  // 'diario' o 'ambos': cada dia cierra por su cuenta, con anticipacion desde su propia fecha.
+  const anticipacion = limiteEmpresa.anticipacion_dias ?? 0;
+  const hora = limiteEmpresa.hora || '09:30';
+  const [hh, mm] = hora.split(':').map(Number);
+  const [anio, mes, dia] = fechaDiaISO.split('-').map(Number);
+  const corte = new Date(anio, mes - 1, dia - anticipacion, hh || 0, mm || 0, 0, 0);
+  const cuando = formatearFechaHoraLimite(corte);
+  const bloqueado = (limiteEmpresa.diasCerrados || []).includes(diaClave);
+  return bloqueado ? `Cerro el ${cuando}` : `Editable hasta el ${cuando}`;
+}
 
 /**
  * Devuelve un objeto legible con la configuracion de limite de la empresa
@@ -848,6 +962,11 @@ export const getSugerenciasPedidoAdmin = async (filters) => {
   return sugerencias.map(normalizarSugerenciaAdmin);
 };
 
+export const getResumenSugerencias = async ({ semana_inicio }) => {
+  const semanaInicio = validarSemanaInicioLunes(semana_inicio);
+  return repo.findResumenSugerencias(semanaInicio);
+};
+
 export const getOpcionesSugerencia = async ({ semana_inicio }) => {
   const semanaInicio = validarSemanaInicioLunes(semana_inicio);
   const opciones = await repo.findOpcionesSugerencia(semanaInicio);
@@ -898,8 +1017,8 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
   if (!empresa) throw ApiError.notFound('Empresa no encontrada');
 
   const menuActivo = menu_semanal_id
-    ? await repo.menuActivoPorId(menu_semanal_id)
-    : await repo.menuPublicadoPorSemana(semana_inicio);
+    ? await repo.menuActivoPorId(menu_semanal_id, undefined, empresaId)
+    : await repo.menuPublicadoPorSemana(semana_inicio, undefined, empresaId);
 
   if (menuActivo) {
     menu_semanal_id = menuActivo.id;
@@ -932,29 +1051,57 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
       if (item.sin_pedido) continue;
 
       const plato = await repo.validateItemForMenu(menuActivo?.id || null, item, client);
-      if (!plato || !plato.activo) {
+      if (!plato || !plato.activo || !plato.tiene_vianda) {
         throw ApiError.unprocessable(`El plato seleccionado para el ${item.dia} ya no esta disponible`);
       }
-      if (plato.tipo !== 'fijo' && !menuActivo) {
+      const esFijo = plato.tipo === 'fijo'
+        || plato.disponibilidad === 'siempre'
+        || (plato.disponibilidad === 'fijo_dia' && plato.dia_fijo === item.dia);
+      if (!esFijo && !menuActivo) {
         throw ApiError.unprocessable(`Todavia no hay menu publicado para elegir plato especial el ${item.dia}`);
       }
-      if (plato.tipo !== 'fijo' && !plato.pertenece_menu) {
+      if (!esFijo && !plato.pertenece_menu) {
         throw ApiError.unprocessable(`El plato "${plato.nombre}" no corresponde al ${item.dia} y opcion indicados`);
       }
-      if (plato.tipo === 'fijo' && item.opcion) {
+      if (esFijo && item.opcion) {
         throw ApiError.badRequest(`Los platos fijos no deben indicar opcion (${item.dia})`);
       }
-      if (plato.tipo !== 'fijo' && !item.opcion) {
+      if (!esFijo && !item.opcion) {
         throw ApiError.badRequest(`La opcion es requerida para el plato del ${item.dia}`);
       }
-      if (plato.tiene_guarnicion && !item.guarnicion_id) {
-        throw ApiError.unprocessable(`Elegi una guarnicion para continuar con el ${item.dia}`);
+
+      const modo = modoGuarnicionPlato(plato);
+      if (modo === 'fija') {
+        // La guarnicion no se elige: siempre viaja la fija de la vianda/slot.
+        item.guarnicion_id = plato.guarnicion_fija_id;
+      } else if (modo === 'sin_guarnicion') {
+        if (item.guarnicion_id) {
+          throw ApiError.unprocessable(`El plato "${plato.nombre}" no admite guarnicion`);
+        }
+      } else {
+        if (!item.guarnicion_id) {
+          throw ApiError.unprocessable(`Elegi una guarnicion para continuar con el ${item.dia}`);
+        }
+        if (!plato.guarnicion_valida) {
+          throw ApiError.unprocessable(`La guarnicion del ${item.dia} no existe o no esta activa`);
+        }
       }
-      if (item.guarnicion_id && !plato.tiene_guarnicion) {
-        throw ApiError.unprocessable(`El plato "${plato.nombre}" no admite guarnicion`);
-      }
-      if (!plato.guarnicion_valida) {
-        throw ApiError.unprocessable(`La guarnicion del ${item.dia} no existe o no esta activa`);
+
+      const modoSalsa = modoSalsaPlato(plato);
+      if (modoSalsa === 'fija') {
+        // La salsa no se elige: siempre viaja la fija de la vianda/slot.
+        item.salsa_id = plato.salsa_fija_id;
+      } else if (modoSalsa === 'sin_salsa') {
+        if (item.salsa_id) {
+          throw ApiError.unprocessable(`El plato "${plato.nombre}" no admite salsa`);
+        }
+      } else {
+        if (!item.salsa_id) {
+          throw ApiError.unprocessable(`Elegi una salsa para continuar con el ${item.dia}`);
+        }
+        if (!plato.salsa_valida) {
+          throw ApiError.unprocessable(`La salsa del ${item.dia} no existe o no esta activa`);
+        }
       }
     }
 
@@ -1230,7 +1377,7 @@ export const cancelarDiaMiPedido = async (empleadoId, empresaId, pedidoId, dia, 
 };
 
 export const cambiarEstado = async (id, estado, actor = {}) => {
-  if (!ESTADOS.includes(estado)) throw ApiError.badRequest(`Estado invalido. Opciones: ${ESTADOS.join(', ')}`);
+  if (!ESTADOS_PEDIDO.includes(estado)) throw ApiError.badRequest(`Estado invalido. Opciones: ${ESTADOS_PEDIDO.join(', ')}`);
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -1238,6 +1385,9 @@ export const cambiarEstado = async (id, estado, actor = {}) => {
     if (!anterior) throw ApiError.notFound(`Pedido ${id} no encontrado`);
 
     const pedido = await repo.updateEstado(id, estado, client);
+    const ESTADO_A_ITEMS = { completo: 'entregado', pendiente: 'pendiente', cancelado: 'cancelado' };
+    const estadoItems = ESTADO_A_ITEMS[estado] ?? null;
+    if (estadoItems) await repo.updateItemsEstadoByPedido(id, estadoItems, client);
     await repo.registrarEvento({
       pedido_id: pedido.id,
       tipo: 'estado_cambiado',
@@ -1248,10 +1398,6 @@ export const cambiarEstado = async (id, estado, actor = {}) => {
       estado_nuevo: estado,
       resumen: `Estado cambiado de ${anterior.estado} a ${estado}`,
       metadata: {},
-    }, client);
-    await notificacionesService.notificarCambioEstadoPedido({
-      pedido,
-      estadoAnterior: anterior.estado,
     }, client);
     await auditoriaService.registrarAdminAction({
       adminUser: actor.adminUser || null,
@@ -1264,7 +1410,86 @@ export const cambiarEstado = async (id, estado, actor = {}) => {
     }, client.query.bind(client));
 
     await client.query('COMMIT');
+
+    // Notificacion/webhook fuera de la transaccion: no debe retener el lock
+    // de la fila ni hacer fallar el cambio de estado si el envio falla.
+    try {
+      await notificacionesService.notificarCambioEstadoPedido({
+        pedido,
+        estadoAnterior: anterior.estado,
+      });
+    } catch (notifyError) {
+      console.error('Error notificando cambio de estado de pedido', pedido.id, notifyError);
+    }
+
     return pedido;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const cambiarEstadoItem = async (itemId, estado, actor = {}) => {
+  if (!ESTADOS_ITEM.includes(estado)) throw ApiError.badRequest(`Estado invalido. Opciones: ${ESTADOS_ITEM.join(', ')}`);
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    // Bloquea el pedido padre para serializar updates concurrentes sobre ítems del mismo pedido
+    await client.query('SELECT id FROM pedidos WHERE id = (SELECT pedido_id FROM pedido_items WHERE id = $1) FOR UPDATE', [itemId]);
+    const anterior = await repo.findItemConPedidoById(itemId, client);
+    if (!anterior) throw ApiError.notFound(`Vianda ${itemId} no encontrada`);
+    if (anterior.sin_pedido) throw ApiError.conflict('No se puede cambiar el estado de una vianda marcada como sin pedido');
+    if (anterior.pedido_estado === 'cancelado') throw ApiError.conflict('No se puede cambiar una vianda de un pedido cancelado');
+
+    const item = await repo.updateItemEstado(itemId, estado, client);
+    const estadoPedido = await repo.calcularEstadoPedidoPorItems(anterior.pedido_id, client);
+    const pedido = await repo.updateEstado(anterior.pedido_id, estadoPedido, client);
+
+    await repo.registrarEvento({
+      pedido_id: anterior.pedido_id,
+      tipo: 'estado_item_cambiado',
+      actor_tipo: actor.actor_tipo || 'admin',
+      actor_id: actor.actor_id || null,
+      actor_nombre: actor.actor_nombre || null,
+      estado_anterior: anterior.estado,
+      estado_nuevo: estado,
+      resumen: `Estado de vianda ${anterior.dia} cambiado de ${anterior.estado} a ${estado}`,
+      metadata: {
+        pedido_item_id: item.id,
+        dia: item.dia,
+        pedido_estado_anterior: anterior.pedido_estado,
+        pedido_estado_nuevo: estadoPedido,
+      },
+    }, client);
+
+    await auditoriaService.registrarAdminAction({
+      adminUser: actor.adminUser || null,
+      accion: 'cambiar_estado_item',
+      entidad_tipo: 'pedido_item',
+      entidad_id: item.id,
+      resumen: `Cambio vianda ${item.id} (${item.dia}) de ${anterior.estado} a ${estado}`,
+      antes: anterior,
+      despues: { ...item, pedido_estado: estadoPedido },
+    }, client.query.bind(client));
+
+    await client.query('COMMIT');
+
+    // Notificacion/webhook fuera de la transaccion: no debe retener el lock
+    // FOR UPDATE ni hacer fallar el cambio de estado si el envio falla.
+    if (estadoPedido !== anterior.pedido_estado) {
+      try {
+        await notificacionesService.notificarCambioEstadoPedido({
+          pedido,
+          estadoAnterior: anterior.pedido_estado,
+        });
+      } catch (notifyError) {
+        console.error('Error notificando cambio de estado de vianda', item.id, notifyError);
+      }
+    }
+
+    return { item, pedido };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

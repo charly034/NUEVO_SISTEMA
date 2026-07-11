@@ -9,14 +9,15 @@ import pedidosRoutes from '../modules/pedidos/pedidos.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
 import adminAuthRoutes from '../modules/admin-auth/admin-auth.routes.js';
 import guarnicionesRoutes from '../modules/guarniciones/guarniciones.routes.js';
+import salsasRoutes from '../modules/salsas/salsas.routes.js';
 import empresasRoutes from '../modules/empresas/empresas.routes.js';
 import empleadosRoutes from '../modules/empleados/empleados.routes.js';
 import menuRoutes from '../modules/menu/menu.routes.js';
 import notificacionesRoutes from '../modules/notificaciones/notificaciones.routes.js';
-import sugerenciasEmpleadosRoutes from '../modules/sugerencias-empleados/sugerencias-empleados.routes.js';
 import adminAuditoriaRoutes from '../modules/admin-auditoria/admin-auditoria.routes.js';
 import planesRoutes from '../modules/planes/planes.routes.js';
 import finanzasRoutes from '../modules/finanzas/finanzas.routes.js';
+import cocinaRoutes from '../modules/cocina/cocina.routes.js';
 
 const router = Router();
 
@@ -32,11 +33,12 @@ router.use('/sugerencias', sugerenciasRoutes);
 router.use('/pedidos', pedidosRoutes);
 router.use('/menu', menuRoutes);
 router.use('/guarniciones', guarnicionesRoutes);
+router.use('/salsas', salsasRoutes);
 router.use('/empresas', empresasRoutes);
 router.use('/empleados', empleadosRoutes);
 router.use('/planes', planesRoutes);
 router.use('/notificaciones', notificacionesRoutes);
-router.use('/mis-sugerencias', sugerenciasEmpleadosRoutes);
 router.use('/finanzas', finanzasRoutes);
+router.use('/cocina', cocinaRoutes);
 
 export default router;

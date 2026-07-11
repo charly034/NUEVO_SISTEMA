@@ -8,7 +8,7 @@ const PAGE_TITLES = {
   '/estadisticas': 'Estadísticas',
   '/sugeridor':    'Generar menú',
   '/pedidos':      'Pedidos',
-  '/pedidos-hoy':  'Pedidos de hoy',
+  '/pedidos-hoy':  'Despacho hoy',
   '/clientes':     'Clientes',
   '/pedidos-pagos': 'Pedidos y pagos',
   '/recomendaciones-menu': 'Sugerencias de clientes',
@@ -52,7 +52,7 @@ export default function MobileHeader({ onLogout, onOpenMenu }) {
       <button
         type="button"
         onClick={onLogout}
-        className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded"
+        className="text-xs text-gray-500 hover:text-red-500 transition-colors px-2 py-1 rounded"
         aria-label="Cerrar sesión del panel admin"
       >
         Salir

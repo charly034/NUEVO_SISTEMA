@@ -1,0 +1,1042 @@
+[
+  {
+    "nombre": "Alitas rebozadas",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Arrollado de matambre",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "sabado",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Arroz con calamar",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Arroz con pollo",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "lunes",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Berenjenas rellenas",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Bife a la criolla",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Bomba de papa rellena",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Bondiola de cerdo braseada",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de batata"
+    ]
+  },
+  {
+    "nombre": "Buñuelos de arroz",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Canastitas de pollo",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "viernes",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Canelones de JyQ",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa blanca",
+      "Salsa bolognesa",
+      "Salsa fileto"
+    ]
+  },
+  {
+    "nombre": "Canelones de pollo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa blanca"
+    ]
+  },
+  {
+    "nombre": "Carbonada de pollo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Carne a la olla",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "viernes",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Carne al horno",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas",
+      "Verduras asadas"
+    ]
+  },
+  {
+    "nombre": "Carne al wok con vegetales",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Cerdo a la barbacoa",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas",
+      "Puré mixto"
+    ]
+  },
+  {
+    "nombre": "Cerdo al chimichurri",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "viernes",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Cerdo al horno",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Papas al horno"
+    ]
+  },
+  {
+    "nombre": "Costeletas de cerdo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Verduras asadas"
+    ]
+  },
+  {
+    "nombre": "Costeletas de cerdo a la riojana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Costillar de cerdo",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "viernes",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Croquetas de papa",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Croquetas de vegetales y semillas",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Empanadas",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "sabado",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Ensalada César",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz integral"
+    ]
+  },
+  {
+    "nombre": "Estofado de albóndigas",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "martes",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Estofado de carne",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Fetuchini",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa con albóndigas",
+      "Salsa de hongos"
+    ]
+  },
+  {
+    "nombre": "Fetuchini de espinaca",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Estofado"
+    ]
+  },
+  {
+    "nombre": "Fideos con estofado",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "jueves",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Filet de merluza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Filet romana",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "martes",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Filet suiza",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "martes",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Guiso de albóndigas",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Guiso de fideos",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Guiso de lentejas",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Guiso de mondongo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Hamburguesa casera de pollo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Verduras asadas"
+    ]
+  },
+  {
+    "nombre": "Hamburguesa de acelga",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Hamburguesa de acelga a la napolitana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Hamburguesa de carne",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "martes",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta",
+      "Papas al horno",
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Hamburguesa de carne a la suiza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz"
+    ]
+  },
+  {
+    "nombre": "Hamburguesa de lentejas",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de zapallo"
+    ]
+  },
+  {
+    "nombre": "Hamburguesa de pollo napolitana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de zapallo"
+    ]
+  },
+  {
+    "nombre": "Hígado encebollado",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Lasaña",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Lasaña de berenjena",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Lasaña de jamón y queso",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Lasaña de zucchini",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Matambre al roquefort",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "sabado",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Medallones de merluza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada rusa",
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Mil hojas de berenjena y zucchini",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz integral"
+    ]
+  },
+  {
+    "nombre": "Milanesa de berenjena napolitana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Milanesa de calabaza napolitana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Milanesa de pollo napolitana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada rusa",
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Milanesa de zucchini napolitana",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Milhojas de papa",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Napolitana de carne",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Papas al horno",
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Ñoquis",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "jueves",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa bolognesa"
+    ]
+  },
+  {
+    "nombre": "Pan de carne",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta",
+      "Papas al horno",
+      "Verduras asadas"
+    ]
+  },
+  {
+    "nombre": "Pan de carne relleno",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Verduras asadas"
+    ]
+  },
+  {
+    "nombre": "Papillot de merluza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pastel de calabaza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pastel de camote",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "miercoles",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pastel de papa",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "miercoles",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pata muslo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz primavera"
+    ]
+  },
+  {
+    "nombre": "Pata muslo al champiñón",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta",
+      "Puré de zapallo"
+    ]
+  },
+  {
+    "nombre": "Pizza de verduras",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Polenta con queso y bolognesa",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Polenta cremosa con cebolla caramelizada y champiñones",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pollo a la crema",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz primavera"
+    ]
+  },
+  {
+    "nombre": "Pollo a la mostaza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Pollo a la portuguesa",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pollo al escabeche con budín de calabaza",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pollo al horno con vegetales",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Pollo al limón",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Fideos al pesto",
+      "Puré de zapallo"
+    ]
+  },
+  {
+    "nombre": "Pollo al romero",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Papas rústicas"
+    ]
+  },
+  {
+    "nombre": "Pollo al verdeo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Puchero",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Ravioles",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "jueves",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa bolognesa",
+      "Salsa caruso"
+    ]
+  },
+  {
+    "nombre": "Ravioles de acelga y ricota",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa bolognesa"
+    ]
+  },
+  {
+    "nombre": "Ravioles de jamón y queso",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa fileto"
+    ]
+  },
+  {
+    "nombre": "Risotto de cerdo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Rollitos de pollo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas",
+      "Puré de zapallo"
+    ]
+  },
+  {
+    "nombre": "Rotolo de verdura",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa bolognesa"
+    ]
+  },
+  {
+    "nombre": "Salpicón",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Sorrentinos de calabaza",
+    "canal": "ambos",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "jueves",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa bolognesa"
+    ]
+  },
+  {
+    "nombre": "Sorrentinos de JyQ",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "jueves",
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Soufflé de espinaca",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz"
+    ]
+  },
+  {
+    "nombre": "Spaghetti con salsa de champiñones",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Spaghetti de espinaca",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Estofado"
+    ]
+  },
+  {
+    "nombre": "Suprema caprese",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de papas"
+    ]
+  },
+  {
+    "nombre": "Tacos de carne",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Tacos de pollo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Tallarines",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa caruso",
+      "Salsa con albóndigas"
+    ]
+  },
+  {
+    "nombre": "Tallarines de espinaca",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Tarta bicolor",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Tarta caprese",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré mixto"
+    ]
+  },
+  {
+    "nombre": "Tarta de atún",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Remolacha y zanahoria"
+    ]
+  },
+  {
+    "nombre": "Tarta de verduras",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Torre de piononos",
+    "canal": "local",
+    "disponibilidad": "fijo_dia",
+    "dia_fijo": "martes",
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Torrejas de arroz y jamón",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Puré de zapallo"
+    ]
+  },
+  {
+    "nombre": "Tortilla de papa rellena",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Tortilla de verduras",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Arroz integral",
+      "Ensalada mixta"
+    ]
+  },
+  {
+    "nombre": "Wok de arroz y ternera",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Wok de carne con vegetales y arroz",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Wok de cerdo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Wok de pollo",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  },
+  {
+    "nombre": "Zapallito relleno",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "libre",
+    "guarniciones_historicas": [
+      "Salsa fileto"
+    ]
+  },
+  {
+    "nombre": "Zapallitos rellenos",
+    "canal": "vianda",
+    "disponibilidad": "especial",
+    "dia_fijo": null,
+    "guarnicion_modo": "sin_guarnicion",
+    "guarniciones_historicas": []
+  }
+]

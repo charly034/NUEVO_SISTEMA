@@ -1,5 +1,5 @@
 schema: la_quinta_ai_admin_guide_v2
-updated_at: "2026-06-28"
+updated_at: "2026-07-06"
 
 maintenance_guide:
   status: verified_in_repo
@@ -39,14 +39,58 @@ start_here_by_task:
       - "docs/ai/60-debt.yaml"
   admin_ui:
     read:
+      - "docs/ai/ux-admin-prompt.md"
       - "front_menu/src/App.jsx"
       - "front_menu/src/auth.js"
       - "front_menu/src/lib/apiClient.js"
       - "front_menu/src/hooks"
       - "front_menu/src/pages"
     docs:
+      - "docs/ai/ux-admin-prompt.md"
       - "docs/ai/05-admin.yaml"
       - "docs/ai/20-modules.yaml"
+
+ux_admin_normalization:
+  status: partially_applied
+  source: "docs/ai/ux-admin-prompt.md"
+  scope: "front_menu"
+  principle: "Simplicidad Radical: el objetivo primario de cada vista debe estar visible y alcanzable en 1-2 clicks, sin scroll inicial."
+  last_application_2026_07_06:
+    code_paths:
+      - "front_menu/src/pages/Platos.jsx"
+      - "front_menu/src/pages/Guarniciones.jsx"
+      - "front_menu/src/pages/NotificacionesAdmin.jsx"
+      - "front_menu/src/pages/Administradores.jsx"
+      - "front_menu/src/pages/PedidosPagos.jsx"
+      - "front_menu/src/pages/SemanaDetalle.jsx"
+      - "front_menu/src/pages/PedidosAdmin.jsx"
+      - "front_menu/src/pages/PedidosHoy.jsx"
+      - "front_menu/src/pages/PedidosPanel.jsx"
+    summary:
+      - "Acciones destructivas removidas de tablas/listados y ubicadas en drawer/modal de detalle."
+      - "Filtros secundarios movidos a secciones Filtros avanzados colapsables donde habia sobrecarga."
+      - "Tabla de PedidosPagos reducida a columnas principales y acciones movidas al detalle."
+      - "SemanaDetalle deja de exponer la X directa para quitar platos y usa detalle con confirmacion."
+      - "Pedidos agrupa Seguimiento, Produccion semanal, Produccion diaria y Despacho hoy en /pedidos, con entregas por vianda diaria y /pedidos-hoy como redireccion de compatibilidad."
+    validation:
+      - "cd front_menu && npm run lint: OK sin errores, con 2 warnings react-hooks en Semanas.jsx."
+      - "cd front_menu && npm run build: OK."
+      - "cd API_LA_QUINTA && npm run lint: OK."
+      - "cd API_LA_QUINTA && npm test: OK."
+      - "cd API_LA_QUINTA && npm run migrate: OK para 1719000048000_pedido-items-estado."
+      - "Smoke navegador integrado /pedidos: Seguimiento, Produccion semanal, Produccion diaria, Despacho hoy y /pedidos-hoy OK sin errores de consola ni overflow horizontal."
+  default_view_structure:
+    - "Header con titulo, descripcion breve y accion primaria."
+    - "Filtros: maximo 3 visibles; el resto en Filtros avanzados colapsable."
+    - "Lista o tabla con columnas clave y detalle progresivo en SideDrawer."
+    - "SideDrawer para formularios/detalles; modales solo para confirmaciones simples o 1-2 campos."
+  must_check_before_admin_ui_finish:
+    - "KPI principal visible en los primeros 100px cuando exista un resumen operativo."
+    - "Tablas con maximo 5-6 columnas visibles."
+    - "Filas clickeables con hover/cursor o una unica accion de ver detalle."
+    - "Acciones destructivas fuera de la tabla, al final del drawer/modal y con confirm()."
+    - "Filtros con label visible, tags de filtro activo y preservacion al cambiar tabs."
+    - "Mobile sin scroll horizontal; filtros colapsables bajo Filtrar cuando corresponda."
   cliente_ui:
     read:
       - "front_clientes/src/App.jsx"

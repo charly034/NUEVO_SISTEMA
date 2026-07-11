@@ -1,6 +1,8 @@
 import * as service from './pedidos.service.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess, sendCreated } from '../../utils/response.js';
+import { ApiError } from '../../utils/ApiError.js';
+import { cambiarEstadoItemSchema } from './pedidos.validation.js';
 
 export const getMenuHoy = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getMenuHoy(), 'Menu del dia');
@@ -94,6 +96,10 @@ export const getSugerenciasPedidoAdmin = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getSugerenciasPedidoAdmin(req.query), 'Sugerencias obtenidas');
 });
 
+export const getResumenSugerenciasAdmin = asyncHandler(async (req, res) => {
+  sendSuccess(res, await service.getResumenSugerencias(req.query), 'Resumen de sugerencias obtenido');
+});
+
 export const getOpcionesSugerencia = asyncHandler(async (req, res) => {
   sendSuccess(res, await service.getOpcionesSugerencia(req.query), 'Opciones de sugerencia obtenidas');
 });
@@ -114,6 +120,21 @@ export const updateEstado = asyncHandler(async (req, res) => {
     actor_nombre: adminNombre || req.adminUser?.email || req.adminUser?.rol || 'Admin',
     adminUser: req.adminUser,
   }), 'Estado actualizado');
+});
+
+export const updateEstadoItem = asyncHandler(async (req, res) => {
+  const itemId = Number(req.params.itemId);
+  if (!Number.isInteger(itemId) || itemId <= 0) throw ApiError.badRequest('itemId invalido');
+  const parsed = cambiarEstadoItemSchema.safeParse(req.body);
+  if (!parsed.success) throw ApiError.badRequest('Estado inválido');
+  const { estado } = parsed.data;
+  const adminNombre = `${req.adminUser?.nombre ?? ''} ${req.adminUser?.apellido ?? ''}`.trim();
+  sendSuccess(res, await service.cambiarEstadoItem(itemId, estado, {
+    actor_tipo: 'admin',
+    actor_id: req.adminUser?.sub,
+    actor_nombre: adminNombre || req.adminUser?.email || req.adminUser?.rol || 'Admin',
+    adminUser: req.adminUser,
+  }), 'Estado de vianda actualizado');
 });
 
 export const getMiHistorial = asyncHandler(async (req, res) => {

@@ -13,6 +13,27 @@ export const getPlato = asyncHandler(async (req, res) => {
   sendSuccess(res, plato, 'Plato obtenido exitosamente');
 });
 
+export const getVisibilidadEmpresas = asyncHandler(async (req, res) => {
+  const result = await platosService.getVisibilidadEmpresas(req.params.id);
+  sendSuccess(res, result, 'Visibilidad de empresas obtenida');
+});
+
+export const setVisibilidadEmpresas = asyncHandler(async (req, res) => {
+  const empresa_ids = (req.body.empresa_ids ?? []).map(Number);
+  const result = await platosService.setVisibilidadEmpresas(req.params.id, empresa_ids);
+  sendSuccess(res, result, 'Visibilidad de empresas actualizada');
+});
+
+export const getDisponibilidadLocal = asyncHandler(async (req, res) => {
+  const result = await platosService.getDisponibilidadLocal(req.params.id);
+  sendSuccess(res, result, 'Disponibilidad en el local obtenida');
+});
+
+export const setDisponibilidadLocal = asyncHandler(async (req, res) => {
+  const result = await platosService.setDisponibilidadLocal(req.params.id, req.body.entradas ?? []);
+  sendSuccess(res, result, 'Disponibilidad en el local actualizada');
+});
+
 export const createPlato = asyncHandler(async (req, res) => {
   const plato = await platosService.createPlato(req.body, req.file);
   sendCreated(res, plato, 'Plato creado exitosamente');

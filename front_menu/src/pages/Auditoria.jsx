@@ -96,7 +96,7 @@ export default function Auditoria() {
                     {evento.admin_nombre || evento.admin_email || 'Admin'}{evento.admin_email ? ` · ${evento.admin_email}` : ''}
                   </p>
                 </div>
-                <time className="shrink-0 text-xs text-gray-400">{fecha(evento.created_at)}</time>
+                <time className="shrink-0 text-xs text-gray-500">{fecha(evento.created_at)}</time>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <JsonPreview label="Antes" value={evento.antes} />
@@ -104,7 +104,7 @@ export default function Auditoria() {
               </div>
             </article>
           ))}
-          {eventos.length === 0 && <p className="p-8 text-center text-sm text-gray-400">No hay eventos para esos filtros.</p>}
+          {eventos.length === 0 && <p className="p-8 text-center text-sm text-gray-500">No hay eventos para esos filtros.</p>}
         </div>
       )}
     </div>

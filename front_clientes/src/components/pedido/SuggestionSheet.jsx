@@ -86,7 +86,7 @@ export default function SuggestionSheet({ abierto, onCerrar, onGuardar, semana }
                       type="button"
                       onClick={() => toggle(sugerencia)}
                       className={[
-                        "rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all",
+                        "rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors",
                         activa
                           ? "border-[#5B6B2A] bg-[#5B6B2A] text-white"
                           : "border-[#D8D5C8] bg-white text-[#5B6B2A]",

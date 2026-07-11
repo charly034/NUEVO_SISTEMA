@@ -1,5 +1,5 @@
 schema: la_quinta_guardrails_v2
-updated_at: "2026-07-04"
+updated_at: "2026-07-06"
 
 non_breakable_invariants:
   verified_in_repo:
@@ -17,6 +17,9 @@ non_breakable_invariants:
   from_chat_summary:
     - "Mantener estilo mobile-first aprobado: fondo calido, verde oliva, card semanal centrada, navegacion inferior."
     - "Usar nombres en espanol para dominio, funciones y estados cuando el proyecto ya lo hace."
+    - "En front_menu aplicar docs/ai/ux-admin-prompt.md: objetivo primario visible sin scroll inicial y alcanzable en 1-2 clicks."
+    - "En front_menu no mostrar mas de 3 filtros visibles sin agrupar ni acciones destructivas en tablas."
+    - "En front_menu usar SideDrawer para edicion/detalle con contexto; modales solo para confirmaciones simples o formularios de 1-2 campos."
 
 high_risk_areas:
   verified_in_repo:
@@ -49,7 +52,7 @@ recommended_blast_radius:
   pedido_business_rule:
     scope: "pedidos.service/validation/repository + pedidoMapper/usePedidoSemanal + docs/pedidos-cliente.md + tests backend/cliente"
   admin_ui_change:
-    scope: "pagina/hook especifico de front_menu; evitar tocar apiClient salvo necesario"
+    scope: "pagina/hook especifico de front_menu + docs/ai/ux-admin-prompt.md si cambia el patron UX; evitar tocar apiClient salvo necesario"
   cliente_visual_change:
     scope: "componentes de front_clientes; no cambiar contratos API"
   migration_change:

@@ -1,7 +1,7 @@
 const TONE_CLASSES = {
-  neutral: 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:ring-gray-400',
-  brand: 'text-gray-400 hover:bg-brand-50 hover:text-brand-600 focus:ring-brand-500',
-  danger: 'text-gray-400 hover:bg-red-50 hover:text-red-500 focus:ring-red-500',
+  neutral: 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:ring-gray-400',
+  brand: 'text-gray-500 hover:bg-brand-50 hover:text-brand-600 focus:ring-brand-500',
+  danger: 'text-gray-500 hover:bg-red-50 hover:text-red-500 focus:ring-red-500',
 };
 
 export function IconActionButton({ label, tooltip = label, tone = 'neutral', onClick, children, disabled = false }) {

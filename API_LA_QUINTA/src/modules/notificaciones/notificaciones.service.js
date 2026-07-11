@@ -52,8 +52,7 @@ const whatsappTestSchema = z.object({
 const ESTADO_TITULO = {
   pendiente: 'Tu pedido esta pendiente',
   en_proceso: 'Tu pedido esta en preparacion',
-  listo: 'Tu pedido esta listo',
-  entregado: 'Tu pedido fue entregado',
+  completo: 'Tu pedido esta completo',
   cancelado: 'Tu pedido fue cancelado',
 };
 
@@ -175,7 +174,7 @@ function normalizarFiltros(payload = {}, canal = 'interna') {
     empresa_id: alcance === 'empresa' ? normalizarId(payload.empresa_id, 'empresa_id') : normalizarIdOpcional(payload.empresa_id, 'empresa_id'),
     empleado_id: alcance === 'empleado' ? normalizarId(payload.empleado_id, 'empleado_id') : normalizarIdOpcional(payload.empleado_id, 'empleado_id'),
     rol: payload.rol && payload.rol !== 'todos' ? String(payload.rol).trim() : null,
-    plan: payload.plan && payload.plan !== 'todos' ? String(payload.plan).trim() : null,
+    plan_id: normalizarIdOpcional(payload.plan_id, 'plan_id'),
     modo_pedido: payload.modo_pedido && payload.modo_pedido !== 'todos' ? String(payload.modo_pedido).trim() : null,
     dias_laborales: payload.dias_laborales && payload.dias_laborales !== 'todos' ? String(payload.dias_laborales).trim() : null,
     solo_preferencia_whatsapp: Boolean(payload.solo_preferencia_whatsapp),
@@ -266,7 +265,7 @@ function valorPreferenciaWhatsapp(empleado) {
 function filtrarEmpleadosPorParametros(empleados, filtros) {
   return empleados.filter((empleado) => {
     if (filtros.rol && empleado.rol !== filtros.rol) return false;
-    if (filtros.plan && empleado.plan !== filtros.plan) return false;
+    if (filtros.plan_id && Number(empleado.plan_id) !== Number(filtros.plan_id)) return false;
     if (filtros.modo_pedido && empleado.modo_pedido !== filtros.modo_pedido) return false;
     if (filtros.dias_laborales && empleado.dias_laborales !== filtros.dias_laborales) return false;
     if (filtros.requiere_telefono && !empleado.telefono) return false;
@@ -369,7 +368,7 @@ function tipoPorEvento(evento, contexto = {}) {
   if (evento === 'menu_publicado') return 'menu';
   if (evento === 'pedido_semanal_pendiente') return 'recordatorio';
   if (evento === 'pedido_estado_cambiado') {
-    return contexto.estado === 'listo' || contexto.estado === 'entregado' ? 'confirmado' : 'sistema';
+    return ['completo', 'listo', 'entregado'].includes(contexto.estado) ? 'confirmado' : 'sistema';
   }
   if (evento === 'nuevo_registro') return 'sistema';
   return 'sistema';

@@ -84,7 +84,7 @@ export default function SugerenciasPage() {
           </button>
           <div>
             <h1 className="text-lg font-bold text-[#2A2C1F] font-serif">Sugerir platos</h1>
-            <p className="text-xs text-[#9A9885]">{rangoSemana(semanaId)}</p>
+            <p className="text-xs text-[#6E6B64]">{rangoSemana(semanaId)}</p>
           </div>
         </div>
       </div>
@@ -107,7 +107,7 @@ export default function SugerenciasPage() {
               <button
                 key={s}
                 onClick={() => toggle(s)}
-                className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${
                   seleccionadas.includes(s)
                     ? 'bg-[#5B6B2A] text-white border-[#5B6B2A]'
                     : 'bg-white text-[#5B6B2A] border-[#D8D5C8]'

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import { useEmpleados } from '../hooks/useEmpleados.js';
+import { usePlanes } from '../hooks/usePlanes.js';
 import {
   useDestinatariosWhatsapp,
   useEliminarDestinatarioWhatsapp,
@@ -20,6 +21,7 @@ import {
   useWhatsappTestLogs,
 } from '../hooks/useNotificaciones.js';
 import { toast } from '../lib/toast.js';
+import { confirmar } from '../lib/confirm.js';
 import Spinner from '../components/ui/Spinner.jsx';
 import SideDrawer from '../components/ui/SideDrawer.jsx';
 
@@ -65,7 +67,7 @@ const FILTROS_BASE = {
   empresa_id: '',
   empleado_id: '',
   rol: 'todos',
-  plan: 'todos',
+  plan_id: 'todos',
   modo_pedido: 'todos',
   dias_laborales: 'todos',
   solo_preferencia_whatsapp: false,
@@ -181,15 +183,6 @@ function resumenErrorWebhook(detalle) {
   return partes.length ? `Prueba fallida: ${partes.join(' - ')}` : '';
 }
 
-function resumenRespuestaWebhook(respuesta) {
-  const parsed = parseRespuestaWebhook(respuesta);
-  const mensajeClaro = mensajeN8n(parsed);
-  if (mensajeClaro) return mensajeClaro;
-  const texto = recortarTexto(respuesta, 220);
-  if (!texto) return '';
-  return texto;
-}
-
 function mensajeErrorHttp(error, fallback) {
   const status = error?.status;
   const errorCode = error?.data?.errorCode || error?.data?.data?.errorCode;
@@ -206,6 +199,16 @@ function zodFieldError(error, field) {
   return error?.issues?.find((issue) => issue.path[0] === field)?.message || '';
 }
 
+// Empleados de una empresa (o todos si no hay empresa elegida). Usado por los
+// formularios de notificación manual y por reglas para acotar el selector de
+// empleado a la empresa seleccionada.
+function useEmpleadosDeEmpresa(empleados, empresaId) {
+  return useMemo(() => {
+    if (!empresaId) return empleados;
+    return empleados.filter((e) => Number(e.empresa_id) === Number(empresaId));
+  }, [empleados, empresaId]);
+}
+
 function limpiarFiltros(filtros, canal) {
   const alcance = filtros.alcance || 'todos';
   return {
@@ -213,7 +216,7 @@ function limpiarFiltros(filtros, canal) {
     empresa_id: filtros.empresa_id || null,
     empleado_id: filtros.empleado_id || null,
     rol: filtros.rol === 'todos' ? null : filtros.rol,
-    plan: filtros.plan === 'todos' ? null : filtros.plan,
+    plan_id: filtros.plan_id === 'todos' || !filtros.plan_id ? null : Number(filtros.plan_id),
     modo_pedido: filtros.modo_pedido === 'todos' ? null : filtros.modo_pedido,
     dias_laborales: filtros.dias_laborales === 'todos' ? null : filtros.dias_laborales,
     solo_preferencia_whatsapp: Boolean(filtros.solo_preferencia_whatsapp),
@@ -263,7 +266,7 @@ function normalizarReglaParaForm(regla) {
       empresa_id: regla.filtros?.empresa_id || '',
       empleado_id: regla.filtros?.empleado_id || '',
       rol: regla.filtros?.rol || 'todos',
-      plan: regla.filtros?.plan || 'todos',
+      plan_id: regla.filtros?.plan_id || 'todos',
       modo_pedido: regla.filtros?.modo_pedido || 'todos',
       dias_laborales: regla.filtros?.dias_laborales || 'todos',
       destinatario_whatsapp_ids: regla.filtros?.destinatario_whatsapp_ids || [],
@@ -332,14 +335,12 @@ function Textarea({ label, value, onChange, required = false, maxLength = 900, p
 }
 
 function FiltrosRegla({ canal, filtros, setFiltros, empresas, empleados, destinatariosWhatsapp }) {
+  const { data: planes = [] } = usePlanes();
   const alcances = canal === 'whatsapp'
     ? [...ALCANCES_REGLA, { value: 'destinatarios_whatsapp', label: 'Destinatarios WhatsApp externos' }]
     : ALCANCES_REGLA;
 
-  const empleadosFiltrados = useMemo(() => {
-    if (!filtros.empresa_id) return empleados;
-    return empleados.filter((e) => Number(e.empresa_id) === Number(filtros.empresa_id));
-  }, [empleados, filtros.empresa_id]);
+  const empleadosFiltrados = useEmpleadosDeEmpresa(empleados, filtros.empresa_id);
 
   const setFiltro = (field, value) => {
     setFiltros((prev) => ({
@@ -411,11 +412,9 @@ function FiltrosRegla({ canal, filtros, setFiltros, empresas, empleados, destina
           <option value="todos">Todos</option>
           <option value="cliente">Cliente</option>
         </Select>
-        <Select label="Plan" value={filtros.plan} onChange={(value) => setFiltro('plan', value)}>
+        <Select label="Plan" value={filtros.plan_id} onChange={(value) => setFiltro('plan_id', value)}>
           <option value="todos">Todos</option>
-          <option value="basico">Basico</option>
-          <option value="con_postre">Con postre</option>
-          <option value="con_postre_bebida">Con postre y bebida</option>
+          {planes.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </Select>
         <Select label="Modo pedido" value={filtros.modo_pedido} onChange={(value) => setFiltro('modo_pedido', value)}>
           <option value="todos">Todos</option>
@@ -457,7 +456,7 @@ function FiltrosRegla({ canal, filtros, setFiltros, empresas, empleados, destina
   );
 }
 
-function ReglaForm({ canal, regla, setRegla, empresas, empleados, destinatariosWhatsapp, onSubmit, saving, onCancel }) {
+function ReglaForm({ canal, regla, setRegla, empresas, empleados, destinatariosWhatsapp, onSubmit, saving, onCancel, onDelete }) {
   const setField = (field, value) => setRegla((prev) => ({ ...prev, [field]: value }));
   const setProgramacion = (field, value) => setRegla((prev) => ({
     ...prev,
@@ -519,13 +518,24 @@ function ReglaForm({ canal, regla, setRegla, empresas, empleados, destinatariosW
         />
       </div>
 
-      <div className="mt-4 flex gap-2 border-t border-gray-100 pt-4">
-        <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-60">
-          {saving ? 'Guardando...' : regla.id ? 'Guardar cambios' : 'Crear regla'}
-        </button>
-        <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-          Cancelar
-        </button>
+      <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+        <div className="flex gap-2">
+          <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-60">
+            {saving ? 'Guardando...' : regla.id ? 'Guardar cambios' : 'Crear regla'}
+          </button>
+          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Cancelar
+          </button>
+        </div>
+        {regla.id ? (
+          <button
+            type="button"
+            onClick={() => onDelete?.(regla.id)}
+            className="w-full rounded-lg border border-red-100 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+          >
+            Eliminar regla
+          </button>
+        ) : null}
       </div>
     </form>
   );
@@ -535,10 +545,7 @@ function ManualInternaForm({ empresas, empleados, onDone }) {
   const [form, setForm] = useState(MANUAL_BASE);
   const enviar = useEnviarNotificacion();
 
-  const empleadosFiltrados = useMemo(() => {
-    if (!form.empresa_id) return empleados;
-    return empleados.filter((e) => Number(e.empresa_id) === Number(form.empresa_id));
-  }, [empleados, form.empresa_id]);
+  const empleadosFiltrados = useEmpleadosDeEmpresa(empleados, form.empresa_id);
 
   const setField = (field, value) => {
     setForm((prev) => ({
@@ -600,7 +607,7 @@ function ManualInternaForm({ empresas, empleados, onDone }) {
   );
 }
 
-function ReglaRow({ regla, onEdit, onDelete }) {
+function ReglaRow({ regla, onEdit }) {
   return (
     <tr className="cursor-pointer hover:bg-gray-50" onClick={() => onEdit(regla)}>
       <td className="px-4 py-3">
@@ -624,10 +631,10 @@ function ReglaRow({ regla, onEdit, onDelete }) {
       <td className="px-4 py-3 text-right">
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onDelete(regla.id); }}
-          className="rounded-md px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
+          onClick={(e) => { e.stopPropagation(); onEdit(regla); }}
+          className="rounded-md px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
         >
-          Eliminar
+          Ver detalle
         </button>
       </td>
     </tr>
@@ -664,9 +671,9 @@ function HistorialInterno({ notificaciones, isLoading }) {
                   </div>
                   <p className="mt-1 text-sm font-semibold text-gray-800">{n.titulo}</p>
                   <p className="text-xs text-gray-500 truncate">{n.cuerpo}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">{n.empleado_apellido}, {n.empleado_nombre} - {n.empresa_nombre}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{n.empleado_apellido}, {n.empleado_nombre} - {n.empresa_nombre}</p>
                 </div>
-                <time className="shrink-0 text-xs text-gray-400">{formatoFecha(n.created_at)}</time>
+                <time className="shrink-0 text-xs text-gray-500">{formatoFecha(n.created_at)}</time>
               </div>
             ))}
           </div>
@@ -803,7 +810,7 @@ function WebhookConfigForm({ config, onClose }) {
   );
 }
 
-function ProbarWhatsappForm({ onClose }) {
+function ProbarWhatsappForm() {
   const [test, setTest] = useState({ telefono: '', nombre: 'Prueba La Quinta', cuerpo: 'Mensaje de prueba desde La Quinta.' });
   const [errors, setErrors] = useState({ telefono: '', nombre: '', cuerpo: '' });
   const probar = useProbarWebhookWhatsapp();
@@ -905,7 +912,7 @@ function ProbarWhatsappForm({ onClose }) {
                         </span>
                         <span className="text-xs text-gray-500">{log.destinatario}</span>
                       </div>
-                      <time className="text-xs text-gray-400">{formatoFecha(log.created_at)}</time>
+                      <time className="text-xs text-gray-500">{formatoFecha(log.created_at)}</time>
                     </div>
                     <div className="flex gap-1">
                       <button type="button" onClick={() => setExpandedId(expanded ? null : log.id)} className="rounded px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-50">
@@ -931,7 +938,7 @@ function ProbarWhatsappForm({ onClose }) {
   );
 }
 
-function DestinatarioForm({ dest, empresas, onClose }) {
+function DestinatarioForm({ dest, empresas, onClose, onDelete }) {
   const [form, setForm] = useState(dest || WHATSAPP_DEST_BASE);
   const guardar = useGuardarDestinatarioWhatsapp();
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
@@ -972,13 +979,24 @@ function DestinatarioForm({ dest, empresas, onClose }) {
           Activo
         </label>
       </div>
-      <div className="mt-4 flex gap-2 border-t border-gray-100 pt-4">
-        <button type="submit" disabled={guardar.isPending} className="flex-1 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-60">
-          {guardar.isPending ? 'Guardando...' : 'Guardar'}
-        </button>
-        <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-          Cancelar
-        </button>
+      <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+        <div className="flex gap-2">
+          <button type="submit" disabled={guardar.isPending} className="flex-1 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-60">
+            {guardar.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+          <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Cancelar
+          </button>
+        </div>
+        {form.id ? (
+          <button
+            type="button"
+            onClick={() => onDelete?.(form.id)}
+            className="w-full rounded-lg border border-red-100 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+          >
+            Eliminar destinatario
+          </button>
+        ) : null}
       </div>
     </form>
   );
@@ -1016,7 +1034,7 @@ function EnviosWhatsappCompacto({ envios, isLoading }) {
                   <p className="text-xs text-gray-500">{envio.destinatario?.telefono} - {envio.regla_nombre || 'Prueba manual'}</p>
                   {envio.error && <p className="text-xs text-red-500">{envio.error}</p>}
                 </div>
-                <time className="shrink-0 text-xs text-gray-400">{formatoFecha(envio.created_at)}</time>
+                <time className="shrink-0 text-xs text-gray-500">{formatoFecha(envio.created_at)}</time>
               </div>
             ))}
           </div>
@@ -1107,20 +1125,32 @@ export default function NotificacionesAdmin() {
   };
 
   const borrarRegla = async (id) => {
-    if (!window.confirm('Eliminar esta regla?')) return;
+    const ok = await confirmar({
+      titulo: 'Eliminar regla?',
+      texto: 'La regla dejara de enviar avisos automaticamente.',
+      botonConfirmar: 'Eliminar regla',
+    });
+    if (!ok) return;
     try {
       await eliminarRegla.mutateAsync(id);
       toast.success('Regla eliminada');
+      closeDrawer();
     } catch (error) {
       toast.error(error?.message || 'No se pudo eliminar la regla');
     }
   };
 
   const borrarDest = async (id) => {
-    if (!window.confirm('Eliminar destinatario de WhatsApp?')) return;
+    const ok = await confirmar({
+      titulo: 'Eliminar destinatario?',
+      texto: 'El contacto dejara de estar disponible para reglas WhatsApp.',
+      botonConfirmar: 'Eliminar destinatario',
+    });
+    if (!ok) return;
     try {
       await eliminarDest.mutateAsync(id);
       toast.success('Destinatario eliminado');
+      closeDrawer();
     } catch (error) {
       toast.error(error?.message || 'No se pudo eliminar el destinatario');
     }
@@ -1158,7 +1188,7 @@ export default function NotificacionesAdmin() {
             ) : (
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                     <th className="px-4 py-2">Regla</th>
                     <th className="px-4 py-2 hidden md:table-cell">Evento</th>
                     <th className="px-4 py-2 hidden sm:table-cell">Alcance</th>
@@ -1167,7 +1197,7 @@ export default function NotificacionesAdmin() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {reglasInternas.map((r) => (
-                    <ReglaRow key={r.id} regla={r} onEdit={(reg) => abrirEditarRegla('interna', reg)} onDelete={borrarRegla} />
+                    <ReglaRow key={r.id} regla={r} onEdit={(reg) => abrirEditarRegla('interna', reg)} />
                   ))}
                 </tbody>
               </table>
@@ -1190,7 +1220,7 @@ export default function NotificacionesAdmin() {
                 <p className="text-xs text-gray-500">
                   {configured ? (whatsappActivo ? 'Configurado y activo' : 'Configurado pero inactivo') : 'Sin configurar'}
                   {whatsappConfig?.masked_webhook_url && (
-                    <span className="ml-2 font-mono text-gray-400">{whatsappConfig.masked_webhook_url}</span>
+                    <span className="ml-2 font-mono text-gray-500">{whatsappConfig.masked_webhook_url}</span>
                   )}
                 </p>
               </div>
@@ -1220,7 +1250,7 @@ export default function NotificacionesAdmin() {
             ) : (
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <tr className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
                     <th className="px-4 py-2">Regla</th>
                     <th className="px-4 py-2 hidden md:table-cell">Evento</th>
                     <th className="px-4 py-2 hidden sm:table-cell">Alcance</th>
@@ -1229,7 +1259,7 @@ export default function NotificacionesAdmin() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {reglasWhatsapp.map((r) => (
-                    <ReglaRow key={r.id} regla={r} onEdit={(reg) => abrirEditarRegla('whatsapp', reg)} onDelete={borrarRegla} />
+                    <ReglaRow key={r.id} regla={r} onEdit={(reg) => abrirEditarRegla('whatsapp', reg)} />
                   ))}
                 </tbody>
               </table>
@@ -1270,10 +1300,7 @@ export default function NotificacionesAdmin() {
                         }}
                         className="rounded-md px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                       >
-                        Editar
-                      </button>
-                      <button type="button" onClick={() => borrarDest(d.id)} className="rounded-md px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50">
-                        Eliminar
+                        Ver detalle
                       </button>
                     </div>
                   </div>
@@ -1297,6 +1324,7 @@ export default function NotificacionesAdmin() {
           onSubmit={(e) => submitRegla(e, 'interna')}
           saving={guardarRegla.isPending}
           onCancel={closeDrawer}
+          onDelete={borrarRegla}
         />
       </SideDrawer>
 
@@ -1311,6 +1339,7 @@ export default function NotificacionesAdmin() {
           onSubmit={(e) => submitRegla(e, 'whatsapp')}
           saving={guardarRegla.isPending}
           onCancel={closeDrawer}
+          onDelete={borrarRegla}
         />
       </SideDrawer>
 
@@ -1327,11 +1356,11 @@ export default function NotificacionesAdmin() {
       </SideDrawer>
 
       <SideDrawer open={drawer === 'probar-wa'} onClose={closeDrawer} title="Probar WhatsApp" width="md">
-        <ProbarWhatsappForm onClose={closeDrawer} />
+        <ProbarWhatsappForm />
       </SideDrawer>
 
       <SideDrawer open={drawer === 'dest-form'} onClose={closeDrawer} title={destEditando ? 'Editar destinatario' : 'Nuevo destinatario externo'} width="md">
-        <DestinatarioForm dest={destEditando} empresas={empresas} onClose={closeDrawer} />
+        <DestinatarioForm dest={destEditando} empresas={empresas} onClose={closeDrawer} onDelete={borrarDest} />
       </SideDrawer>
     </div>
   );

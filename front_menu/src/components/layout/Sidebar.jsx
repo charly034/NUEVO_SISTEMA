@@ -7,21 +7,22 @@ const NAV = [
   { type: 'catalogo' },
   { type: 'menu-semanal' },
   { to: '/pedidos', label: 'Pedidos' },
-  { to: '/pedidos-hoy', label: 'Pedidos de hoy' },
   { to: '/auditoria', label: 'Auditoría', superadminOnly: true },
   { to: '/administradores', label: 'Administradores', superadminOnly: true },
 ];
 
 const CLIENTES_ITEMS = [
   { to: '/clientes', label: 'Empresas', vista: 'empresas', icon: '/empresas' },
+  { to: '/clientes?vista=clientes', label: 'Clientes finales', vista: 'clientes', icon: '/clientes-finales' },
+  { to: '/clientes?vista=planes', label: 'Planes', vista: 'planes', icon: '/clientes-planes' },
   { to: '/clientes?vista=pagos', label: 'Pagos', vista: 'pagos', icon: '/pedidos-pagos' },
   { to: '/clientes?vista=notificaciones', label: 'Notificaciones', vista: 'notificaciones', icon: '/notificaciones' },
-  { to: '/recomendaciones-menu', label: 'Sugerencias de clientes', path: '/recomendaciones-menu', icon: '/recomendaciones-menu' },
 ];
 
 const CATALOGO_ITEMS = [
   { to: '/platos', label: 'Platos' },
   { to: '/guarniciones', label: 'Guarniciones' },
+  { to: '/salsas', label: 'Salsas' },
 ];
 
 const MENU_SEMANAL_GROUPS = [
@@ -33,10 +34,17 @@ const MENU_SEMANAL_GROUPS = [
     ],
   },
   {
+    label: 'Cocina',
+    items: [
+      { to: '/cocina', label: 'Cockpit de cocina' },
+    ],
+  },
+  {
     label: 'Análisis',
     items: [
       { to: '/historial', label: 'Historial de platos' },
       { to: '/estadisticas', label: 'Estadísticas' },
+      { to: '/recomendaciones-menu', label: 'Sugerencias de clientes' },
     ],
   },
 ];
@@ -48,6 +56,7 @@ const ICONS = {
   '/clientes': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M3 21h18M9 8h1m5 0h1M9 12h1m5 0h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" /><path d="M7 21v-5h10v5" /></svg>,
   '/platos': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>,
   '/guarniciones': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M4 10h16" /><path d="M6 10l1.5 9h9L18 10" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>,
+  '/salsas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M12 3c2.5 3 4 5.5 4 8a4 4 0 1 1-8 0c0-2.5 1.5-5 4-8z" /></svg>,
   '/semanas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>,
   '/sugeridor': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>,
   '/historial': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M12 8v4l3 3" /><path d="M3.05 11a9 9 0 1 0 .5-3" /><path d="M3 4v4h4" /></svg>,
@@ -58,8 +67,11 @@ const ICONS = {
   '/notificaciones': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>,
   '/recomendaciones-menu': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" /><path d="M8 9h8M8 13h5" /></svg>,
   '/empresas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M3 21h18M9 8h1m5 0h1M9 12h1m5 0h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" /></svg>,
+  '/clientes-finales': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+  '/clientes-planes': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
   '/auditoria': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>,
   '/administradores': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M16 21v-2a4 4 0 0 0-8 0v2" /><circle cx="12" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>,
+  '/cocina': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M6 2v6a6 6 0 0 0 12 0V2" /><path d="M3 22h18" /><path d="M12 14v8" /></svg>,
 };
 
 function esRutaMenuSemanal(pathname, to) {
@@ -115,7 +127,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
     <>
       <div className="border-b border-gray-100 px-5 py-5">
         <span className="text-lg font-bold text-brand-700">La Quinta</span>
-        <p className="mt-0.5 text-xs text-gray-400">Sistema de menús</p>
+        <p className="mt-0.5 text-xs text-gray-500">Sistema de menús</p>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
         {NAV.filter(item => !item.superadminOnly || admin.rol === 'superadmin').map((item) => {
@@ -248,7 +260,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
                   <div className="ml-5 border-l border-gray-100 pl-2">
                     {MENU_SEMANAL_GROUPS.map((group, groupIndex) => (
                       <div key={group.label} className={groupIndex > 0 ? 'mt-2 border-t border-gray-100 pt-2' : ''}>
-                        <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
                           {group.label}
                         </p>
                         <div className="space-y-0.5">

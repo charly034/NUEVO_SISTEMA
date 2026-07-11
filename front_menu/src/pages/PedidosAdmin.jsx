@@ -1,27 +1,34 @@
-﻿import { useState, useMemo, useCallback } from 'react';
+﻿import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Tabs, Tab } from '../components/ui/Tabs.jsx';
 import * as XLSX from 'xlsx';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
-import { usePedidos, useUpdateEstadoPedido } from '../hooks/usePedidos.js';
+import { usePedidos, useUpdateEstadoPedido, useUpdateEstadoPedidoItem } from '../hooks/usePedidos.js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import { useEmpleados } from '../hooks/useEmpleados.js';
 import { toast } from '../lib/toast.js';
+import { DIAS_ORDEN, DIA_ABREV as DIAS_LABEL, DIA_NOMBRE as DIAS_FULL } from '../lib/dias.js';
+import { lunesActualISO as getLunes, addDiasISO as addDias } from '../lib/fechas.js';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const DIAS_ORDEN = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-const DIAS_LABEL = { lunes: 'Lun', martes: 'Mar', miercoles: 'Mié', jueves: 'Jue', viernes: 'Vie', sabado: 'Sáb', domingo: 'Dom' };
-const DIAS_FULL  = { lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo' };
-
-const ESTADOS = [
+const ESTADOS_PEDIDO = [
   { key: 'pendiente',  label: 'Pendiente',  icon: '🕐', cls: 'bg-amber-50 text-amber-700 border-amber-200'  },
   { key: 'en_proceso', label: 'En proceso', icon: '🔥', cls: 'bg-blue-50 text-blue-700 border-blue-200'    },
-  { key: 'listo',      label: 'Listo',       icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
-  { key: 'entregado',  label: 'Entregado',   icon: '📦', cls: 'bg-gray-50 text-gray-500 border-gray-200'   },
+  { key: 'completo',   label: 'Completo',    icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
   { key: 'cancelado',  label: 'Cancelado',   icon: '❌', cls: 'bg-red-50 text-red-600 border-red-200'      },
 ];
-const ESTADO_MAP = Object.fromEntries(ESTADOS.map(e => [e.key, e]));
+const ESTADOS_ITEM = [
+  { key: 'pendiente',  label: 'Pendiente',  icon: '🕐', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'preparado',  label: 'Preparada',  icon: '🍽️', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { key: 'entregado',  label: 'Entregada',  icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
+  { key: 'cancelado',  label: 'Cancelada',  icon: '❌', cls: 'bg-red-50 text-red-600 border-red-200' },
+];
+// Estados ya no escritos; solo para mostrar filas históricas en la DB
+const ESTADOS_LEGACY = [
+  { key: 'listo',      label: 'Listo',      icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
+  { key: 'entregado',  label: 'Entregado',  icon: '📦', cls: 'bg-gray-50 text-gray-500 border-gray-200' },
+];
+const ESTADO_MAP = Object.fromEntries([...ESTADOS_PEDIDO, ...ESTADOS_ITEM, ...ESTADOS_LEGACY].map(e => [e.key, e]));
 
 const AVATAR_COLORS = [
   'bg-green-600','bg-blue-600','bg-purple-600','bg-orange-500',
@@ -29,18 +36,7 @@ const AVATAR_COLORS = [
 ];
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
-
-function getLunes() {
-  const hoy = new Date();
-  const diff = hoy.getDay() === 0 ? -6 : 1 - hoy.getDay();
-  const l = new Date(hoy); l.setDate(hoy.getDate() + diff);
-  return l.toISOString().split('T')[0];
-}
-
-function addDias(iso, n) {
-  const d = new Date(iso); d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
-}
+// getLunes y addDias vienen de lib/fechas.js (ver imports).
 
 function fmt(iso) {
   if (!iso) return '';
@@ -67,6 +63,7 @@ const EVENTO_LABELS = {
   pedido_actualizado: 'Actualizado',
   pedido_cancelado: 'Cancelado',
   estado_cambiado: 'Cambio de estado',
+  estado_item_cambiado: 'Cambio de vianda',
 };
 
 function labelEstado(estado) {
@@ -85,6 +82,7 @@ function descripcionEvento(evento) {
   if (evento.tipo === 'pedido_creado') return 'Pedido creado';
   if (evento.tipo === 'pedido_actualizado') return 'Pedido actualizado';
   if (evento.tipo === 'pedido_cancelado') return 'Pedido cancelado';
+  if (evento.tipo === 'estado_item_cambiado') return evento.resumen || 'Cambio de estado de vianda';
 
   if (evento.resumen && !esResumenInterno(evento.resumen)) return evento.resumen;
   return EVENTO_LABELS[evento.tipo] ?? 'Evento registrado';
@@ -92,7 +90,7 @@ function descripcionEvento(evento) {
 
 function EmptyPedidos({ filtrosActivos, onLimpiarFiltros }) {
   return (
-    <div className="text-center py-12 text-gray-400">
+    <div className="text-center py-12 text-gray-500">
       <p className="text-4xl mb-3">📋</p>
       <p className="text-sm">
         {filtrosActivos
@@ -153,12 +151,20 @@ function getClavePreparacion(item) {
   ].join('__');
 }
 
+function esItemActivoCocina(item) {
+  return item && !item.sin_pedido && item.estado !== 'cancelado';
+}
+
 function crearGrupoCocina(item) {
   return {
     plato_nombre: item.plato_nombre,
     opcion: item.opcion,
     guarnicion_nombre: item.guarnicion_nombre,
     cantidad: 0,
+    preparadas: 0,
+    entregadas: 0,
+    pendienteIds: [],    // pendiente → preparado
+    preparadoIds: [],    // preparado → entregado
     tamanos: {},
     postres: 0,
     bebidas: 0,
@@ -192,8 +198,9 @@ function resumenExtras(grupo) {
 }
 
 function resumenItems(items = []) {
-  const resumen = { viandas: items.length, tamanos: {}, postres: 0, bebidas: 0 };
-  for (const item of items) {
+  const activos = items.filter(esItemActivoCocina);
+  const resumen = { viandas: activos.length, tamanos: {}, postres: 0, bebidas: 0 };
+  for (const item of activos) {
     const tamano = getTamanoPlan(item);
     resumen.tamanos[tamano] = (resumen.tamanos[tamano] || 0) + 1;
     if (item.plan_incluye_postre) resumen.postres++;
@@ -226,6 +233,7 @@ function buildRows(pedidos, semana, { soloEmpresa = null, soloDia = null } = {})
         BEBIDA: p.plan_incluye_bebida ? 'Si' : 'No',
         Principal: item.plato_nombre || '',
         GUARNICION: item.guarnicion_nombre || '',
+        ESTADO_VIANDA: ESTADO_MAP[item.estado]?.label || item.estado || '',
       });
     }
   }
@@ -262,10 +270,15 @@ function exportarExcel(pedidos, semana, filtros = {}) {
 
 // ── Botón exportar con dropdown de filtros ────────────────────────────────────
 
-function BotonExportar({ pedidos, semana, empresas, compact = false }) {
+function BotonExportar({ pedidos, semana, empresas, compact = false, initialEmpresa = '' }) {
   const [open, setOpen] = useState(false);
-  const [soloEmpresa, setSoloEmpresa] = useState('');
+  const [soloEmpresa, setSoloEmpresa] = useState(initialEmpresa);
   const [soloDia, setSoloDia]         = useState('');
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setSoloEmpresa(initialEmpresa);
+  }, [open, initialEmpresa]);
 
   const diasConPedidos = DIAS_ORDEN.filter(d =>
     pedidos.some(p => (p.items || []).some(i => i.dia === d))
@@ -344,22 +357,6 @@ function abrirVentanaImpresion(html) {
   w.onload = () => { w.focus(); w.print(); };
 }
 
-// Construye los grupos de cocina para un día dado
-function buildGruposCocina(pedidos, dia) {
-  const map = {};
-  for (const p of pedidos) {
-    for (const item of (p.items || []).filter(i => i.dia === dia)) {
-      const planNombre = getPlanNombre(p);
-      const key = getClavePreparacion(item);
-      if (!map[key]) map[key] = crearGrupoCocina(item);
-      map[key].cantidad++;
-      sumarDetallePlan(map[key], p);
-      map[key].personas.push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, empresa: p.empresa_nombre, plan: planNombre });
-    }
-  }
-  return Object.values(map).sort((a, b) => b.cantidad - a.cantidad);
-}
-
 // CSS base compartido para hojas de impresión
 const CSS_BASE = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -369,19 +366,28 @@ const CSS_BASE = `
 `;
 
 // Genera el HTML de una hoja de producción para un día
+// Header compartido por las hojas de impresión: título + subtítulo (badge o texto) + timestamp
+function htmlHeader(titulo, subtituloHtml) {
+  return `
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1a5c2a;padding-bottom:4px;margin-bottom:8px">
+    <div>
+      <div style="font-size:20px;font-weight:bold;color:#1a5c2a">${titulo}</div>
+      ${subtituloHtml}
+    </div>
+    <div style="font-size:11px;color:#666;text-align:right">La Quinta · ${new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+  </div>`;
+}
+
 function htmlProduccion(dia, gruposCocina, semana) {
   const fechaIdx = DIAS_ORDEN.indexOf(dia);
   const fecha = fechaIdx >= 0 ? fmtFull(addDias(semana, fechaIdx)) : '';
   const total = gruposCocina.reduce((s, g) => s + g.cantidad, 0);
   return `
 <div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1a5c2a;padding-bottom:4px;margin-bottom:8px">
-    <div>
-      <div style="font-size:20px;font-weight:bold;color:#1a5c2a">Producción — ${DIAS_FULL[dia]} ${fecha}</div>
-      <span style="background:#1a5c2a;color:white;font-size:13px;font-weight:bold;padding:2px 8px;border-radius:3px;display:inline-block;margin-top:3px">${total} vianda${total !== 1 ? 's' : ''}</span>
-    </div>
-    <div style="font-size:11px;color:#666;text-align:right">La Quinta · ${new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</div>
-  </div>
+  ${htmlHeader(
+    `Producción — ${DIAS_FULL[dia]} ${fecha}`,
+    `<span style="background:#1a5c2a;color:white;font-size:13px;font-weight:bold;padding:2px 8px;border-radius:3px;display:inline-block;margin-top:3px">${total} vianda${total !== 1 ? 's' : ''}</span>`
+  )}
   <table style="width:100%;border-collapse:collapse;border:1px solid #bbb">
     <thead><tr>
       <th style="background:#1a5c2a;color:white;text-align:left;padding:5px 8px;font-size:14px">Plato</th>
@@ -409,7 +415,7 @@ function htmlDetalle(dia, pedidos, semana) {
   const fecha = fechaIdx >= 0 ? fmtFull(addDias(semana, fechaIdx)) : '';
   const porEmpresa = {};
   for (const p of pedidos) {
-    const items = (p.items || []).filter(i => i.dia === dia);
+    const items = (p.items || []).filter(i => i.dia === dia && esItemActivoCocina(i));
     if (!items.length) continue;
     const emp = p.empresa_nombre || 'Sin empresa';
     if (!porEmpresa[emp]) porEmpresa[emp] = [];
@@ -420,13 +426,10 @@ function htmlDetalle(dia, pedidos, semana) {
   if (!empresas.length) return '';
   return `
 <div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1a5c2a;padding-bottom:4px;margin-bottom:8px">
-    <div>
-      <div style="font-size:20px;font-weight:bold;color:#1a5c2a">Detalle por empresa — ${DIAS_FULL[dia]} ${fecha}</div>
-      <div style="font-size:12px;color:#555;margin-top:2px">${total} vianda${total!==1?'s':''} · ${empresas.length} empresa${empresas.length!==1?'s':''}</div>
-    </div>
-    <div style="font-size:11px;color:#666;text-align:right">La Quinta · ${new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</div>
-  </div>
+  ${htmlHeader(
+    `Detalle por empresa — ${DIAS_FULL[dia]} ${fecha}`,
+    `<div style="font-size:12px;color:#555;margin-top:2px">${total} vianda${total!==1?'s':''} · ${empresas.length} empresa${empresas.length!==1?'s':''}</div>`
+  )}
   ${empresas.map(([empresa, personas]) => `
   <div style="margin-bottom:8px;break-inside:avoid;border:2px solid #1a5c2a;border-radius:3px;overflow:hidden">
     <div style="background:#1a5c2a;color:white;padding:4px 8px;font-size:14px;font-weight:bold;display:flex;justify-content:space-between">
@@ -457,35 +460,11 @@ function htmlDetalle(dia, pedidos, semana) {
 </div>`;
 }
 
-// Wrappers de impresión para un día
-function imprimirProduccion(dia, gruposCocina, semana) {
-  abrirVentanaImpresion(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${CSS_BASE}</style></head><body>${htmlProduccion(dia, gruposCocina, semana)}</body></html>`);
-}
-
-function imprimirDetalle(dia, pedidos, semana) {
-  const h = htmlDetalle(dia, pedidos, semana);
-  if (!h) return;
-  abrirVentanaImpresion(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${CSS_BASE}</style></head><body>${h}</body></html>`);
-}
-
 function imprimirAmbas(dia, gruposCocina, pedidos, semana) {
   const hDet = htmlDetalle(dia, pedidos, semana);
   abrirVentanaImpresion(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${CSS_BASE}</style></head><body>${htmlProduccion(dia, gruposCocina, semana)}${hDet ? '<div class="page-break"></div>' + hDet : ''}</body></html>`);
 }
 
-function imprimirSemana(tipo, pedidos, semana) {
-  const diasConItems = DIAS_ORDEN.filter(d => pedidos.some(p => (p.items||[]).some(i => i.dia === d)));
-  if (!diasConItems.length) return;
-  const bloques = diasConItems.map((dia, idx) => {
-    const grupos = buildGruposCocina(pedidos, dia);
-    const sep = idx > 0 ? '<div class="page-break"></div>' : '';
-    if (tipo === 'produccion') return sep + htmlProduccion(dia, grupos, semana);
-    if (tipo === 'detalle')    { const h = htmlDetalle(dia, pedidos, semana); return h ? sep + h : ''; }
-    const hDet = htmlDetalle(dia, pedidos, semana);
-    return sep + htmlProduccion(dia, grupos, semana) + (hDet ? '<div class="page-break"></div>' + hDet : '');
-  }).filter(Boolean);
-  abrirVentanaImpresion(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${CSS_BASE}</style></head><body>${bloques.join('')}</body></html>`);
-}
 // ── Componentes UI ────────────────────────────────────────────────────────────
 
 function Avatar({ nombre, apellido, size = 'md' }) {
@@ -538,7 +517,7 @@ function EstadoBadge({ pedido, onCambiar, loading }) {
               }}
               onClick={ev => ev.stopPropagation()}
             >
-            {ESTADOS.filter(s => s.key !== pedido.estado).map(s => (
+            {ESTADOS_PEDIDO.filter(s => s.key !== pedido.estado).map(s => (
               <button
                 key={s.key}
                 onClick={() => { onCambiar(s.key); setOpen(false); }}
@@ -556,10 +535,65 @@ function EstadoBadge({ pedido, onCambiar, loading }) {
   );
 }
 
+const SIGUIENTE_ESTADO_ITEM = { pendiente: 'preparado', preparado: 'entregado' };
+const ACCION_LABEL = { pendiente: 'Preparar', preparado: 'Entregar', entregado: 'Entregada', cancelado: 'Cancelada' };
+
+function EstadoItemBadge({ item, onCambiar, loading }) {
+  const [open, setOpen] = useState(false);
+  const estado = item.estado || (item.sin_pedido ? 'cancelado' : 'pendiente');
+  const e = ESTADO_MAP[estado] || ESTADO_MAP.pendiente;
+  const siguiente = SIGUIENTE_ESTADO_ITEM[estado];
+  const textoAccion = ACCION_LABEL[estado] || estado;
+
+  return (
+    <div className="relative print:hidden" onClick={ev => ev.stopPropagation()}>
+      <button
+        type="button"
+        disabled={loading || item.sin_pedido || !siguiente}
+        onClick={() => {
+          if (siguiente) onCambiar(item.id, siguiente);
+          else setOpen(o => !o);
+        }}
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors ${e.cls} ${loading ? 'opacity-60' : siguiente ? 'hover:opacity-80' : 'opacity-70 cursor-default'}`}
+        title={siguiente ? `Marcar como ${ACCION_LABEL[siguiente]?.toLowerCase()}` : textoAccion}
+      >
+        <span>{loading ? '...' : e.icon}</span>
+        <span>{textoAccion}</span>
+      </button>
+      <button
+        type="button"
+        disabled={loading || item.sin_pedido}
+        onClick={() => setOpen(o => !o)}
+        className="ml-1 rounded px-1 text-[11px] text-gray-500 hover:bg-gray-50 hover:text-gray-600 disabled:opacity-40"
+        aria-label="Abrir estados de vianda"
+      >
+        ▾
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-[80] mt-1 min-w-[150px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
+            {ESTADOS_ITEM.filter(s => s.key !== estado).map(s => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => { onCambiar(item.id, s.key); setOpen(false); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50"
+              >
+                <span>{s.icon}</span><span>{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Barra de acción masiva ────────────────────────────────────────────────────
 
 function BulkActionBar({ count, onClear, onCambiarEstado, loading }) {
-  const [estadoSel, setEstadoSel] = useState('listo');
+  const [estadoSel, setEstadoSel] = useState('en_proceso');
   return (
     <div className="flex items-center gap-3 bg-green-700 text-white px-4 py-2.5 rounded-xl mb-4 print:hidden">
       <span className="text-sm font-semibold">{count} seleccionado{count !== 1 ? 's' : ''}</span>
@@ -567,9 +601,9 @@ function BulkActionBar({ count, onClear, onCambiarEstado, loading }) {
         <select
           value={estadoSel}
           onChange={e => setEstadoSel(e.target.value)}
-          className="text-sm bg-white text-gray-800 rounded-lg px-2 py-1 border-0 focus:outline-none"
+          className="text-sm bg-white text-gray-800 rounded-lg px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-green-500"
         >
-          {ESTADOS.map(e => <option key={e.key} value={e.key}>{e.icon} {e.label}</option>)}
+          {ESTADOS_PEDIDO.map(e => <option key={e.key} value={e.key}>{e.icon} {e.label}</option>)}
         </select>
         <button
           onClick={() => onCambiarEstado(estadoSel)}
@@ -614,7 +648,7 @@ function EmpleadosSinPedido({ pedidos, empresaFiltro }) {
               <Avatar nombre={e.nombre} apellido={e.apellido} />
               <div>
                 <p className="text-sm font-medium text-gray-800">{e.apellido}, {e.nombre}</p>
-                <p className="text-xs text-gray-400">{e.email}</p>
+                <p className="text-xs text-gray-500">{e.email}</p>
               </div>
               <span className="ml-auto text-xs text-red-500 font-medium">Sin pedido</span>
             </div>
@@ -627,17 +661,17 @@ function EmpleadosSinPedido({ pedidos, empresaFiltro }) {
 
 // ── Card de pedido ────────────────────────────────────────────────────────────
 
-function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, onToggleSelect }) {
+function PedidoCard({ pedido, diasSemana, onCambiarEstado, onCambiarEstadoItem, loadingId, loadingItemId, selected, onToggleSelect }) {
   const [expandido, setExpandido] = useState(false);
   const itemsPorDia = Object.fromEntries((pedido.items||[]).map(i => [i.dia, i]));
-  const totalDias = diasSemana.filter(d => itemsPorDia[d]).length;
+  const diasConItem = diasSemana.filter(d => itemsPorDia[d]);
   const isSelected = selected.has(pedido.id);
+  const tieneEventos = (pedido.eventos ?? []).length > 0;
 
   return (
     <div className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-colors ${isSelected ? 'border-green-400' : 'border-gray-100'}`}>
-      <div className="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setExpandido(e => !e)}>
-
-        {/* Checkbox */}
+      {/* Fila principal — siempre visible */}
+      <div className="flex items-center px-4 py-3">
         <div className="mr-3 print:hidden" onClick={e => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -653,8 +687,7 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
           <p className="font-semibold text-gray-900 text-sm leading-tight truncate">
             {pedido.empleado_apellido}, {pedido.empleado_nombre}
           </p>
-          <p className="text-xs text-gray-400">{pedido.empresa_nombre} · {totalDias} día{totalDias !== 1 ? 's' : ''}</p>
-          <p className="text-xs text-green-700">{getPlanNombre(pedido)} · {getPlanDetalle(pedido)}</p>
+          <p className="text-xs text-gray-500">{getPlanDetalle(pedido)}</p>
         </div>
 
         <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -663,144 +696,59 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, loadingId, selected, 
             loading={loadingId === pedido.id}
             onCambiar={(estado) => onCambiarEstado(pedido.id, estado)}
           />
-          <span className="text-gray-300 text-xs print:hidden">{expandido ? '▲' : '▼'}</span>
+          {tieneEventos && (
+            <button
+              type="button"
+              onClick={() => setExpandido(e => !e)}
+              className="text-gray-500 hover:text-gray-500 text-xs print:hidden"
+              title="Ver historial"
+            >
+              {expandido ? '▲' : '▼'}
+            </button>
+          )}
         </div>
       </div>
 
-      {expandido && (
+      {/* Items por día — siempre visibles */}
+      {diasConItem.length > 0 && (
         <div className="border-t border-gray-50 divide-y divide-gray-50">
-          {diasSemana.map(dia => {
+          {diasConItem.map(dia => {
             const item = itemsPorDia[dia];
-            if (!item) return null;
             return (
-              <div key={dia} className="flex items-start gap-3 px-4 py-2.5">
-                <span className="text-xs font-bold text-green-700 w-8 pt-0.5 shrink-0">{DIAS_LABEL[dia]}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-800 truncate">{item.plato_nombre}</p>
-                  <div className="flex flex-wrap gap-x-3 mt-0.5">
-                    {item.opcion && <span className="text-[11px] text-gray-400">Opción {item.opcion}</span>}
-                    {item.guarnicion_nombre && <span className="text-[11px] text-emerald-600">+ {item.guarnicion_nombre}</span>}
-                  </div>
+              <div key={dia} className="flex items-center gap-3 px-4 py-2">
+                <span className="text-[11px] font-bold text-green-700 w-8 shrink-0">{DIAS_LABEL[dia]}</span>
+                <p className="text-xs text-gray-800 flex-1 truncate">{item.plato_nombre}</p>
+                <div className="flex gap-2 shrink-0">
+                  {item.opcion && <span className="text-[11px] text-gray-500">Op.{item.opcion}</span>}
+                  {item.guarnicion_nombre && <span className="text-[11px] text-emerald-600 truncate max-w-[80px]">+{item.guarnicion_nombre}</span>}
+                  <EstadoItemBadge
+                    item={item}
+                    loading={loadingItemId === item.id}
+                    onCambiar={onCambiarEstadoItem}
+                  />
                 </div>
               </div>
             );
           })}
-          {(pedido.eventos ?? []).length > 0 && (
-            <div className="px-4 py-3 bg-slate-50">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Historial del pedido</p>
-              <div className="space-y-2">
-                {pedido.eventos.slice().reverse().map((evento) => (
-                  <div key={evento.id} className="flex gap-2 text-xs">
-                    <span className="mt-1 w-2 h-2 rounded-full bg-green-600 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-700">
-                        {descripcionEvento(evento)}
-                      </p>
-                      <p className="text-slate-500">
-                        {[evento.actor_nombre, fmtEvento(evento.created_at)].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
-    </div>
-  );
-}
 
-// ── Botón imprimir con panel de filtros ───────────────────────────────────────
-
-function BotonImprimir({ dia, gruposCocina, pedidos, semana, diasDisponibles }) {
-  const [open, setOpen]       = useState(false);
-  const [alcance, setAlcance] = useState('dia');    // 'dia' | 'semana'
-  const [tipo, setTipo]       = useState('ambas');  // 'produccion' | 'detalle' | 'ambas'
-  const [diasSel, setDiasSel] = useState([]);
-
-  const toggleDia = (d) => setDiasSel(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
-
-  const handleImprimir = () => {
-    if (alcance === 'dia') {
-      if (tipo === 'produccion') imprimirProduccion(dia, gruposCocina, semana);
-      else if (tipo === 'detalle') imprimirDetalle(dia, pedidos, semana);
-      else imprimirAmbas(dia, gruposCocina, pedidos, semana);
-    } else {
-      const ped = diasSel.length
-        ? pedidos.map(p => ({ ...p, items: (p.items||[]).filter(i => diasSel.includes(i.dia)) })).filter(p => p.items.length)
-        : pedidos;
-      imprimirSemana(tipo, ped, semana);
-    }
-    setOpen(false);
-  };
-
-  return (
-    <div className="relative shrink-0">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
-      >
-        🖨️ Imprimir ▾
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-64 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Opciones de impresión</p>
-
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Alcance</p>
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-                {[['dia','Este día'],['semana','Semana completa']].map(([v,l]) => (
-                  <button key={v} onClick={() => setAlcance(v)}
-                    className={`flex-1 py-1.5 font-medium transition-colors ${alcance===v ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-50'} ${v==='semana' ? 'border-l border-gray-200' : ''}`}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {alcance === 'semana' && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Días <span className="text-gray-400">(vacío = todos)</span></p>
-                <div className="flex flex-wrap gap-1">
-                  {diasDisponibles.map(d => (
-                    <button key={d} onClick={() => toggleDia(d)}
-                      className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${diasSel.includes(d) ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
-                      {DIAS_LABEL[d]}
-                    </button>
-                  ))}
+      {/* Historial — colapsable, solo si hay eventos */}
+      {expandido && tieneEventos && (
+        <div className="border-t border-gray-100 px-4 py-3 bg-slate-50">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">Historial</p>
+          <div className="space-y-2">
+            {pedido.eventos.slice().reverse().map((evento) => (
+              <div key={evento.id} className="flex gap-2 text-xs">
+                <span className="mt-1 w-2 h-2 rounded-full bg-green-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-700">{descripcionEvento(evento)}</p>
+                  <p className="text-slate-500">{[evento.actor_nombre, fmtEvento(evento.created_at)].filter(Boolean).join(' · ')}</p>
                 </div>
               </div>
-            )}
-
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Contenido</p>
-              <div className="space-y-1.5">
-                {[
-                  ['ambas',      '📄 Producción + Detalle', 'Las dos hojas juntas'],
-                  ['produccion', '🍳 Solo producción',       'Platos y cantidades'],
-                  ['detalle',    '🏢 Solo detalle',          'Por empresa y persona'],
-                ].map(([v,l,sub]) => (
-                  <label key={v} className="flex items-start gap-2 cursor-pointer">
-                    <input type="radio" name="tipo-imp" value={v} checked={tipo===v} onChange={() => setTipo(v)} className="mt-0.5 accent-gray-800" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-800 leading-tight">{l}</p>
-                      <p className="text-xs text-gray-400">{sub}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <button onClick={handleImprimir}
-              className="w-full bg-gray-800 text-white rounded-lg py-1.5 text-sm font-semibold hover:bg-gray-700 transition-colors">
-              🖨️ Imprimir
-            </button>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -808,16 +756,21 @@ function BotonImprimir({ dia, gruposCocina, pedidos, semana, diasDisponibles }) 
 
 // ── Vista por día ─────────────────────────────────────────────────────────────
 
-function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, onLimpiarFiltros }) {
+function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, onLimpiarFiltros, onCambiarEstadoItem, loadingItemId, onEntregarVarios }) {
   const [subVista, setSubVista] = useState('cocina'); // 'cocina' | 'empresa'
+  const [bulkGrupo, setBulkGrupo] = useState(null); // key del grupo procesando
   const [filtroPlatoTxt, setFiltroPlatoTxt] = useState('');
+  const [expandGrupo, setExpandGrupo] = useState(null); // grupoKey expandido
+  const diaHoy = semana === getLunes() ? DIAS_ORDEN[(new Date().getDay() + 6) % 7] : null;
 
-  const hayPedidosSemana = pedidos.some(p => (p.items || []).length > 0);
-  const diasVisibles = hayPedidosSemana ? DIAS_ORDEN : [];
+  const diasVisibles = useMemo(() => DIAS_ORDEN.filter(d =>
+    pedidos.some(p => (p.items || []).some(i => i.dia === d && esItemActivoCocina(i)))
+  ), [pedidos]);
+  const hayPedidosSemana = diasVisibles.length > 0;
   const fechaDia = (dia) => { const idx = DIAS_ORDEN.indexOf(dia); return idx >= 0 ? addDias(semana, idx) : null; };
   const dia = diasVisibles.includes(diaActivo) ? diaActivo : diasVisibles[0];
 
-  const itemsDia = pedidos.flatMap(p =>
+  const itemsDia = useMemo(() => pedidos.flatMap(p =>
     (p.items||[]).filter(i => i.dia === dia).map(i => ({
       ...i,
       empleado_nombre: p.empleado_nombre,
@@ -831,41 +784,50 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
       plan_incluye_postre: p.plan_incluye_postre,
       plan_incluye_bebida: p.plan_incluye_bebida,
     }))
-  );
+  ), [pedidos, dia]);
+  const itemsDiaActivos = useMemo(() => itemsDia.filter(esItemActivoCocina), [itemsDia]);
 
   // Grupos para lista de cocina: plato + opcion + guarnicion → cantidad
-  const gruposCocina = (() => {
+  const gruposCocina = useMemo(() => {
     const map = {};
-    for (const item of itemsDia) {
+    for (const item of itemsDiaActivos) {
       const key = getClavePreparacion(item);
       if (!map[key]) map[key] = crearGrupoCocina(item);
       map[key].cantidad++;
+      if (item.estado === 'entregado') map[key].entregadas++;
+      else if (item.estado === 'preparado') { map[key].preparadas++; map[key].preparadoIds.push(item.id); }
+      else map[key].pendienteIds.push(item.id);
       sumarDetallePlan(map[key], item);
-      map[key].personas.push({ nombre: `${texto(item.empleado_apellido)}, ${texto(item.empleado_nombre)}`, empresa: item.empresa_nombre, plan: item.plan_nombre });
+      map[key].personas.push({ nombre: `${texto(item.empleado_apellido)}, ${texto(item.empleado_nombre)}`, empresa: item.empresa_nombre, plan: item.plan_nombre, itemId: item.id, estado: item.estado });
     }
     return Object.values(map).sort((a,b) => b.cantidad - a.cantidad);
-  })();
+  }, [itemsDiaActivos]);
 
   // Grupos para vista por empresa: empresa → persona → items
-  const gruposEmpresa = (() => {
+  const gruposEmpresa = useMemo(() => {
     const map = {};
     for (const p of pedidos) {
       const items = (p.items||[]).filter(i => i.dia === dia);
       if (!items.length) continue;
       const emp = p.empresa_nombre || 'Sin empresa';
-      if (!map[emp]) map[emp] = [];
-      map[emp].push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items });
+      if (!map[emp]) map[emp] = { personas: [], pendienteIds: [], preparadoIds: [] };
+      map[emp].personas.push({ nombre: `${p.empleado_apellido}, ${p.empleado_nombre}`, items });
+      for (const item of items) {
+        if (!esItemActivoCocina(item)) continue;
+        if (item.estado === 'pendiente') map[emp].pendienteIds.push(item.id);
+        else if (item.estado === 'preparado') map[emp].preparadoIds.push(item.id);
+      }
     }
     return Object.entries(map).sort(([a],[b]) => texto(a).localeCompare(texto(b)));
-  })();
+  }, [pedidos, dia]);
 
-  const gruposCocinaFiltrados = (() => {
+  const gruposCocinaFiltrados = useMemo(() => {
     if (!filtroPlatoTxt.trim()) return gruposCocina;
     const q = filtroPlatoTxt.toLowerCase();
     return gruposCocina.filter(g => texto(g.plato_nombre).toLowerCase().includes(q));
-  })();
+  }, [gruposCocina, filtroPlatoTxt]);
 
-  const resumenDia = resumenItems(itemsDia);
+  const resumenDia = useMemo(() => resumenItems(itemsDia), [itemsDia]);
 
   if (!hayPedidosSemana) {
     return (
@@ -875,10 +837,13 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
 
   return (
     <div>
-      {/* Tabs de días — compactos */}
-      <div className="flex flex-wrap gap-1.5 mb-4 pb-1">
+      {/* Tabs de días */}
+      <div className="flex flex-wrap gap-1.5 mb-3 pb-1">
         {diasVisibles.map(d => {
-          const count = pedidos.reduce((n,p) => n + (p.items||[]).filter(i => i.dia === d).length, 0);
+          const itemsDiaD = pedidos.flatMap(p => (p.items||[]).filter(i => i.dia === d && esItemActivoCocina(i)));
+          const count = itemsDiaD.length;
+          const porPreparar = itemsDiaD.filter(i => i.estado === 'pendiente').length;
+          const preparadas  = itemsDiaD.filter(i => i.estado === 'preparado').length;
           const activo = d === dia;
           return (
             <button
@@ -886,92 +851,250 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
               onClick={() => { setDiaActivo(d); setFiltroPlatoTxt(''); }}
               className={`flex flex-col items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${activo ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-200 hover:border-green-300'}`}
             >
-              <span className="font-bold">{DIAS_FULL[d]}</span>
-              <span className={`text-[10px] ${activo ? 'text-green-200' : 'text-gray-400'}`}>{fmt(fechaDia(d))}</span>
+              <span className="font-bold flex items-center gap-1">
+                {DIAS_FULL[d]}
+                {d === diaHoy && <span className={`text-[9px] font-bold px-1 py-px rounded ${activo ? 'bg-white text-green-700' : 'bg-green-600 text-white'}`}>Hoy</span>}
+              </span>
+              <span className={`text-[10px] ${activo ? 'text-green-200' : 'text-gray-500'}`}>{fmt(fechaDia(d))}</span>
               <span className={`mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activo ? 'bg-white text-green-700' : 'bg-green-100 text-green-700'}`}>{count}</span>
+              {porPreparar > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activo ? 'bg-amber-300 text-amber-900' : 'bg-amber-100 text-amber-700'}`}>{porPreparar} por hacer</span>
+              )}
+              {preparadas > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activo ? 'bg-blue-200 text-blue-900' : 'bg-blue-100 text-blue-700'}`}>{preparadas} listas</span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* Sub-tabs: Lista de cocina / Por empresa */}
-      {dia && (
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-            {[['cocina','🍳 Lista de cocina'],['empresa','🏢 Por empresa']].map(([v,l]) => (
-              <button
-                key={v}
-                onClick={() => setSubVista(v)}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${subVista === v ? 'bg-green-700 text-white' : 'text-gray-600 hover:bg-gray-50'} ${v === 'empresa' ? 'border-l border-gray-200' : ''}`}
-              >
-                {l}
-              </button>
-            ))}
+      {/* Leyenda de estados — solo cuando hay al menos dos estados distintos en la semana */}
+      {(() => {
+        const estados = new Set(pedidos.flatMap(p => (p.items||[]).filter(esItemActivoCocina).map(i => i.estado)));
+        if (estados.size < 2) return null;
+        return (
+          <div className="flex items-center gap-3 mb-3 text-[11px] text-gray-500">
+            {estados.has('pendiente')  && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Por preparar</span>}
+            {estados.has('preparado') && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Preparada</span>}
+            {estados.has('entregado') && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600 inline-block" />Entregada</span>}
           </div>
-          {subVista === 'cocina' && (
-            <div className="relative flex-1">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
-              <input
-                type="text"
-                placeholder="Buscar plato..."
-                value={filtroPlatoTxt}
-                onChange={e => setFiltroPlatoTxt(e.target.value)}
-                className="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-green-400"
-              />
+        );
+      })()}
+
+      {/* Sub-tabs + búsqueda + acciones secundarias */}
+      {dia && (
+        <>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex gap-1 rounded-lg bg-gray-100 p-1 shrink-0">
+              {[['cocina','🍳 Cocina'],['empresa','🏢 Empresa']].map(([v,l]) => (
+                <button
+                  key={v}
+                  onClick={() => setSubVista(v)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${subVista === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  {l}
+                </button>
+              ))}
             </div>
-          )}
-          <BotonImprimir dia={dia} gruposCocina={gruposCocina} pedidos={pedidos} semana={semana} diasDisponibles={diasVisibles} />
-        </div>
+            {subVista === 'cocina' && (
+              <div className="relative flex-1">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Buscar plato..."
+                  value={filtroPlatoTxt}
+                  onChange={e => setFiltroPlatoTxt(e.target.value)}
+                  className="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-green-400"
+                />
+              </div>
+            )}
+            <button
+              onClick={() => imprimirAmbas(dia, gruposCocina, pedidos, semana)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors shrink-0"
+              title="Imprimir producción + detalle por empresa"
+            >
+              🖨️ Imprimir
+            </button>
+            <button
+              onClick={() => exportarExcel(pedidos, semana, { soloDia: dia })}
+              disabled={pedidos.length === 0}
+              className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors shrink-0"
+              title="Descargar etiquetas del día en Excel"
+            >
+              📥 Etiquetas
+            </button>
+          </div>
+
+          {/* Acciones masivas — barra propia, solo aparece cuando hay pendientes */}
+          {(() => {
+            const idsPorPreparar = gruposCocina.flatMap(g => g.pendienteIds);
+            const idsPreparadas  = gruposCocina.flatMap(g => g.preparadoIds);
+            if (!idsPorPreparar.length && !idsPreparadas.length) return null;
+            return (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100">
+                <span className="text-[11px] font-semibold text-gray-500 mr-1 shrink-0">{DIAS_FULL[dia]}:</span>
+                {idsPorPreparar.length > 0 && (
+                  <button
+                    onClick={() => onEntregarVarios(idsPorPreparar, 'preparado')}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 transition-colors shrink-0"
+                  >
+                    🍽️ Preparar {idsPorPreparar.length} viandas
+                  </button>
+                )}
+                {idsPreparadas.length > 0 && (
+                  <button
+                    onClick={() => onEntregarVarios(idsPreparadas, 'entregado')}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+                  >
+                    ✓ Entregar {idsPreparadas.length} viandas
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+        </>
       )}
 
-      {dia && (
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-sm">
-            <p className="text-[11px] font-medium text-gray-400">Viandas</p>
-            <p className="text-lg font-bold text-gray-900">{resumenDia.viandas}</p>
-            {resumenTamanos(resumenDia.tamanos) && (
-              <p className="text-[11px] text-gray-500 leading-tight">{resumenTamanos(resumenDia.tamanos)}</p>
-            )}
+      {dia && (() => {
+        const porPreparar = itemsDiaActivos.filter(i => i.estado === 'pendiente').length;
+        const preparadas  = itemsDiaActivos.filter(i => i.estado === 'preparado').length;
+        const entregadas  = itemsDiaActivos.filter(i => i.estado === 'entregado').length;
+        return (
+          <div className="mb-3 grid grid-cols-4 gap-0 overflow-hidden rounded-xl border border-gray-100 shadow-sm divide-x divide-gray-100">
+            <div className="bg-white p-3 text-center">
+              <p className="text-xl font-bold text-gray-900">{itemsDiaActivos.length}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Total</p>
+              {resumenTamanos(resumenDia.tamanos) && (
+                <p className="text-[10px] text-gray-500 leading-tight mt-0.5 truncate">{resumenTamanos(resumenDia.tamanos)}</p>
+              )}
+            </div>
+            <div className="bg-amber-50 p-3 text-center">
+              <p className="text-xl font-bold text-amber-700">{porPreparar}</p>
+              <p className="text-[11px] text-amber-600 mt-0.5">Por preparar</p>
+            </div>
+            <div className="bg-blue-50 p-3 text-center">
+              <p className="text-xl font-bold text-blue-700">{preparadas}</p>
+              <p className="text-[11px] text-blue-600 mt-0.5">Preparadas</p>
+            </div>
+            <div className="bg-green-50 p-3 text-center">
+              <p className="text-xl font-bold text-green-700">{entregadas}</p>
+              <p className="text-[11px] text-green-600 mt-0.5">Entregadas</p>
+            </div>
           </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 shadow-sm">
-            <p className="text-[11px] font-medium text-amber-600">Postres</p>
-            <p className="text-lg font-bold text-amber-800">{resumenDia.postres}</p>
-          </div>
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 shadow-sm">
-            <p className="text-[11px] font-medium text-blue-600">Bebidas</p>
-            <p className="text-lg font-bold text-blue-800">{resumenDia.bebidas}</p>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Lista de cocina ── */}
       {subVista === 'cocina' && (
         <div className="space-y-2">
           {gruposCocinaFiltrados.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8">
-              {itemsDia.length === 0 ? 'Sin pedidos para este día.' : 'Sin resultados.'}
+            <p className="text-gray-500 text-sm text-center py-8">
+              {itemsDiaActivos.length === 0 ? 'Sin pedidos activos para este dia.' : 'Sin resultados.'}
             </p>
           )}
-          {gruposCocinaFiltrados.map((grupo, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 flex items-center gap-3 px-4 py-3 shadow-sm">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm">{grupo.plato_nombre}</p>
-                <div className="flex gap-3 mt-0.5">
-                  {grupo.opcion && <span className="text-xs text-gray-400">Opción {grupo.opcion}</span>}
-                  {grupo.guarnicion_nombre && <span className="text-xs text-emerald-600">+ {grupo.guarnicion_nombre}</span>}
+          {gruposCocinaFiltrados.map((grupo, i) => {
+            const todoEntregado = grupo.entregadas === grupo.cantidad;
+            const grupoKey = `${grupo.plato_nombre}__${grupo.opcion||''}__${grupo.guarnicion_nombre||''}`;
+            const cargandoGrupo = bulkGrupo === grupoKey;
+            const estaExpandido = expandGrupo === grupoKey;
+            return (
+              <div key={i} className={`bg-white rounded-xl border shadow-sm ${todoEntregado ? 'border-green-200' : 'border-gray-100'}`}>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-gray-900 text-sm">{grupo.plato_nombre}</p>
+                      {todoEntregado
+                        ? <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ Entregadas</span>
+                        : grupo.preparadas > 0 && grupo.pendienteIds.length === 0
+                          ? <span className="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🍽️ {grupo.preparadas} listo{grupo.preparadas !== 1 ? 's' : ''}</span>
+                          : <span className="text-[11px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{grupo.pendienteIds.length} por preparar</span>
+                      }
+                      {!todoEntregado && grupo.preparadas > 0 && grupo.pendienteIds.length > 0 && (
+                        <span className="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🍽️ {grupo.preparadas} listo{grupo.preparadas !== 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-3 mt-0.5">
+                      {grupo.opcion && <span className="text-xs text-gray-500">Opción {grupo.opcion}</span>}
+                      {grupo.guarnicion_nombre && <span className="text-xs text-emerald-600">+ {grupo.guarnicion_nombre}</span>}
+                    </div>
+                    <p className="mt-1 text-xs font-medium text-green-700">
+                      {grupo.cantidad} vianda{grupo.cantidad !== 1 ? 's' : ''} · {resumenTamanos(grupo.tamanos)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-gray-500">{resumenExtras(grupo)}</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 shrink-0">
+                    <div className={`text-xl font-bold w-11 h-11 rounded-xl flex items-center justify-center ${todoEntregado ? 'bg-green-100 text-green-700' : 'bg-green-700 text-white'}`}>
+                      {grupo.cantidad}
+                    </div>
+                    {grupo.pendienteIds.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          setBulkGrupo(grupoKey);
+                          await onEntregarVarios(grupo.pendienteIds, 'preparado');
+                          setBulkGrupo(null);
+                        }}
+                        disabled={cargandoGrupo}
+                        className="text-[11px] font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 px-2 py-0.5 rounded-full transition-colors whitespace-nowrap"
+                      >
+                        {cargandoGrupo ? '...' : `🍽️ Preparar ${grupo.pendienteIds.length}`}
+                      </button>
+                    )}
+                    {grupo.preparadoIds.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          setBulkGrupo(grupoKey);
+                          await onEntregarVarios(grupo.preparadoIds, 'entregado');
+                          setBulkGrupo(null);
+                        }}
+                        disabled={cargandoGrupo}
+                        className="text-[11px] font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50 px-2 py-0.5 rounded-full transition-colors whitespace-nowrap"
+                      >
+                        {cargandoGrupo ? '...' : `✓ Entregar ${grupo.preparadoIds.length}`}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setExpandGrupo(estaExpandido ? null : grupoKey)}
+                      className="text-[11px] text-gray-500 hover:text-gray-600 transition-colors"
+                    >
+                      {estaExpandido ? '▲ ocultar' : '▼ personas'}
+                    </button>
+                  </div>
                 </div>
-                <p className="mt-1 text-xs font-medium text-green-700">
-                  {grupo.cantidad} vianda{grupo.cantidad !== 1 ? 's' : ''} · {resumenTamanos(grupo.tamanos)}
-                </p>
-                <p className="mt-0.5 text-[11px] text-gray-500">{resumenExtras(grupo)}</p>
+                {estaExpandido && (
+                  <div className="border-t border-gray-100 px-4 py-2 space-y-1">
+                    {grupo.personas.map((p, pi) => {
+                      const siguienteEstado = p.estado === 'pendiente' ? 'preparado' : p.estado === 'preparado' ? 'entregado' : null;
+                      const accionLabel = p.estado === 'pendiente' ? '🍽️ Preparar' : p.estado === 'preparado' ? '✓ Entregar' : null;
+                      const estadoCls = p.estado === 'entregado' ? 'text-green-600' : p.estado === 'preparado' ? 'text-blue-600' : 'text-amber-600';
+                      const cargandoItem = loadingItemId === p.itemId;
+                      return (
+                        <div key={pi} className="flex items-center justify-between gap-2 py-1">
+                          <div className="min-w-0">
+                            <span className="text-xs font-medium text-gray-800">{p.nombre}</span>
+                            {p.empresa && <span className="ml-1.5 text-[11px] text-gray-500">{p.empresa}</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`text-[11px] font-semibold ${estadoCls}`}>{p.estado}</span>
+                            {siguienteEstado && (
+                              <button
+                                onClick={() => onCambiarEstadoItem(p.itemId, siguienteEstado)}
+                                disabled={cargandoItem}
+                                className="text-[11px] font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 px-2 py-0.5 rounded-full transition-colors whitespace-nowrap"
+                              >
+                                {cargandoItem ? '...' : accionLabel}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <div className="bg-green-700 text-white text-xl font-bold w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
-                {grupo.cantidad}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {gruposCocinaFiltrados.length > 0 && (
-            <p className="text-xs text-gray-400 text-right pt-1">
+            <p className="text-xs text-gray-500 text-right pt-1">
               Total: {gruposCocinaFiltrados.reduce((s,g) => s + g.cantidad, 0)} viandas
             </p>
           )}
@@ -982,14 +1105,32 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
       {subVista === 'empresa' && (
         <div className="space-y-3">
           {gruposEmpresa.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8">Sin pedidos para este día.</p>
+            <p className="text-gray-500 text-sm text-center py-8">Sin pedidos para este día.</p>
           )}
-          {gruposEmpresa.map(([empresa, personas]) => (
+          {gruposEmpresa.map(([empresa, { personas, pendienteIds, preparadoIds }]) => (
             <div key={empresa} className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
               {/* Header empresa */}
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100 min-h-[48px]">
                 <p className="font-semibold text-gray-800 text-sm">{empresa}</p>
-                <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{personas.length}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{personas.length}</span>
+                  {pendienteIds.length > 0 && (
+                    <button
+                      onClick={() => onEntregarVarios(pendienteIds, 'preparado')}
+                      className="text-[11px] font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 px-2 py-0.5 rounded-full transition-colors whitespace-nowrap"
+                    >
+                      🍽️ Preparar {pendienteIds.length}
+                    </button>
+                  )}
+                  {preparadoIds.length > 0 && (
+                    <button
+                      onClick={() => onEntregarVarios(preparadoIds, 'entregado')}
+                      className="text-[11px] font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-0.5 rounded-full transition-colors whitespace-nowrap"
+                    >
+                      ✓ Entregar {preparadoIds.length}
+                    </button>
+                  )}
+                </div>
               </div>
               {/* Filas */}
               <div className="divide-y divide-gray-50">
@@ -1001,9 +1142,16 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
                       {p.items.map((item, k) => (
                         <div key={k} className="text-xs text-gray-500 leading-relaxed">
                           <span className="font-medium text-gray-700">{item.plato_nombre}</span>
-                          {item.opcion && <span className="text-gray-400"> · Op. {item.opcion}</span>}
+                          {item.opcion && <span className="text-gray-500"> · Op. {item.opcion}</span>}
                           {item.guarnicion_nombre && <span className="text-emerald-600"> + {item.guarnicion_nombre}</span>}
                           <span className="text-green-700"> · {item.plan_nombre}</span>
+                          <span className="ml-2 inline-flex">
+                            <EstadoItemBadge
+                              item={item}
+                              loading={loadingItemId === item.id}
+                              onCambiar={onCambiarEstadoItem}
+                            />
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -1020,7 +1168,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
 
 // ── Grupo empresa colapsable (vista Personas) ─────────────────────────────────
 
-function GrupoEmpresa({ empresa, grupo, diasSemana, onCambiarEstado, loadingId, selected, onToggleSelect }) {
+function GrupoEmpresa({ empresa, grupo, diasSemana, onCambiarEstado, onCambiarEstadoItem, loadingId, loadingItemId, selected, onToggleSelect }) {
   const [abierto, setAbierto] = useState(false);
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
@@ -1031,7 +1179,7 @@ function GrupoEmpresa({ empresa, grupo, diasSemana, onCambiarEstado, loadingId, 
         <p className="font-semibold text-gray-800 text-sm">{empresa}</p>
         <div className="flex items-center gap-2.5">
           <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{grupo.length}</span>
-          <span className="text-gray-400 text-sm">{abierto ? '▲' : '▼'}</span>
+          <span className="text-gray-500 text-sm">{abierto ? '▲' : '▼'}</span>
         </div>
       </button>
       {abierto && (
@@ -1042,7 +1190,9 @@ function GrupoEmpresa({ empresa, grupo, diasSemana, onCambiarEstado, loadingId, 
               pedido={pedido}
               diasSemana={diasSemana}
               onCambiarEstado={onCambiarEstado}
+              onCambiarEstadoItem={onCambiarEstadoItem}
               loadingId={loadingId}
+              loadingItemId={loadingItemId}
               selected={selected}
               onToggleSelect={onToggleSelect}
             />
@@ -1055,20 +1205,25 @@ function GrupoEmpresa({ empresa, grupo, diasSemana, onCambiarEstado, loadingId, 
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export default function PedidosAdmin() {
+export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento de pedidos' } = {}) {
   const [semana, setSemana]               = useState(getLunes());
   const [empresaFiltro, setEmpresaFiltro] = useState('');
   const [estadoFiltro, setEstadoFiltro]   = useState('');
   const [busqueda, setBusqueda]           = useState('');
-  const [vista, setVista]                 = useState('empresa');
-  const [diaActivo, setDiaActivo]         = useState(null);
+  const [vistaInterna, setVistaInterna]   = useState('empresa');
+  const [diaActivo, setDiaActivo]         = useState(() => DIAS_ORDEN[(new Date().getDay() + 6) % 7]);
   const [selected, setSelected]           = useState(new Set());
   const [bulkLoading, setBulkLoading]     = useState(false);
   const [loadingId, setLoadingId]         = useState(null);
+  const [loadingItemId, setLoadingItemId] = useState(null);
 
   const { data: pedidosRaw = [], isLoading } = usePedidos({ semana_inicio: semana, empresa_id: empresaFiltro || undefined, limit: 500 });
   const { data: empresas = [] } = useEmpresas();
   const updateEstado = useUpdateEstadoPedido();
+  const updateEstadoItem = useUpdateEstadoPedidoItem();
+  const vista = vistaFija || vistaInterna;
+  const setVista = vistaFija ? () => {} : setVistaInterna;
+  const esSeguimiento = vista === 'empresa';
 
   const cambiarSemana = (delta) => {
     const d = new Date(semana); d.setDate(d.getDate() + delta * 7);
@@ -1092,9 +1247,17 @@ export default function PedidosAdmin() {
   const stats = useMemo(() => {
     const porEstado = {};
     for (const p of pedidosRaw) porEstado[p.estado] = (porEstado[p.estado]||0) + 1;
+    const items = pedidosRaw.flatMap(p => (p.items || []).filter(item => !item.sin_pedido));
+    const itemsActivos = items.filter(esItemActivoCocina);
+    const entregadas  = itemsActivos.filter(item => item.estado === 'entregado').length;
+    const preparadas  = itemsActivos.filter(item => item.estado === 'preparado').length;
+    const porPreparar = itemsActivos.filter(item => item.estado === 'pendiente').length;
     return {
       total: pedidosRaw.length,
-      viandas: pedidosRaw.reduce((s,p) => s + (p.items?.length||0), 0),
+      viandas: itemsActivos.length,
+      entregadas,
+      preparadas,
+      porPreparar,
       porEstado,
     };
   }, [pedidosRaw]);
@@ -1129,21 +1292,48 @@ export default function PedidosAdmin() {
     } finally { setLoadingId(null); }
   }, [updateEstado]);
 
+  const handleCambiarEstadoItem = useCallback(async (itemId, estado) => {
+    setLoadingItemId(itemId);
+    try {
+      await updateEstadoItem.mutateAsync({ itemId, estado });
+      toast.success(`Vianda ${ESTADO_MAP[estado]?.label?.toLowerCase() || estado}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Error al actualizar vianda');
+    } finally {
+      setLoadingItemId(null);
+    }
+  }, [updateEstadoItem]);
+
+  const handleEntregarVarios = useCallback(async (ids, estado = 'entregado') => {
+    const resultados = await Promise.allSettled(
+      ids.map((itemId) => updateEstadoItem.mutateAsync({ itemId, estado })),
+    );
+    const ok = resultados.filter((r) => r.status === 'fulfilled').length;
+    const fallidas = resultados.length - ok;
+    const label = estado === 'preparado' ? 'preparada' : 'entregada';
+    if (fallidas === 0 && ok > 0) {
+      toast.success(`${ok} vianda${ok !== 1 ? 's' : ''} ${label}${ok !== 1 ? 's' : ''}`);
+    } else if (ok > 0 && fallidas > 0) {
+      toast.warning(`${ok} ${label}${ok !== 1 ? 's' : ''} · ${fallidas} no se pudo${fallidas !== 1 ? 'eron' : ''} actualizar — reintentá manualmente`);
+    } else if (fallidas > 0) {
+      toast.error(`No se pudieron actualizar las ${fallidas} vianda${fallidas !== 1 ? 's' : ''} — verificá la conexión`);
+    }
+  }, [updateEstadoItem]);
+
   const handleBulkEstado = async (estado) => {
     setBulkLoading(true);
     const ids = [...selected];
-    const fallidos = [];
     try {
-      for (const id of ids) {
-        try {
-          await updateEstado.mutateAsync({ id, estado });
-        } catch (e) {
-          fallidos.push({
-            id,
-            mensaje: e?.response?.data?.message || e?.message || 'No se pudo actualizar',
-          });
-        }
-      }
+      const resultados = await Promise.allSettled(
+        ids.map((id) => updateEstado.mutateAsync({ id, estado })),
+      );
+      const fallidos = resultados
+        .map((r, i) => ({ r, id: ids[i] }))
+        .filter(({ r }) => r.status === 'rejected')
+        .map(({ r, id }) => ({
+          id,
+          mensaje: r.reason?.response?.data?.message || r.reason?.message || 'No se pudo actualizar',
+        }));
 
       const actualizados = ids.length - fallidos.length;
       if (actualizados > 0) {
@@ -1176,22 +1366,28 @@ export default function PedidosAdmin() {
 
   const esEstaSemana = semana === getLunes();
   const domingoSemana = addDias(semana, 6);
+  const empresaFiltroNombre = useMemo(
+    () => empresas.find(e => String(e.id) === String(empresaFiltro))?.nombre || '',
+    [empresas, empresaFiltro],
+  );
 
   return (
     <div className="px-4 pt-0 pb-4 md:p-6 max-w-7xl mx-auto">
 
       {/* ── Header mobile (sticky) ── */}
       <div className="md:hidden sticky top-0 z-20 bg-green-700 text-white px-4 py-3 -mx-4 -mt-0 mb-4 print:hidden flex flex-wrap items-center gap-2">
-        <h1 className="text-base font-bold flex-1">Pedidos</h1>
+        <h1 className="text-base font-bold flex-1">{titulo}</h1>
         <button onClick={() => cambiarSemana(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 text-white text-lg leading-none">‹</button>
         <div className="text-center">
           <p className="text-xs font-semibold leading-tight">{fmt(semana)} — {fmt(domingoSemana)}</p>
           <p className="text-[10px] text-green-200">{fmtFull(semana).split('/')[2]}</p>
         </div>
         <button onClick={() => cambiarSemana(1)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 text-white text-lg leading-none">›</button>
-        <div className="ml-1">
-          <BotonExportar pedidos={pedidos} semana={semana} empresas={[...new Set(pedidos.map(p => p.empresa_nombre).filter(Boolean))].sort()} compact />
-        </div>
+        {esSeguimiento && (
+          <div className="ml-1">
+            <BotonExportar pedidos={pedidos} semana={semana} empresas={[...new Set(pedidos.map(p => p.empresa_nombre).filter(Boolean))].sort()} compact initialEmpresa={empresaFiltroNombre} />
+          </div>
+        )}
         <div className="basis-full flex items-center justify-end gap-2 pt-1">
           <button
             type="button"
@@ -1200,20 +1396,17 @@ export default function PedidosAdmin() {
           >
             Semana actual
           </button>
-          <Link to="/pedidos-hoy" className="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/25">
-            📅 Pedidos de hoy
-          </Link>
         </div>
       </div>
 
       {/* ── Header desktop ── */}
       <div className="hidden md:flex flex-wrap items-center justify-between gap-3 mb-5 print:mb-2">
-        <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{titulo}</h1>
         <div className="flex items-center gap-1 print:hidden">
           <button onClick={() => cambiarSemana(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-lg">‹</button>
           <div className="text-center px-3">
             <p className="text-sm font-semibold text-gray-800">{fmt(semana)} — {fmt(domingoSemana)}</p>
-            <p className="text-[11px] text-gray-400">{fmtFull(semana).split('/')[2]}</p>
+            <p className="text-[11px] text-gray-500">{fmtFull(semana).split('/')[2]}</p>
           </div>
           <button onClick={() => cambiarSemana(1)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-lg">›</button>
           <button
@@ -1223,56 +1416,61 @@ export default function PedidosAdmin() {
           >
             Semana actual
           </button>
-          <Link to="/pedidos-hoy" className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
-            📅 Pedidos de hoy
-          </Link>
         </div>
-        <div className="flex gap-2 print:hidden">
-          <BotonExportar pedidos={pedidos} semana={semana} empresas={[...new Set(pedidos.map(p => p.empresa_nombre).filter(Boolean))].sort()} />
-        </div>
+        {esSeguimiento && (
+          <div className="flex gap-2 print:hidden">
+            <BotonExportar pedidos={pedidos} semana={semana} empresas={[...new Set(pedidos.map(p => p.empresa_nombre).filter(Boolean))].sort()} initialEmpresa={empresaFiltroNombre} />
+          </div>
+        )}
       </div>
 
-      {/* ── KPI cards ── */}
-      <div className="grid grid-cols-4 gap-0 mb-4 print:hidden overflow-hidden rounded-xl border border-gray-100 shadow-sm divide-x divide-gray-100">
-        <div className="bg-white p-3 text-center">
-          <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-          <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">Pedidos</p>
+      {/* ── KPI cards — solo en vista seguimiento ── */}
+      {esSeguimiento && (
+        <div className="grid grid-cols-4 gap-0 mb-4 print:hidden overflow-hidden rounded-xl border border-gray-100 shadow-sm divide-x divide-gray-100">
+          <div className="bg-white p-3 text-center">
+            <p className="text-xl font-bold text-gray-900">{stats.total}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Pedidos</p>
+          </div>
+          <div className="bg-white p-3 text-center">
+            <p className="text-xl font-bold text-green-700">{stats.viandas}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Viandas</p>
+          </div>
+          <div className="bg-white p-3 text-center">
+            <p className="text-xl font-bold text-gray-700">{stats.entregadas}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Entregadas</p>
+          </div>
+          <button
+            className={`p-3 text-center transition-colors ${
+              (stats.porEstado.pendiente || 0) === 0
+                ? 'bg-white hover:bg-gray-50'
+                : estadoFiltro === 'pendiente' ? 'bg-amber-100' : 'bg-amber-50 hover:bg-amber-100'
+            }`}
+            onClick={() => setEstadoFiltro(estadoFiltro === 'pendiente' ? '' : 'pendiente')}
+          >
+            <p className={`text-xl font-bold ${(stats.porEstado.pendiente || 0) === 0 ? 'text-gray-500' : 'text-amber-700'}`}>{stats.porEstado.pendiente || 0}</p>
+            <p className={`text-[11px] mt-0.5 leading-tight ${(stats.porEstado.pendiente || 0) === 0 ? 'text-gray-500' : 'text-amber-600'}`}>Pendientes</p>
+          </button>
         </div>
-        <div className="bg-white p-3 text-center">
-          <p className="text-xl font-bold text-green-700">{stats.viandas}</p>
-          <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">Viandas</p>
-        </div>
-        <button
-          className={`p-3 text-center transition-colors ${estadoFiltro === 'pendiente' ? 'bg-amber-100' : 'bg-amber-50 hover:bg-amber-100'}`}
-          onClick={() => setEstadoFiltro(estadoFiltro === 'pendiente' ? '' : 'pendiente')}
-        >
-          <p className="text-xl font-bold text-amber-700">{stats.porEstado.pendiente||0}</p>
-          <p className="text-[11px] text-amber-600 mt-0.5 leading-tight">Pend.</p>
-        </button>
-        <button
-          className={`p-3 text-center transition-colors ${estadoFiltro === 'listo' ? 'bg-green-100' : 'bg-green-50 hover:bg-green-100'}`}
-          onClick={() => setEstadoFiltro(estadoFiltro === 'listo' ? '' : 'listo')}
-        >
-          <p className="text-xl font-bold text-green-700">{(stats.porEstado.listo||0) + (stats.porEstado.entregado||0)}</p>
-          <p className="text-[11px] text-green-600 mt-0.5 leading-tight">Listos</p>
-        </button>
-      </div>
+      )}
 
       {/* ── Filtros ── */}
       <div className="space-y-2 mb-4 print:hidden">
         {/* Buscador full-width */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-          <input
-            type="text"
-            placeholder="Buscar empleado o empresa..."
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400"
-          />
-        </div>
-        {/* Empresa + Estado en 2 columnas */}
-        <div className="grid grid-cols-2 gap-2">
+        {esSeguimiento && (
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar empleado o empresa..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400"
+            />
+          </div>
+        )}
+        {/* Empresa + Estado en 2 columnas — solo en vista seguimiento */}
+        {esSeguimiento && (
+        <div className="grid gap-2 grid-cols-2">
           <select
             className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 bg-white"
             value={empresaFiltro}
@@ -1287,25 +1485,28 @@ export default function PedidosAdmin() {
             onChange={e => setEstadoFiltro(e.target.value)}
           >
             <option value="">Estado</option>
-            {ESTADOS.map(e => <option key={e.key} value={e.key}>{e.icon} {e.label}</option>)}
+            {ESTADOS_PEDIDO.map(e => <option key={e.key} value={e.key}>{e.icon} {e.label}</option>)}
           </select>
         </div>
+        )}
       </div>
-      <Tabs value={vista} onChange={setVista}>
-        <Tab value="empresa" label="Seguimiento" />
-        <Tab value="dia" label="Cocina / Producción" />
-      </Tabs>
+      {!vistaFija && (
+        <Tabs value={vista} onChange={setVista}>
+          <Tab value="empresa" label="Seguimiento" />
+          <Tab value="dia" label="Produccion diaria" />
+        </Tabs>
+      )}
 
       {/* Filtros activos */}
       {filtrosActivos && (
-        <p className="text-xs text-gray-400 mb-3 print:hidden">
+        <p className="text-xs text-gray-500 mb-3 print:hidden">
           Mostrando {pedidos.length} de {pedidosRaw.length} pedidos
           <button onClick={limpiarFiltros} className="ml-2 text-green-700 underline">Limpiar filtros</button>
         </p>
       )}
 
       {/* ── Bulk action bar ── */}
-      {selected.size > 0 && (
+      {esSeguimiento && selected.size > 0 && (
         <BulkActionBar
           count={selected.size}
           onClear={() => setSelected(new Set())}
@@ -1315,11 +1516,12 @@ export default function PedidosAdmin() {
       )}
 
       {/* ── Empleados sin pedido ── */}
-      <EmpleadosSinPedido pedidos={pedidosRaw} empresaFiltro={empresaFiltro} />
+      {esSeguimiento && <EmpleadosSinPedido pedidos={pedidosRaw} empresaFiltro={empresaFiltro} />}
 
       {isLoading && (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-gray-500">
           <div className="animate-spin w-8 h-8 border-2 border-green-700 border-t-transparent rounded-full" />
+          <p>Cargando pedidos...</p>
         </div>
       )}
 
@@ -1337,7 +1539,7 @@ export default function PedidosAdmin() {
         const grupos = Object.entries(porEmpresa).sort(([a],[b]) => texto(a).localeCompare(texto(b)));
         return (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-xs text-gray-400 pb-1 print:hidden">
+            <div className="flex items-center gap-2 text-xs text-gray-500 pb-1 print:hidden">
               <input type="checkbox" checked={selected.size === pedidos.length && pedidos.length > 0} onChange={toggleSelectAll} className="w-4 h-4 accent-green-700 cursor-pointer" />
               <span>{selected.size === pedidos.length ? 'Deseleccionar todos' : 'Seleccionar todos'}</span>
             </div>
@@ -1348,7 +1550,9 @@ export default function PedidosAdmin() {
                 grupo={grupo}
                 diasSemana={diasSemana}
                 onCambiarEstado={handleCambiarEstado}
+                onCambiarEstadoItem={handleCambiarEstadoItem}
                 loadingId={loadingId}
+                loadingItemId={loadingItemId}
                 selected={selected}
                 onToggleSelect={toggleSelect}
               />
@@ -1366,6 +1570,9 @@ export default function PedidosAdmin() {
           setDiaActivo={setDiaActivo}
           filtrosActivos={filtrosActivos}
           onLimpiarFiltros={limpiarFiltros}
+          onCambiarEstadoItem={handleCambiarEstadoItem}
+          loadingItemId={loadingItemId}
+          onEntregarVarios={handleEntregarVarios}
         />
       )}
     </div>

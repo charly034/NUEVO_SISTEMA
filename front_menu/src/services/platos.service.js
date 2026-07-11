@@ -32,4 +32,8 @@ export const platosService = {
   create: (data) => apiClient.post('/platos', payload(data)),
   update: (id, data) => apiClient.put(`/platos/${id}`, payload(data)),
   remove: (id) => apiClient.delete(`/platos/${id}`),
+  getVisibilidadEmpresas: (id) => apiClient.get(`/platos/${id}/visibilidad-empresas`),
+  setVisibilidadEmpresas: (id, empresa_ids) => apiClient.put(`/platos/${id}/visibilidad-empresas`, { empresa_ids }),
+  getDisponibilidadLocal: (id) => apiClient.get(`/platos/${id}/disponibilidad-local`),
+  setDisponibilidadLocal: (id, entradas) => apiClient.put(`/platos/${id}/disponibilidad-local`, { entradas }),
 };

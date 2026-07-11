@@ -115,14 +115,6 @@ function estadoFinancieroClass(value) {
   return 'border-gray-200 bg-gray-50 text-gray-700';
 }
 
-function estadoOperativoClass(value) {
-  if (value === 'entregado') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (value === 'cancelado') return 'border-red-200 bg-red-50 text-red-700';
-  if (value === 'listo') return 'border-blue-200 bg-blue-50 text-blue-700';
-  if (value === 'en_proceso') return 'border-indigo-200 bg-indigo-50 text-indigo-700';
-  return 'border-amber-200 bg-amber-50 text-amber-700';
-}
-
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -407,7 +399,17 @@ function AsociarPagoModal({ pedido, onClose, onAplicar, loading }) {
   );
 }
 
-function DetalleModal({ pedido, onClose, onCuenta }) {
+function DetalleModal({
+  pedido,
+  onClose,
+  onCuenta,
+  onRegistrarPago,
+  onAsociarPago,
+  onCambiarEstado,
+  estadoLoading,
+  onImprimir,
+  onCopiarWhatsApp,
+}) {
   if (!pedido) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 md:items-center md:p-4">
@@ -434,6 +436,17 @@ function DetalleModal({ pedido, onClose, onCuenta }) {
           <button type="button" onClick={() => onCuenta('empresa', pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Cuenta empresa</button>
           <button type="button" onClick={() => onCuenta('empleado', pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Cuenta persona</button>
           <Link to="/pedidos" className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Ir a pedidos</Link>
+          <button type="button" onClick={() => onRegistrarPago(pedido)} className="rounded-lg border border-green-700 px-3 py-2 text-sm font-medium text-green-700">Registrar pago</button>
+          <button type="button" onClick={() => onAsociarPago(pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Asociar pago</button>
+          <button type="button" onClick={() => onImprimir(pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Imprimir</button>
+          <button type="button" onClick={() => onCopiarWhatsApp(pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Copiar WhatsApp</button>
+        </div>
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Acciones de estado</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => onCambiarEstado(pedido, 'entregado')} disabled={estadoLoading} className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 disabled:opacity-50">Marcar entregado</button>
+            <button type="button" onClick={() => onCambiarEstado(pedido, 'cancelado')} disabled={estadoLoading} className="rounded-lg border border-red-100 px-3 py-2 text-sm font-medium text-red-600 disabled:opacity-50">Cancelar pedido</button>
+          </div>
         </div>
       </div>
     </div>
@@ -461,6 +474,7 @@ export default function PedidosPagos() {
   const [pagoPedido, setPagoPedido] = useState(null);
   const [asociarPedido, setAsociarPedido] = useState(null);
   const [cuenta, setCuenta] = useState(null);
+  const [filtrosAvanzadosAbiertos, setFiltrosAvanzadosAbiertos] = useState(false);
 
   const queryParams = useMemo(() => ({
     empresa_id: filtros.empresa_id || undefined,
@@ -632,45 +646,89 @@ export default function PedidosPagos() {
       </div>
 
       <section className="mb-4 border border-gray-200 bg-white p-3">
-        <div className="grid gap-2 md:grid-cols-6 xl:grid-cols-10">
-          <select value={filtros.empresa_id} onChange={e => setFiltro('empresa_id', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Todas las empresas</option>
-            {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-          </select>
-          <select value={filtros.empleado_id} onChange={e => setFiltro('empleado_id', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Todas las personas</option>
-            {empleadosOpciones.map(e => <option key={e.id} value={e.id}>{`${e.apellido || ''} ${e.nombre || ''}`.trim() || e.email}</option>)}
-          </select>
-          <input type="date" value={filtros.desde} onChange={e => setFiltro('desde', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="date" value={filtros.hasta} onChange={e => setFiltro('hasta', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <select value={filtros.estado} onChange={e => setFiltro('estado', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Estado pedido</option>
-            {ESTADOS_OPERATIVOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-          </select>
-          <select value={filtros.estado_financiero} onChange={e => setFiltro('estado_financiero', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Estado pago</option>
-            {ESTADOS_FINANCIEROS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-          </select>
-          <input value={filtros.menu} onChange={e => setFiltro('menu', e.target.value)} placeholder="Menu/vianda/plato" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <select value={filtros.pago} onChange={e => setFiltro('pago', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Pagado/no pagado</option>
-            <option value="pagado">Pagado</option>
-            <option value="no_pagado">No pagado</option>
-            <option value="parcial">Parcial</option>
-          </select>
-          <select value={filtros.metodo_pago} onChange={e => setFiltro('metodo_pago', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Metodo de pago</option>
-            {METODOS_PAGO.map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
-          </select>
-          <input value={filtros.q} onChange={e => setFiltro('q', e.target.value)} placeholder="Buscar..." className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">Agrupar por</span>
-            <select value={agrupacion} onChange={e => setAgrupacion(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              {AGRUPACIONES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+        <div className="grid gap-2 md:grid-cols-3">
+          <label className="text-sm">
+            <span className="mb-1 block text-xs font-medium text-gray-500">Empresa</span>
+            <select value={filtros.empresa_id} onChange={e => setFiltro('empresa_id', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <option value="">Todas las empresas</option>
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
-          </div>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-xs font-medium text-gray-500">Estado financiero</span>
+            <select value={filtros.estado_financiero} onChange={e => setFiltro('estado_financiero', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <option value="">Todos</option>
+              {ESTADOS_FINANCIEROS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-xs font-medium text-gray-500">Buscar</span>
+            <input value={filtros.q} onChange={e => setFiltro('q', e.target.value)} placeholder="Empresa, persona, pedido..." className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          </label>
+        </div>
+        <div className="mt-3 rounded-lg border border-gray-100">
+          <button
+            type="button"
+            onClick={() => setFiltrosAvanzadosAbiertos((open) => !open)}
+            className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-gray-700"
+          >
+            <span>Filtros avanzados</span>
+            <span className="text-xs text-gray-500">{filtrosAvanzadosAbiertos ? 'Ocultar' : 'Mostrar'}</span>
+          </button>
+          {filtrosAvanzadosAbiertos ? (
+            <div className="grid gap-2 border-t border-gray-100 p-3 md:grid-cols-3 xl:grid-cols-4">
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Persona</span>
+                <select value={filtros.empleado_id} onChange={e => setFiltro('empleado_id', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">Todas las personas</option>
+                  {empleadosOpciones.map(e => <option key={e.id} value={e.id}>{`${e.apellido || ''} ${e.nombre || ''}`.trim() || e.email}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Desde</span>
+                <input type="date" value={filtros.desde} onChange={e => setFiltro('desde', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Hasta</span>
+                <input type="date" value={filtros.hasta} onChange={e => setFiltro('hasta', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Estado pedido</span>
+                <select value={filtros.estado} onChange={e => setFiltro('estado', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">Todos</option>
+                  {ESTADOS_OPERATIVOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Menu / vianda</span>
+                <input value={filtros.menu} onChange={e => setFiltro('menu', e.target.value)} placeholder="Menu, vianda o plato" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Pago rapido</span>
+                <select value={filtros.pago} onChange={e => setFiltro('pago', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">Todos</option>
+                  <option value="pagado">Pagado</option>
+                  <option value="no_pagado">No pagado</option>
+                  <option value="parcial">Parcial</option>
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Metodo de pago</span>
+                <select value={filtros.metodo_pago} onChange={e => setFiltro('metodo_pago', e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  <option value="">Todos</option>
+                  {METODOS_PAGO.map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-gray-500">Agrupar por</span>
+                <select value={agrupacion} onChange={e => setAgrupacion(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                  {AGRUPACIONES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-3 flex justify-end">
           <button type="button" onClick={limpiarFiltros} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Limpiar filtros</button>
         </div>
       </section>
@@ -692,61 +750,35 @@ export default function PedidosPagos() {
                     <span>Pendiente {formatMoney(gm.pendiente)}</span>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-[1500px] w-full border-collapse text-left text-sm">
+                <div className="overflow-hidden">
+                  <table className="w-full border-collapse text-left text-sm">
                     <thead className="bg-white text-xs uppercase tracking-wide text-gray-500">
                       <tr className="border-b border-gray-200">
                         <th className="px-3 py-2">Fecha</th>
                         <th className="px-3 py-2">Empresa</th>
                         <th className="px-3 py-2">Persona</th>
-                        <th className="px-3 py-2">Menu/vianda</th>
-                        <th className="px-3 py-2 text-right">Cant.</th>
-                        <th className="px-3 py-2 text-right">Precio unit.</th>
                         <th className="px-3 py-2 text-right">Total</th>
-                        <th className="px-3 py-2">Estado pedido</th>
                         <th className="px-3 py-2">Estado pago</th>
-                        <th className="px-3 py-2 text-right">Pagado</th>
                         <th className="px-3 py-2 text-right">Saldo</th>
-                        <th className="px-3 py-2">Metodo</th>
-                        <th className="px-3 py-2">Fecha pago</th>
-                        <th className="px-3 py-2">Comprobante</th>
-                        <th className="px-3 py-2">Acciones</th>
+                        <th className="px-3 py-2 text-right">Detalle</th>
                       </tr>
                     </thead>
                     <tbody>
                       {grupo.rows.map(row => (
-                        <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <tr key={row.id} onClick={() => setDetalle(row)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
                           <td className="whitespace-nowrap px-3 py-2">{formatDate(row.semana_inicio)}</td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                             <button type="button" onClick={() => abrirCuenta('empresa', row)} className="font-medium text-gray-900 hover:text-green-700">{row.empresa_nombre || '-'}</button>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                             <button type="button" onClick={() => abrirCuenta('empleado', row)} className="font-medium text-gray-900 hover:text-green-700">{row.persona}</button>
                             {row.empleado_email && <p className="text-xs text-gray-500">{row.empleado_email}</p>}
                           </td>
-                          <td className="px-3 py-2">{row.menu_nombre || '-'}</td>
-                          <td className="px-3 py-2 text-right">{row.cantidad_viandas}</td>
-                          <td className="px-3 py-2 text-right">{formatMoney(row.precio_unitario)}</td>
                           <td className="px-3 py-2 text-right font-semibold">{formatMoney(row.vendido)}</td>
-                          <td className="px-3 py-2"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${estadoOperativoClass(row.estado)}`}>{row.estado || '-'}</span></td>
                           <td className="px-3 py-2"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${estadoFinancieroClass(row.estado_financiero)}`}>{labelEstadoFinanciero(row.estado_financiero)}</span></td>
-                          <td className="px-3 py-2 text-right">{formatMoney(row.cobrado)}</td>
                           <td className={`px-3 py-2 text-right font-semibold ${row.saldo > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatMoney(row.saldo)}</td>
-                          <td className="px-3 py-2">{row.metodo_pago || '-'}</td>
-                          <td className="px-3 py-2">{row.fecha_pago ? formatDate(row.fecha_pago) : '-'}</td>
-                          <td className="px-3 py-2">{row.comprobante_url ? <a href={row.comprobante_url} target="_blank" rel="noreferrer" className="text-green-700 underline">Ver</a> : '-'}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex flex-wrap gap-1">
-                              <ActionButton title="Ver detalle" onClick={() => setDetalle(row)}>{icono('eye')}</ActionButton>
-                              <Link to="/pedidos" title="Editar pedido" className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">{icono('file')}</Link>
-                              <ActionButton title="Marcar entregado" onClick={() => cambiarEstado(row, 'entregado')} disabled={updateEstado.isPending}>{icono('check')}</ActionButton>
-                              <ActionButton title="Marcar no entregado" onClick={() => toast.info('Estado no entregado pendiente de modelado operativo en backend')} disabled>{icono('x')}</ActionButton>
-                              <ActionButton title="Cancelar" onClick={() => cambiarEstado(row, 'cancelado')} disabled={updateEstado.isPending}>{icono('x')}</ActionButton>
-                              <ActionButton title="Registrar pago" onClick={() => setPagoPedido(row)}>{icono('cash')}</ActionButton>
-                              <ActionButton title="Asociar a pago grupal" onClick={() => setAsociarPedido(row)}>{icono('link')}</ActionButton>
-                              <ActionButton title="Imprimir resumen" onClick={() => imprimirResumen([row], calcularMetricas([row]))}>{icono('print')}</ActionButton>
-                              <ActionButton title="Copiar WhatsApp" onClick={() => navigator.clipboard.writeText(textoWhatsApp([row], calcularMetricas([row]))).then(() => toast.success('Texto copiado'))}>{icono('message')}</ActionButton>
-                            </div>
+                          <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                            <ActionButton title="Ver detalle" onClick={() => setDetalle(row)}>{icono('eye')}</ActionButton>
                           </td>
                         </tr>
                       ))}
@@ -760,7 +792,17 @@ export default function PedidosPagos() {
         </div>
       )}
 
-      <DetalleModal pedido={detalle} onClose={() => setDetalle(null)} onCuenta={abrirCuenta} />
+      <DetalleModal
+        pedido={detalle}
+        onClose={() => setDetalle(null)}
+        onCuenta={abrirCuenta}
+        onRegistrarPago={(pedido) => { setDetalle(null); setPagoPedido(pedido); }}
+        onAsociarPago={(pedido) => { setDetalle(null); setAsociarPedido(pedido); }}
+        onCambiarEstado={cambiarEstado}
+        estadoLoading={updateEstado.isPending}
+        onImprimir={(pedido) => imprimirResumen([pedido], calcularMetricas([pedido]))}
+        onCopiarWhatsApp={(pedido) => navigator.clipboard.writeText(textoWhatsApp([pedido], calcularMetricas([pedido]))).then(() => toast.success('Texto copiado'))}
+      />
       <PagoModal pedido={pagoPedido} onClose={() => setPagoPedido(null)} onRegistrar={registrarPagoPedido} loading={registrarPago.isPending || aplicarPago.isPending} />
       <AsociarPagoModal pedido={asociarPedido} onClose={() => setAsociarPedido(null)} onAplicar={aplicarPagoExistente} loading={aplicarPago.isPending} />
       {cuenta && (

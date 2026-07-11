@@ -1,25 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDependenciasEmpresa, useEmpresas, useCreateEmpresa, useUpdateEmpresa, useDeleteEmpresa, useReopenPlazo, useClearOverride, useRegenerarCodigo } from '../hooks/useEmpresas.js';
 import { useEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado, useGenerarResetCode, useImportarEmpleados } from '../hooks/useEmpleados.js';
-import { usePlanes, useCreatePlan, useUpdatePlan, useDeletePlan } from '../hooks/usePlanes.js';
+import { usePlanes } from '../hooks/usePlanes.js';
 import { useDebounce } from '../hooks/useDebounce.js';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
 import { adminAuth } from '../auth.js';
 import CuentaCorrienteFicha from '../components/finanzas/CuentaCorrienteFicha.jsx';
 import SideDrawer from '../components/ui/SideDrawer.jsx';
+import { DIAS_LABORALES as DIAS_SEMANA, DIA_NOMBRE as DIAS_LABEL } from '../lib/dias.js';
+import { formatFechaCorta as formatearFechaCorta } from '../lib/fechas.js';
 
 function normalizarFechaInput(fecha) {
   return fecha ? String(fecha).split('T')[0] : '';
-}
-
-function formatearFechaCorta(fecha) {
-  if (!fecha) return null;
-  return new Date(fecha).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
 }
 
 const PLANES = { basico: 'Básico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
@@ -180,7 +173,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
         <input
           value={busquedaEmpresa}
           onChange={(event) => { setBusquedaEmpresa(event.target.value); setPage(1); }}
-          placeholder="Buscar por empresa, slug o email..."
+          placeholder="Nombre, @slug o email de contacto..."
           className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none sm:max-w-sm"
         />
         <EstadoFiltroChips value={estadoFiltro} onChange={(value) => { setEstadoFiltro(value); setPage(1); }} />
@@ -207,7 +200,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
               >
                 <td className="px-4 py-3">
                   <p className="font-semibold text-gray-900">{e.nombre}</p>
-                  <p className="text-xs text-gray-400">@{e.slug}</p>
+                  <p className="text-xs text-gray-500">@{e.slug}</p>
                 </td>
                 <td className="px-4 py-3 hidden sm:table-cell text-gray-600">
                   {e.plan_nombre || PLANES[e.plan] || '—'}
@@ -238,7 +231,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
             <p className="text-sm font-semibold text-gray-700">
               {hayBusquedaEmpresa ? `No se encontraron empresas para "${busquedaEmpresa.trim()}"` : 'Todavía no hay empresas cargadas.'}
             </p>
-            {hayBusquedaEmpresa && <p className="mt-1 text-xs text-gray-400">Probá con otro nombre, slug o email.</p>}
+            {hayBusquedaEmpresa && <p className="mt-1 text-xs text-gray-500">Probá con otro nombre, slug o email.</p>}
           </div>
         )}
       </div>
@@ -259,7 +252,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <EstadoEmpresaBadge activa={empresaActiva.activo} />
-                <span className="text-xs text-gray-400">@{empresaActiva.slug}</span>
+                <span className="text-xs text-gray-500">@{empresaActiva.slug}</span>
               </div>
               <p className="text-sm text-gray-600">
                 {empresaActiva.plan_nombre || PLANES[empresaActiva.plan] || 'Sin plan'} · {MODOS[empresaActiva.modo_pedido]}
@@ -449,95 +442,6 @@ function Pagination({ page, totalPages, onChange }) {
   );
 }
 
-function EmpresaCard({
-  empresa,
-  activa,
-  esSuperAdmin,
-  onSeleccionar,
-  onEditar,
-  onEliminar,
-  onCuentaCorriente,
-  onReabrirPlazo,
-  onRegenerarCodigo,
-}) {
-  const plazoActivo = empresa.plazo_override_hasta && new Date() <= new Date(empresa.plazo_override_hasta);
-  const puedeReabrir = empresa.limite_hora || empresa.modo_pedido === 'semanal' || empresa.modo_pedido === 'ambos';
-
-  return (
-    <div
-      onClick={onSeleccionar}
-      className={`cursor-pointer rounded-lg border-2 bg-white p-4 transition-colors ${
-        activa ? 'border-green-600' : 'border-gray-100 hover:border-gray-300'
-      } ${empresa.activo ? '' : 'opacity-60 grayscale-[30%]'}`}
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-bold text-gray-900">{empresa.nombre}</p>
-            <EstadoEmpresaBadge activa={empresa.activo} />
-          </div>
-          <p className="mt-0.5 text-xs text-gray-500">
-            @{empresa.slug} · {empresa.plan_nombre || PLANES[empresa.plan]} · {MODOS[empresa.modo_pedido]}
-          </p>
-          <PlanDetalleChip plan={empresa.plan_detalle} />
-          {empresa.limite_hora && (
-            <p className="mt-1 text-xs text-amber-600">
-              {empresa.modo_pedido === 'semanal'
-                ? `Límite: ${empresa.limite_dia_semana || 'lunes'} ${empresa.limite_hora}hs`
-                : empresa.limite_anticipacion_dias > 0
-                  ? `Límite: día anterior ${empresa.limite_hora}hs`
-                  : `Límite: mismo día ${empresa.limite_hora}hs`}
-            </p>
-          )}
-          {plazoActivo && (
-            <p className="mt-1 text-xs font-medium text-green-700">
-              Plazo reabierto hasta {new Date(empresa.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
-            </p>
-          )}
-          <CodigoBadge
-            empresa={empresa}
-            esSuperAdmin={esSuperAdmin}
-            puedeReabrir={puedeReabrir}
-            onRegenerarCodigo={onRegenerarCodigo}
-            onReabrirPlazo={onReabrirPlazo}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <button
-            type="button"
-            onClick={(ev) => { ev.stopPropagation(); onEditar(); }}
-            className={iconButtonClass}
-            aria-label={`Editar ${empresa.nombre}`}
-            title="Editar"
-          >
-            <EditarIcon />
-          </button>
-          <button
-            type="button"
-            onClick={(ev) => { ev.stopPropagation(); onCuentaCorriente(); }}
-            className={iconButtonClass}
-            aria-label={`Cuenta corriente de ${empresa.nombre}`}
-            title="Cuenta corriente"
-          >
-            <CuentaCorrienteIcon />
-          </button>
-          {esSuperAdmin && (
-            <button
-              type="button"
-              onClick={(ev) => { ev.stopPropagation(); onEliminar(); }}
-              className={dangerIconButtonClass}
-              aria-label={`Eliminar ${empresa.nombre}`}
-              title="Eliminar"
-            >
-              <EliminarIcon />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function EstadoEmpresaBadge({ activa }) {
   return (
     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${
@@ -548,28 +452,6 @@ function EstadoEmpresaBadge({ activa }) {
     >
       {activa ? 'Activa' : 'Inactiva'}
     </span>
-  );
-}
-
-function PlanDetalleChip({ plan }) {
-  if (!plan) return null;
-  const gramaje = plan.gramaje_max ? `${plan.gramaje_min}-${plan.gramaje_max} g` : `${plan.gramaje_min} g`;
-
-  return (
-    <details className="mt-2 w-fit" onClick={(event) => event.stopPropagation()}>
-      <summary className="cursor-pointer rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
-        Ver detalles del plan
-      </summary>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{gramaje}</span>
-        <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_postre ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
-          {plan.incluye_postre ? 'Con postre' : 'Sin postre'}
-        </span>
-        <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_bebida ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-          {plan.incluye_bebida ? 'Con bebida' : 'Sin bebida'}
-        </span>
-      </div>
-    </details>
   );
 }
 
@@ -748,157 +630,6 @@ function ConfirmDeleteModal({ empresa, onCerrar, onConfirmar, loading }) {
   );
 }
 
-function PlanesPanel({ planes, onNuevo, onEditar }) {
-  const deletePlan = useDeletePlan();
-
-  return (
-    <section className="mt-6 rounded-xl border border-gray-100 bg-white p-4">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-bold text-gray-900">Planes de vianda</h2>
-          <p className="text-sm text-gray-500">Combinaciones de tamaÁ±o, postre y bebida para empresas y cocina.</p>
-        </div>
-        <button onClick={onNuevo} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800">
-          + Nuevo plan
-        </button>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        {planes.map((plan) => (
-          <div key={plan.id} className={`rounded-lg border p-3 ${plan.activo ? 'border-gray-100' : 'border-gray-100 bg-gray-50 opacity-70'}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-semibold text-gray-900">{plan.nombre}</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {plan.gramaje_min}-{plan.gramaje_max || plan.gramaje_min} g
-                </p>
-              </div>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${plan.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {plan.activo ? 'Activo' : 'Inactivo'}
-              </span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_postre ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
-                {plan.incluye_postre ? 'Con postre' : 'Sin postre'}
-              </span>
-              <span className={`rounded-full px-2 py-0.5 text-xs ${plan.incluye_bebida ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                {plan.incluye_bebida ? 'Con bebida' : 'Sin bebida'}
-              </span>
-            </div>
-            {plan.descripcion && <p className="mt-2 text-xs text-gray-400">{plan.descripcion}</p>}
-            <div className="mt-3 flex justify-end gap-2">
-              <button onClick={() => onEditar(plan)} className="text-xs font-semibold text-gray-500 hover:text-gray-900">Editar</button>
-              {plan.activo && (
-                <button
-                  onClick={async () => {
-                    try {
-                      await deletePlan.mutateAsync(plan.id);
-                      toast.success('Plan desactivado');
-                    } catch (e) {
-                      toast.error(e?.message || 'No se pudo desactivar');
-                    }
-                  }}
-                  className="text-xs font-semibold text-red-500 hover:text-red-700"
-                >
-                  Desactivar
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ModalPlan({ plan, onCerrar }) {
-  const createPlan = useCreatePlan();
-  const updatePlan = useUpdatePlan();
-  const [form, setForm] = useState({
-    nombre: plan?.nombre || '',
-    codigo: plan?.codigo || '',
-    descripcion: plan?.descripcion || '',
-    gramaje_min: plan?.gramaje_min || 450,
-    gramaje_max: plan?.gramaje_max || 500,
-    incluye_postre: Boolean(plan?.incluye_postre),
-    incluye_bebida: Boolean(plan?.incluye_bebida),
-    activo: plan?.activo ?? true,
-    orden: plan?.orden || 0,
-  });
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    const payload = {
-      ...form,
-      gramaje_min: Number(form.gramaje_min),
-      gramaje_max: form.gramaje_max ? Number(form.gramaje_max) : null,
-      orden: Number(form.orden || 0),
-    };
-    try {
-      if (plan) {
-        await updatePlan.mutateAsync({ id: plan.id, data: payload });
-        toast.success('Plan actualizado');
-      } else {
-        await createPlan.mutateAsync(payload);
-        toast.success('Plan creado');
-      }
-      onCerrar();
-    } catch (e) {
-      toast.error(e?.message || 'No se pudo guardar el plan');
-    }
-  };
-
-  return (
-    <Modal onCerrar={onCerrar} titulo={plan ? 'Editar plan' : 'Nuevo plan'}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Campo label="Nombre">
-          <input className={input} required value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Plan Clasico 450" />
-        </Campo>
-        <Campo label="Codigo">
-          <input className={input} value={form.codigo} onChange={e => set('codigo', e.target.value)} placeholder="Se genera desde el nombre si queda vacio" />
-        </Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo label="Gramaje minimo">
-            <input className={input} type="number" min="1" required value={form.gramaje_min} onChange={e => set('gramaje_min', e.target.value)} />
-          </Campo>
-          <Campo label="Gramaje maximo">
-            <input className={input} type="number" min="1" value={form.gramaje_max} onChange={e => set('gramaje_max', e.target.value)} />
-          </Campo>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <input type="checkbox" checked={form.incluye_postre} onChange={e => set('incluye_postre', e.target.checked)} />
-            Incluye postre
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <input type="checkbox" checked={form.incluye_bebida} onChange={e => set('incluye_bebida', e.target.checked)} />
-            Incluye bebida
-          </label>
-        </div>
-        <Campo label="Descripcion">
-          <textarea className={input} rows={3} value={form.descripcion} onChange={e => set('descripcion', e.target.value)} />
-        </Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo label="Orden">
-            <input className={input} type="number" value={form.orden} onChange={e => set('orden', e.target.value)} />
-          </Campo>
-          <label className="mt-6 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.activo} onChange={e => set('activo', e.target.checked)} />
-            Activo
-          </label>
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cancelar</button>
-          <button type="submit" disabled={createPlan.isPending || updatePlan.isPending} className="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {createPlan.isPending || updatePlan.isPending ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
   const { data: todosEmpleados = [] } = useEmpleados(empresa.id);
   const empleados = todosEmpleados.filter(e => e.rol !== 'admin');
@@ -928,9 +659,9 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
           <div key={emp.id} className="flex flex-col gap-3 py-2 border-b border-gray-50 last:border-0 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="font-medium text-sm">{emp.nombre} {emp.apellido}</p>
-              <p className="text-xs text-gray-400">{emp.email} · {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
+              <p className="text-xs text-gray-500">{emp.email} · {emp.rol === 'admin' ? 'Administrador' : 'Cliente'}</p>
               {(emp.telefono || emp.fecha_nacimiento) && (
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-500 mt-0.5">
                   {emp.telefono || 'Sin teléfono'}
                   {emp.fecha_nacimiento ? ` · Nac. ${formatearFechaCorta(emp.fecha_nacimiento)}` : ''}
                 </p>
@@ -994,7 +725,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
             </div>
           </div>
         ))}
-        {empleados.length === 0 && <p className="text-gray-400 text-sm">Sin empleados aún.</p>}
+        {empleados.length === 0 && <p className="text-gray-500 text-sm">Sin empleados aún.</p>}
       </div>
 
       {modalEmpleado && (
@@ -1030,7 +761,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
-            <p className="text-xs text-gray-400 mb-5">
+            <p className="text-xs text-gray-500 mb-5">
               El empleado debe ir a "¿Olvidaste tu contraseña?" en la app e ingresar este código.
             </p>
             <button
@@ -1149,7 +880,7 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
                 {index + 1}. {fila.apellido}, {fila.nombre} · {fila.email || 'sin email'}
               </p>
             ))}
-            {filas.length > 5 && <p className="text-xs text-gray-400">+{filas.length - 5} filas más</p>}
+            {filas.length > 5 && <p className="text-xs text-gray-500">+{filas.length - 5} filas más</p>}
           </div>
         </div>
         {resultado && (
@@ -1174,9 +905,6 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
     </Modal>
   );
 }
-
-const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
-const DIAS_LABEL = { lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes' };
 
 function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
   const esNueva = !empresa;
@@ -1336,7 +1064,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
               <select className={input} value={form.limite_dia_semana} onChange={e => set('limite_dia_semana', e.target.value)}>
                 {DIAS_SEMANA.map(d => <option key={d} value={d}>{DIAS_LABEL[d]}</option>)}
               </select>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Los empleados deben pedir antes del {DIAS_LABEL[form.limite_dia_semana] || '""'} a las {form.limite_hora}hs.
               </p>
             </Campo>
@@ -1352,7 +1080,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
           )}
 
           {!tieneHora && (
-            <p className="text-xs text-gray-400">Sin límite: los empleados pueden pedir hasta que cerrés el menú manualmente.</p>
+            <p className="text-xs text-gray-500">Sin límite: los empleados pueden pedir hasta que cerrés el menú manualmente.</p>
           )}
         </div>
 
@@ -1564,7 +1292,7 @@ function Modal({ titulo, onCerrar, children, footer }) {
       <div ref={modalRef} data-admin-modal="true" className="flex h-full max-h-none w-full flex-col bg-white shadow-xl md:h-auto md:max-h-[90vh] md:max-w-md md:rounded-2xl">
         <div className="flex justify-between items-center p-5 border-b flex-shrink-0">
           <h3 className="font-bold text-lg">{titulo}</h3>
-          <button type="button" onClick={onCerrar} className="text-gray-400 hover:text-gray-700 text-xl" aria-label="Cerrar">✕</button>
+          <button type="button" onClick={onCerrar} className="text-gray-500 hover:text-gray-700 text-xl" aria-label="Cerrar">✕</button>
         </div>
         <div className="p-5 overflow-y-auto">{children}</div>
         {footer && (

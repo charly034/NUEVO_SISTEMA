@@ -55,6 +55,41 @@ function obtenerIdGuarnicion(seleccion, dia) {
   );
 }
 
+function obtenerIdSalsa(seleccion, dia) {
+  const valorDirecto = seleccion?.salsaId ?? seleccion?.salsa_id;
+  if (valorDirecto !== null && valorDirecto !== undefined && valorDirecto !== "") {
+    return normalizarEnteroPositivo(valorDirecto);
+  }
+
+  const salsa = seleccion?.salsa;
+  if (typeof salsa === "string") {
+    const idDesdeTextoNumerico = normalizarEnteroPositivo(salsa);
+    if (idDesdeTextoNumerico) return idDesdeTextoNumerico;
+  } else if (salsa) {
+    const idDesdeObjeto = normalizarEnteroPositivo(
+      salsa.id ?? salsa.salsaId ?? salsa.salsa_id,
+    );
+    if (idDesdeObjeto) return idDesdeObjeto;
+  }
+
+  const nombreSalsa = normalizarTexto(
+    seleccion?.nombreSalsa ||
+      seleccion?.salsa_nombre ||
+      (typeof salsa === "string" ? salsa : salsa?.nombre),
+  );
+  const textoDia = normalizarTexto(dia?.plato);
+  const salsaPorNombre = (seleccion?.plato?.salsas || []).find((opcion) => {
+    const nombre = normalizarTexto(opcion?.nombre ?? opcion?.salsa_nombre ?? opcion);
+    return nombre && (nombre === nombreSalsa || textoDia.includes(nombre));
+  });
+
+  return normalizarEnteroPositivo(
+    salsaPorNombre?.id ??
+      salsaPorNombre?.salsaId ??
+      salsaPorNombre?.salsa_id,
+  );
+}
+
 function mapearDiasPayload(semana) {
   return (semana.dias || [])
     .filter((dia) => dia.seleccion?.plato && diaEsEditablePedido(dia, semana))
@@ -67,6 +102,7 @@ function mapearDiasPayload(semana) {
         fecha: dia.fecha,
         platoId: sinPedido ? null : platoId,
         guarnicionId: sinPedido ? null : obtenerIdGuarnicion(dia.seleccion, dia),
+        salsaId: sinPedido ? null : obtenerIdSalsa(dia.seleccion, dia),
         sinPedido,
         origen: sinPedido ? dia.seleccion.origenSinPedido || "usuario" : null,
         opcion: sinPedido ? null : dia.seleccion?.plato?.opcion || null,

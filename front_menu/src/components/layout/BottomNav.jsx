@@ -4,12 +4,12 @@ import { NavLink, useLocation } from 'react-router-dom';
 const NAV_PRIMARY = [
   { to: '/', label: 'Inicio' },
   { to: '/pedidos', label: 'Pedidos' },
-  { to: '/clientes', label: 'Clientes' },
   { to: '/semanas', label: 'Menús' },
+  { to: '/clientes', label: 'Clientes' },
 ];
 
 const NAV_MORE = [
-  { to: '/pedidos-hoy', label: 'Hoy' },
+  { to: '/cocina', label: 'Cocina' },
   { to: '/platos', label: 'Platos' },
   { to: '/guarniciones', label: 'Guarn.' },
   { to: '/auditoria', label: 'Auditoría', superadminOnly: true },
@@ -23,6 +23,7 @@ const ICONS = {
   '/semanas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>,
   '/platos': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>,
   '/guarniciones': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><path d="M4 10h16" /><path d="M6 10l1.5 9h9L18 10" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>,
+  '/cocina': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><path d="M6 2v6a6 6 0 0 0 12 0V2" /><path d="M3 22h18" /><path d="M12 14v8" /></svg>,
   '/pedidos-hoy': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></svg>,
   '/historial': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><path d="M12 8v4l3 3" /><path d="M3.05 11a9 9 0 1 0 .5-3" /><path d="M3 4v4h4" /></svg>,
   '/estadisticas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><path d="M18 20V10M12 20V4M6 20v-6" /></svg>,
@@ -87,7 +88,7 @@ export default function BottomNav({ admin }) {
               end={to === '/'}
               className={({ isActive }) =>
                 `flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
-                  isActive ? 'text-brand-700' : 'text-gray-400'
+                  isActive ? 'text-brand-700' : 'text-gray-500'
                 }`
               }
             >
@@ -100,7 +101,7 @@ export default function BottomNav({ admin }) {
             type="button"
             onClick={() => setMasOpen(v => !v)}
             className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
-              inMore || masOpen ? 'text-brand-700' : 'text-gray-400'
+              inMore || masOpen ? 'text-brand-700' : 'text-gray-500'
             }`}
           >
             <IconMas />

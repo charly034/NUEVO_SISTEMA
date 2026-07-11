@@ -63,7 +63,7 @@ export async function findDestinatarios({ alcance = 'todos', empresaId = null, e
   const { rows } = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.telefono, e.rol, e.activo,
             e.preferencias_alimentarias, e.empresa_id, emp.nombre AS empresa_nombre,
-            emp.plan, emp.modo_pedido, emp.dias_laborales
+            emp.plan_id, emp.modo_pedido, emp.dias_laborales
      FROM empleados e
      JOIN empresas emp ON emp.id = e.empresa_id
      WHERE ${conditions.join(' AND ')}
@@ -389,7 +389,7 @@ export async function findEmpleadosSinPedidoSemanal(semanaInicio) {
   const { rows } = await query(
     `SELECT e.id, e.nombre, e.apellido, e.email, e.telefono, e.rol, e.activo,
             e.preferencias_alimentarias, e.empresa_id, emp.nombre AS empresa_nombre,
-            emp.plan, emp.modo_pedido, emp.dias_laborales
+            emp.plan_id, emp.modo_pedido, emp.dias_laborales
      FROM empleados e
      JOIN empresas emp ON emp.id = e.empresa_id
      LEFT JOIN pedidos p

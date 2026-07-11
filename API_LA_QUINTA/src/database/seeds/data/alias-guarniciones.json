@@ -1,0 +1,32 @@
+{
+  "_doc": "Sufijos que aparecen tras el nombre del plato en el CSV historico -> guarnicion canonica. Se evaluan en orden (mas especifico primero). El texto se normaliza (minusculas, sin tildes, espacios colapsados) antes de comparar.",
+  "reglas": [
+    { "sufijo": "remolacha y zanahoria cocida", "guarnicion": "Remolacha y zanahoria" },
+    { "sufijo": "remolacha y zanahoria",         "guarnicion": "Remolacha y zanahoria" },
+    { "sufijo": "pure de zapallos",              "guarnicion": "Puré de zapallo" },
+    { "sufijo": "pure de zapallo",               "guarnicion": "Puré de zapallo" },
+    { "sufijo": "pure de batata",                "guarnicion": "Puré de batata" },
+    { "sufijo": "pure de papas",                 "guarnicion": "Puré de papas" },
+    { "sufijo": "pure de papa",                  "guarnicion": "Puré de papas" },
+    { "sufijo": "pure de mixto",                 "guarnicion": "Puré mixto" },
+    { "sufijo": "pure mixto",                    "guarnicion": "Puré mixto" },
+    { "sufijo": "puree",                          "guarnicion": "Puré de papas" },
+    { "sufijo": "pure",                          "guarnicion": "Puré de papas" },
+    { "sufijo": "papas al horno",                "guarnicion": "Papas al horno" },
+    { "sufijo": "papas rusticas",                "guarnicion": "Papas rústicas" },
+    { "sufijo": "papas",                         "guarnicion": "Papas al horno" },
+    { "sufijo": "arroz integral",                "guarnicion": "Arroz integral" },
+    { "sufijo": "arroz primavera",               "guarnicion": "Arroz primavera" },
+    { "sufijo": "arroz",                         "guarnicion": "Arroz" },
+    { "sufijo": "fideos al pesto",               "guarnicion": "Fideos al pesto" },
+    { "sufijo": "verduras asadas",               "guarnicion": "Verduras asadas" },
+    { "sufijo": "verduras al horno",             "guarnicion": "Verduras asadas" },
+    { "sufijo": "verduras grilladas",            "guarnicion": "Verduras asadas" },
+    { "sufijo": "vegetales asados",              "guarnicion": "Verduras asadas" },
+    { "sufijo": "ensalada rusa",                 "guarnicion": "Ensalada rusa" },
+    { "sufijo": "rusa",                          "guarnicion": "Ensalada rusa" },
+    { "sufijo": "ensalada mixta",                "guarnicion": "Ensalada mixta" },
+    { "sufijo": "mixta",                         "guarnicion": "Ensalada mixta" },
+    { "sufijo": "ensalada",                      "guarnicion": "Ensalada mixta" }
+  ]
+}

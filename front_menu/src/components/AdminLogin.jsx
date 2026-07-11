@@ -28,7 +28,7 @@ export default function AdminLogin({ onLogin }) {
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">🌿</div>
           <h1 className="text-2xl font-bold text-green-700">La Quinta</h1>
-          <p className="text-sm text-gray-400 mt-1">Panel administrativo</p>
+          <p className="text-sm text-gray-500 mt-1">Panel administrativo</p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -68,7 +68,7 @@ export default function AdminLogin({ onLogin }) {
               <button
                 type="button"
                 onClick={() => setShowPass(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors p-1"
                 tabIndex={-1}
                 aria-label={showPass ? 'Ocultar contraseña' : 'Ver contraseña'}
               >

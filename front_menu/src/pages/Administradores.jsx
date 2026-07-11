@@ -8,6 +8,7 @@ import {
 import { adminAuth } from '../auth.js';
 import { confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
+import SideDrawer from '../components/ui/SideDrawer.jsx';
 
 const ROLES = {
   admin: 'Admin operativo',
@@ -30,6 +31,7 @@ export default function Administradores() {
   const updateUser = useUpdateAdminUser();
   const deleteUser = useDeleteAdminUser();
   const [modalUser, setModalUser] = useState(null);
+  const [detalleUser, setDetalleUser] = useState(null);
 
   if (!esSuperAdmin) {
     return (
@@ -111,13 +113,22 @@ export default function Administradores() {
             {usuarios.map((usuario) => {
               const esActual = usuario.id === adminActual?.id;
               return (
-                <div key={usuario.id} className="grid md:grid-cols-[1.5fr_1.3fr_0.8fr_0.8fr_1fr] gap-3 px-4 py-4 items-center">
+                <div
+                  key={usuario.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setDetalleUser(usuario)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') setDetalleUser(usuario);
+                  }}
+                  className="grid cursor-pointer gap-3 px-4 py-4 transition-colors hover:bg-gray-50 md:grid-cols-[1.5fr_1.3fr_0.8fr_0.8fr_0.6fr] md:items-center"
+                >
                   <div>
                     <p className="font-semibold text-gray-900">
                       {usuario.nombre} {usuario.apellido}
                       {esActual && <span className="ml-2 text-[10px] bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full">Vos</span>}
                     </p>
-                    <p className={`text-xs mt-1 ${usuario.activo ? 'text-green-700' : 'text-gray-400'}`}>
+                    <p className={`text-xs mt-1 ${usuario.activo ? 'text-green-700' : 'text-gray-500'}`}>
                       {usuario.activo ? 'Activo' : 'Inactivo'}
                     </p>
                   </div>
@@ -132,33 +143,20 @@ export default function Administradores() {
                     </span>
                   </p>
                   <p className="text-sm text-gray-500">{fechaCorta(usuario.created_at)}</p>
-                  <div className="flex md:justify-end gap-2">
+                  <div className="flex md:justify-end">
                     <button
-                      onClick={() => cambiarEstado(usuario)}
-                      disabled={updateUser.isPending || esActual}
-                      className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-                    >
-                      {usuario.activo ? 'Desactivar' : 'Activar'}
-                    </button>
-                    <button
-                      onClick={() => setModalUser(usuario)}
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); setDetalleUser(usuario); }}
                       className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
                     >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => eliminar(usuario)}
-                      disabled={deleteUser.isPending || esActual}
-                      className="text-xs px-2.5 py-1.5 rounded-lg border border-red-100 text-red-600 hover:bg-red-50 disabled:opacity-40"
-                    >
-                      Eliminar
+                      Ver detalle
                     </button>
                   </div>
                 </div>
               );
             })}
             {usuarios.length === 0 && (
-              <p className="px-4 py-8 text-center text-gray-400 text-sm">No hay administradores cargados.</p>
+              <p className="px-4 py-8 text-center text-gray-500 text-sm">No hay administradores cargados.</p>
             )}
           </div>
         </div>
@@ -171,6 +169,78 @@ export default function Administradores() {
           onCerrar={() => setModalUser(null)}
         />
       )}
+
+      <SideDrawer open={!!detalleUser} onClose={() => setDetalleUser(null)} title="Detalle de administrador" width="md">
+        {detalleUser ? (
+          <div className="flex h-full flex-col p-5">
+            <div className="flex-1 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Usuario</p>
+                <h2 className="mt-1 text-xl font-bold text-gray-900">{detalleUser.nombre} {detalleUser.apellido}</h2>
+                {detalleUser.id === adminActual?.id ? (
+                  <span className="mt-2 inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">Vos</span>
+                ) : null}
+              </div>
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Email</dt>
+                  <dd className="mt-1 text-gray-800">{detalleUser.email}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Rol</dt>
+                  <dd className="mt-1">
+                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                      detalleUser.rol === 'superadmin'
+                        ? 'bg-purple-50 text-purple-700'
+                        : 'bg-blue-50 text-blue-700'
+                    }`}>
+                      {ROLES[detalleUser.rol] ?? detalleUser.rol}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</dt>
+                  <dd className={`mt-1 font-semibold ${detalleUser.activo ? 'text-green-700' : 'text-gray-500'}`}>
+                    {detalleUser.activo ? 'Activo' : 'Inactivo'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Alta</dt>
+                  <dd className="mt-1 text-gray-700">{fechaCorta(detalleUser.created_at)}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="space-y-3 border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                onClick={() => { const usuario = detalleUser; setDetalleUser(null); setModalUser(usuario); }}
+                className="w-full rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
+              >
+                Editar administrador
+              </button>
+              <button type="button" onClick={() => setDetalleUser(null)} className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => { const usuario = detalleUser; setDetalleUser(null); cambiarEstado(usuario); }}
+                disabled={updateUser.isPending || detalleUser.id === adminActual?.id}
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                {detalleUser.activo ? 'Desactivar administrador' : 'Activar administrador'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { const usuario = detalleUser; setDetalleUser(null); eliminar(usuario); }}
+                disabled={deleteUser.isPending || detalleUser.id === adminActual?.id}
+                className="w-full rounded-lg border border-red-100 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
+              >
+                Eliminar administrador
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </SideDrawer>
     </div>
   );
 }
@@ -217,7 +287,7 @@ function AdminUserModal({ usuario, adminActual, onCerrar }) {
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div className="flex justify-between items-center p-5 border-b border-gray-100">
           <h3 className="font-bold text-lg">{esNuevo ? 'Nuevo administrador' : 'Editar administrador'}</h3>
-          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-700 text-xl">×</button>
+          <button onClick={onCerrar} className="text-gray-500 hover:text-gray-700 text-xl">×</button>
         </div>
 
         <form onSubmit={guardar} className="p-5 space-y-4">
@@ -264,7 +334,7 @@ function AdminUserModal({ usuario, adminActual, onCerrar }) {
               <option value="admin">Admin operativo</option>
               <option value="superadmin">Superadmin</option>
             </select>
-            {esActual && <p className="text-xs text-gray-400 mt-1">No podés cambiar tu propio rol.</p>}
+            {esActual && <p className="text-xs text-gray-500 mt-1">No podés cambiar tu propio rol.</p>}
           </Campo>
 
           {!esNuevo && (

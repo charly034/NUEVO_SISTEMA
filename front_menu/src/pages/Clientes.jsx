@@ -1,8 +1,9 @@
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import Empresas from './Empresas.jsx';
 import Planes from './Planes.jsx';
 import PedidosPagos from './PedidosPagos.jsx';
 import NotificacionesAdmin from './NotificacionesAdmin.jsx';
+import ClientesFinales from './ClientesFinales.jsx';
 
 const VISTAS = [
   {
@@ -10,6 +11,12 @@ const VISTAS = [
     label: 'Empresas',
     description: 'Empresas, empleados y cuenta corriente.',
     component: Empresas,
+  },
+  {
+    key: 'clientes',
+    label: 'Clientes finales',
+    description: 'Todos los clientes finales registrados en el sistema.',
+    component: ClientesFinales,
   },
   {
     key: 'planes',
@@ -49,7 +56,7 @@ export default function Clientes() {
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white px-4 md:px-6">
         <div className="mx-auto max-w-[1600px]">
           <div className="pt-3 pb-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Administración de clientes</p>
+            <p className="text-xs font-medium text-gray-500">Administración de clientes</p>
             <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
           </div>
           {/* Tabs */}

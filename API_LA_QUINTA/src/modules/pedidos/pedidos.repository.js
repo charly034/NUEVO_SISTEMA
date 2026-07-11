@@ -5,65 +5,131 @@ const execute = (db, text, params) => (
   typeof db === 'function' ? db(text, params) : db.query(text, params)
 );
 
+// Filtro de visibilidad por empresa: un slot/plato sin filas en la tabla de
+// visibilidad es visible para todas las empresas; si tiene filas, solo para
+// las empresas listadas. Si empresaId es null (sin contexto de empresa),
+// no se restringe nada.
+const FILTRO_VISIBILIDAD_SLOT = `(
+  $2::integer IS NULL
+  OR NOT EXISTS (SELECT 1 FROM menu_empresa_visibilidad mev WHERE mev.menu_semanal_dia_id = msd.id)
+  OR EXISTS (SELECT 1 FROM menu_empresa_visibilidad mev WHERE mev.menu_semanal_dia_id = msd.id AND mev.empresa_id = $2)
+)`;
+const FILTRO_VISIBILIDAD_PLATO = `(
+  $2::integer IS NULL
+  OR NOT EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id)
+  OR EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id AND pev.empresa_id = $2)
+)`;
+
+// Resolución de guarnición/salsa efectiva de un slot: override del slot > default de
+// la vianda del catálogo (mismo patrón de precedencia que cocina.repository.js).
+// 'libre' de guarnición no viene de la vianda (que solo fija una o ninguna) sino del
+// booleano legacy tiene_guarnicion: plato sin guarnición fija pero que sí admite que
+// el empleado elija una del catálogo general. Salsa no tiene ese arrastre histórico,
+// pero sí puede ser 'libre' como default de la vianda (v.salsa_libre) -- ver
+// create-viandas-table para por qué salsa necesitó su propio campo en vez de un
+// legacy booleano.
+const VIANDA_SLOT_COLS = `
+            COALESCE(v.nombre_vianda, p.nombre) AS nombre_vianda,
+            CASE
+              WHEN msd.guarnicion_modo_override = 'fija' THEN 'fija'
+              WHEN msd.guarnicion_modo_override IN ('sin_guarnicion', 'libre') THEN msd.guarnicion_modo_override
+              WHEN v.guarnicion_id IS NOT NULL THEN 'fija'
+              WHEN p.tiene_guarnicion THEN 'libre'
+              ELSE 'sin_guarnicion'
+            END AS guarnicion_modo,
+            COALESCE(msd.guarnicion_fija_override_id, v.guarnicion_id) AS guarnicion_fija_id,
+            gf.nombre AS guarnicion_fija_nombre,
+            CASE
+              WHEN msd.salsa_modo_override = 'fija' THEN 'fija'
+              WHEN msd.salsa_modo_override IN ('sin_salsa', 'libre') THEN msd.salsa_modo_override
+              WHEN v.salsa_id IS NOT NULL THEN 'fija'
+              WHEN v.salsa_libre THEN 'libre'
+              ELSE 'sin_salsa'
+            END AS salsa_modo,
+            COALESCE(msd.salsa_fija_override_id, v.salsa_id) AS salsa_fija_id,
+            sf.nombre AS salsa_fija_nombre`;
+const VIANDA_SLOT_JOINS = `
+     LEFT JOIN viandas v ON v.id = msd.vianda_id
+     LEFT JOIN guarniciones gf ON gf.id = COALESCE(msd.guarnicion_fija_override_id, v.guarnicion_id)
+     LEFT JOIN salsas sf ON sf.id = COALESCE(msd.salsa_fija_override_id, v.salsa_id)`;
+
 // ── Menú de la semana para el cliente ────────────────────────────────────────
 
-export const menuSemana = async (semanaInicio) => {
+export const menuSemana = async (semanaInicio, empresaId = null) => {
   // Solo menús publicados
   const variablesRes = await query(
     `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
             p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
             p.tags, p.tiene_guarnicion, p.vegetariano,
-            p.calorias, p.alergenos, p.foto_url,
-            ms.id AS menu_semanal_id, ms.nombre AS menu_nombre,
+            p.calorias, p.alergenos, p.foto_url,${VIANDA_SLOT_COLS}
+            , ms.id AS menu_semanal_id, ms.nombre AS menu_nombre,
             ms.fecha_inicio, ms.fecha_fin, ms.estado,
             ms.fecha_limite_pedidos
      FROM menus_semanales ms
      JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
-     JOIN platos p ON p.id = msd.plato_id
+     JOIN platos p ON p.id = msd.plato_id${VIANDA_SLOT_JOINS}
      WHERE ms.fecha_inicio = $1 AND ms.estado = 'publicado' AND p.activo = true
+       AND ${FILTRO_VISIBILIDAD_SLOT}
+       AND ${FILTRO_VISIBILIDAD_PLATO}
      ORDER BY msd.dia::text, msd.opcion ASC`,
-    [semanaInicio]
+    [semanaInicio, empresaId]
   );
 
-  // Platos fijos activos
-  const fijosRes = await query(
-    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, descripcion_larga,
-            tags, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url
-     FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
-  );
+  const fijosRes = await cargarPlatosFijos(query, empresaId);
 
   return { variables: variablesRes.rows, fijos: fijosRes.rows };
 };
 
-// Carga las variables y fijos de un menú dado su row de DB
-function cargarPlatosFijos(db = query) {
+// Platos candidatos a "fijo" para el menú: tipo='fijo' clásico, o disponibilidad
+// fijo_dia/siempre del catálogo -- en ambos casos, solo si tienen una vianda activa
+// (ver create-viandas-table). Sin eso no hay guarnición/salsa efectiva que resolver.
+function cargarPlatosFijos(db = query, empresaId = null) {
   return execute(db,
-    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, descripcion_larga,
-            tags, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url
-     FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
+    `SELECT p.id AS plato_id, p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
+            p.tags, p.tiene_guarnicion, p.vegetariano, p.calorias, p.alergenos, p.foto_url,
+            p.tipo, p.disponibilidad, p.dia_fijo,
+            CASE WHEN v.guarnicion_id IS NOT NULL THEN 'fija' WHEN p.tiene_guarnicion THEN 'libre' ELSE 'sin_guarnicion' END AS guarnicion_modo,
+            v.guarnicion_id AS guarnicion_fija_id, gf.nombre AS guarnicion_fija_nombre,
+            CASE WHEN v.salsa_id IS NOT NULL THEN 'fija' WHEN v.salsa_libre THEN 'libre' ELSE 'sin_salsa' END AS salsa_modo,
+            v.salsa_id AS salsa_fija_id, sf.nombre AS salsa_fija_nombre
+     FROM platos p
+     JOIN viandas v ON v.plato_id = p.id AND v.activo = true
+     LEFT JOIN guarniciones gf ON gf.id = v.guarnicion_id
+     LEFT JOIN salsas sf ON sf.id = v.salsa_id
+     WHERE p.activo = true
+       AND (p.tipo = 'fijo' OR p.disponibilidad IN ('fijo_dia', 'siempre'))
+       AND (
+         $1::integer IS NULL
+         OR NOT EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id)
+         OR EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id AND pev.empresa_id = $1)
+       )
+     ORDER BY p.nombre ASC`,
+    [empresaId]
   );
 }
 
-async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null) {
+async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null, empresaId = null) {
   const variablesRes = await execute(db,
       `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
               p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
               p.tags, p.tiene_guarnicion, p.vegetariano,
-              p.calorias, p.alergenos, p.foto_url,
-              ms.id AS menu_semanal_id
+              p.calorias, p.alergenos, p.foto_url,${VIANDA_SLOT_COLS}
+              , ms.id AS menu_semanal_id
        FROM menus_semanales ms
        JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
-       JOIN platos p ON p.id = msd.plato_id
+       JOIN platos p ON p.id = msd.plato_id${VIANDA_SLOT_JOINS}
        WHERE ms.id = $1 AND p.activo = true
+         AND ${FILTRO_VISIBILIDAD_SLOT}
+         AND ${FILTRO_VISIBILIDAD_PLATO}
        ORDER BY msd.dia::text, msd.opcion ASC`,
-      [menu.id]
+      [menu.id, empresaId]
     );
-  const fijos = fijosPrecargados || (await cargarPlatosFijos(db)).rows;
+  const fijos = fijosPrecargados || (await cargarPlatosFijos(db, empresaId)).rows;
   return { ...menu, variables: variablesRes.rows, fijos };
 }
 
 // Devuelve todos los menús publicados vigentes (fecha_fin >= hoy), ordenados por fecha_inicio
-export const menusPublicadosList = async () => {
+export const menusPublicadosList = async (empresaId = null) => {
   const result = await query(
     `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at,
             COALESCE((
@@ -77,12 +143,12 @@ export const menusPublicadosList = async () => {
      ORDER BY fecha_inicio ASC`
   );
   // Cargar platos de todos los menús en paralelo
-  const fijosRes = await cargarPlatosFijos();
-  return Promise.all(result.rows.map(m => cargarDetallesMenu(m, query, fijosRes.rows)));
+  const fijosRes = await cargarPlatosFijos(query, empresaId);
+  return Promise.all(result.rows.map(m => cargarDetallesMenu(m, query, fijosRes.rows, empresaId)));
 };
 
 // Devuelve un menú publicado específico por su ID (para validar al guardar pedido)
-export const menuActivoPorId = async (id, db = query) => {
+export const menuActivoPorId = async (id, db = query, empresaId = null) => {
   const menuRes = await execute(db,
     `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
             COALESCE((
@@ -96,10 +162,10 @@ export const menuActivoPorId = async (id, db = query) => {
   );
   const menu = menuRes.rows[0];
   if (!menu) return null;
-  return cargarDetallesMenu(menu, db);
+  return cargarDetallesMenu(menu, db, null, empresaId);
 };
 
-export const menuPublicadoPorSemana = async (semanaId, db = query) => {
+export const menuPublicadoPorSemana = async (semanaId, db = query, empresaId = null) => {
   const menuRes = await execute(db,
     `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
             COALESCE((
@@ -122,11 +188,11 @@ export const menuPublicadoPorSemana = async (semanaId, db = query) => {
   );
   const menu = menuRes.rows[0];
   if (!menu) return null;
-  return cargarDetallesMenu(menu, db);
+  return cargarDetallesMenu(menu, db, null, empresaId);
 };
 
 // Mantener por compatibilidad con menuHoy y otros usos internos
-export const menuActivo = async (db = query) => {
+export const menuActivo = async (db = query, empresaId = null) => {
   const menuRes = await execute(db,
     `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
             COALESCE((
@@ -143,7 +209,7 @@ export const menuActivo = async (db = query) => {
   );
   const menu = menuRes.rows[0];
   if (!menu) return null;
-  return cargarDetallesMenu(menu, db);
+  return cargarDetallesMenu(menu, db, null, empresaId);
 };
 
 export const menuHoy = async () => {
@@ -170,11 +236,7 @@ export const menuHoy = async () => {
     [diaStr, fechaHoy]
   );
 
-  const fijosRes = await query(
-    `SELECT id AS plato_id, nombre AS plato_nombre, descripcion, descripcion_larga,
-            tags, tiene_guarnicion, vegetariano, calorias, alergenos, foto_url
-     FROM platos WHERE tipo = 'fijo' AND activo = true ORDER BY nombre ASC`
-  );
+  const fijosRes = await cargarPlatosFijos();
 
   return { dia: diaStr, fecha: fechaHoy, variables: variablesRes.rows, fijos: fijosRes.rows };
 };
@@ -189,14 +251,17 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
          'plato_nombre', pl.nombre, 'opcion', pi.opcion,
          'tiene_guarnicion', pl.tiene_guarnicion,
          'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+         'salsa_id', pi.salsa_id, 'salsa_nombre', s.nombre,
          'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
-         'notas', pi.notas
+         'notas', pi.notas,
+         'estado', pi.estado::text, 'estado_updated_at', pi.estado_updated_at
        ) ORDER BY pi.dia
      ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
+     LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.empleado_id = $1 AND p.semana_inicio = $2
      GROUP BY p.id`,
     [empleadoId, semanaInicio]
@@ -279,8 +344,10 @@ export const findById = async (id) => {
                 'plato_nombre', pl.nombre, 'opcion', pi.opcion,
                 'tiene_guarnicion', pl.tiene_guarnicion,
                 'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+                'salsa_id', pi.salsa_id, 'salsa_nombre', s.nombre,
                 'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
-                'notas', pi.notas
+                'notas', pi.notas,
+                'estado', pi.estado::text, 'estado_updated_at', pi.estado_updated_at
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
@@ -289,6 +356,7 @@ export const findById = async (id) => {
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
+     LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.id = $1
      GROUP BY p.id, e.id, emp.id`,
     [id]
@@ -322,8 +390,10 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
                 'plato_nombre', pl.nombre, 'opcion', pi.opcion,
                 'tiene_guarnicion', pl.tiene_guarnicion,
                 'guarnicion_id', pi.guarnicion_id, 'guarnicion_nombre', g.nombre,
+                'salsa_id', pi.salsa_id, 'salsa_nombre', s.nombre,
                 'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
-                'notas', pi.notas
+                'notas', pi.notas,
+                'estado', pi.estado::text, 'estado_updated_at', pi.estado_updated_at
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
@@ -332,6 +402,7 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
+     LEFT JOIN salsas s ON s.id = pi.salsa_id
      ${where}
      GROUP BY p.id, e.id, emp.id
      ORDER BY p.created_at DESC
@@ -392,16 +463,17 @@ export const upsertPedido = async ({
 
 export const upsertItem = async (
   pedidoId,
-  { dia, plato_id, opcion, guarnicion_id, notas, sin_pedido = false, origen = null },
+  { dia, plato_id, opcion, guarnicion_id, salsa_id, notas, sin_pedido = false, origen = null },
   db = query,
 ) => {
   const r = await execute(db,
-    `INSERT INTO pedido_items (pedido_id, dia, plato_id, opcion, guarnicion_id, notas, sin_pedido, origen)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO pedido_items (pedido_id, dia, plato_id, opcion, guarnicion_id, salsa_id, notas, sin_pedido, origen, estado, estado_updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $8::boolean THEN 'cancelado'::pedido_item_estado ELSE 'pendiente'::pedido_item_estado END, NOW())
      ON CONFLICT (pedido_id, dia)
      DO UPDATE SET plato_id = EXCLUDED.plato_id, opcion = EXCLUDED.opcion,
-       guarnicion_id = EXCLUDED.guarnicion_id, notas = EXCLUDED.notas,
+       guarnicion_id = EXCLUDED.guarnicion_id, salsa_id = EXCLUDED.salsa_id, notas = EXCLUDED.notas,
        sin_pedido = EXCLUDED.sin_pedido, origen = EXCLUDED.origen,
+       estado = EXCLUDED.estado, estado_updated_at = NOW(),
        updated_at = NOW()
      RETURNING *`,
     [
@@ -410,6 +482,7 @@ export const upsertItem = async (
       plato_id || null,
       opcion || null,
       guarnicion_id || null,
+      salsa_id || null,
       notas || null,
       Boolean(sin_pedido),
       origen || null,
@@ -425,9 +498,12 @@ export const cancelarItemPedido = async (pedidoId, dia, db = query) => {
      SET plato_id = NULL,
        opcion = NULL,
        guarnicion_id = NULL,
+       salsa_id = NULL,
        notas = NULL,
        sin_pedido = TRUE,
        origen = 'usuario',
+       estado = 'cancelado',
+       estado_updated_at = NOW(),
        updated_at = NOW()
      WHERE pedido_id = $1 AND dia = $2
      RETURNING *`,
@@ -448,10 +524,13 @@ export const deleteItemsNotInDays = async (pedidoId, dias, db = query) => {
   );
 };
 
+// Resuelve la vianda efectiva del ítem: la del slot de menú si el plato pertenece a un
+// menú semanal ese día/opción (msd.vianda_id), o la vianda global del plato si es un
+// "fijo" sin slot (ver create-viandas-table, "un poco de ambas" del design doc).
 export const validateItemForMenu = async (menuId, item, db = query) => {
   const result = await execute(
     db,
-    `SELECT p.id, p.nombre, p.tipo, p.activo, p.tiene_guarnicion,
+    `SELECT p.id, p.nombre, p.tipo, p.activo, p.disponibilidad, p.dia_fijo, p.tiene_guarnicion,
             EXISTS (
               SELECT 1
               FROM menu_semanal_dias msd
@@ -460,17 +539,40 @@ export const validateItemForMenu = async (menuId, item, db = query) => {
                 AND msd.plato_id = p.id
                 AND msd.opcion = $4
             ) AS pertenece_menu,
+            (v_slot.id IS NOT NULL OR v_global.id IS NOT NULL) AS tiene_vianda,
+            CASE
+              WHEN msd.guarnicion_modo_override = 'fija' THEN 'fija'
+              WHEN msd.guarnicion_modo_override IN ('sin_guarnicion', 'libre') THEN msd.guarnicion_modo_override
+              WHEN COALESCE(v_slot.guarnicion_id, v_global.guarnicion_id) IS NOT NULL THEN 'fija'
+              WHEN p.tiene_guarnicion THEN 'libre'
+              ELSE 'sin_guarnicion'
+            END AS guarnicion_modo,
+            COALESCE(msd.guarnicion_fija_override_id, v_slot.guarnicion_id, v_global.guarnicion_id) AS guarnicion_fija_id,
+            CASE
+              WHEN msd.salsa_modo_override = 'fija' THEN 'fija'
+              WHEN msd.salsa_modo_override IN ('sin_salsa', 'libre') THEN msd.salsa_modo_override
+              WHEN COALESCE(v_slot.salsa_id, v_global.salsa_id) IS NOT NULL THEN 'fija'
+              WHEN COALESCE(v_slot.salsa_libre, v_global.salsa_libre, false) THEN 'libre'
+              ELSE 'sin_salsa'
+            END AS salsa_modo,
+            COALESCE(msd.salsa_fija_override_id, v_slot.salsa_id, v_global.salsa_id) AS salsa_fija_id,
             CASE WHEN $5::integer IS NULL THEN true ELSE EXISTS (
               SELECT 1 FROM guarniciones g WHERE g.id = $5 AND g.activo = true
-                AND p.tiene_guarnicion = true
             ) END AS guarnicion_valida,
+            CASE WHEN $6::integer IS NULL THEN true ELSE EXISTS (
+              SELECT 1 FROM salsas s WHERE s.id = $6 AND s.activo = true
+            ) END AS salsa_valida,
             EXISTS (
               SELECT 1 FROM menu_semanal_sin_servicio ss
               WHERE ss.menu_semanal_id = $2 AND ss.dia::text = $3
             ) AS sin_servicio
      FROM platos p
+     LEFT JOIN menu_semanal_dias msd
+       ON msd.menu_semanal_id = $2 AND msd.dia::text = $3 AND msd.plato_id = p.id AND msd.opcion = $4
+     LEFT JOIN viandas v_slot ON v_slot.id = msd.vianda_id
+     LEFT JOIN viandas v_global ON v_global.plato_id = p.id AND v_global.empresa_id IS NULL AND v_global.activo = true
      WHERE p.id = $1`,
-    [item.plato_id, menuId, item.dia, item.opcion, item.guarnicion_id || null]
+    [item.plato_id, menuId, item.dia, item.opcion, item.guarnicion_id || null, item.salsa_id || null]
   );
   return result.rows[0] || null;
 };
@@ -484,7 +586,9 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
                 'dia', pi.dia, 'plato_id', pi.plato_id,
                 'plato_nombre', pl.nombre, 'opcion', pi.opcion,
                 'guarnicion_nombre', g.nombre,
-                'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen
+                'salsa_id', pi.salsa_id, 'salsa_nombre', s.nombre,
+                'sin_pedido', COALESCE(pi.sin_pedido, false), 'origen', pi.origen,
+                'estado', pi.estado::text, 'estado_updated_at', pi.estado_updated_at
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
@@ -492,6 +596,7 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
+     LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.empleado_id = $1
      GROUP BY p.id, ms.id
      ORDER BY p.semana_inicio DESC
@@ -533,6 +638,20 @@ export const findSugerenciasAdmin = async ({ empresa_id, semana_inicio, limit = 
      ORDER BY ps.updated_at DESC, ps.created_at DESC
      LIMIT $${vals.length - 1} OFFSET $${vals.length}`,
     vals
+  );
+  return r.rows;
+};
+
+export const findResumenSugerencias = async (semanaInicio) => {
+  const r = await query(
+    `SELECT valor AS nombre, COUNT(*)::int AS votos
+     FROM pedido_sugerencias,
+          jsonb_array_elements_text(ideas) AS valor
+     WHERE semana_inicio = $1
+       AND jsonb_array_length(ideas) > 0
+     GROUP BY valor
+     ORDER BY votos DESC, valor`,
+    [semanaInicio]
   );
   return r.rows;
 };
@@ -646,6 +765,71 @@ export const updateEstado = async (id, estado, db = query) => {
     [estado, id]
   );
   return r.rows[0] || null;
+};
+
+export const updateItemsEstadoByPedido = async (pedidoId, estado, db = query) => {
+  const r = await execute(db,
+    `UPDATE pedido_items
+     SET estado = $1,
+       estado_updated_at = NOW(),
+       updated_at = NOW()
+     WHERE pedido_id = $2
+       AND COALESCE(sin_pedido, false) = false
+     RETURNING id, pedido_id, dia, plato_id, opcion, guarnicion_id, sin_pedido, estado::text AS estado, estado_updated_at`,
+    [estado, pedidoId]
+  );
+  return r.rows;
+};
+
+export const findItemConPedidoById = async (itemId, db = query) => {
+  const r = await execute(db,
+    `SELECT pi.id, pi.pedido_id, pi.dia, pi.plato_id, pi.opcion, pi.guarnicion_id,
+            COALESCE(pi.sin_pedido, false) AS sin_pedido,
+            pi.estado::text AS estado, pi.estado_updated_at,
+            p.estado::text AS pedido_estado, p.semana_inicio, p.empleado_id, p.empresa_id
+     FROM pedido_items pi
+     JOIN pedidos p ON p.id = pi.pedido_id
+     WHERE pi.id = $1`,
+    [itemId]
+  );
+  return r.rows[0] || null;
+};
+
+export const updateItemEstado = async (itemId, estado, db = query) => {
+  const r = await execute(db,
+    `UPDATE pedido_items
+     SET estado = $1,
+       estado_updated_at = NOW(),
+       updated_at = NOW()
+     WHERE id = $2
+     RETURNING id, pedido_id, dia, plato_id, opcion, guarnicion_id,
+       COALESCE(sin_pedido, false) AS sin_pedido,
+       estado::text AS estado, estado_updated_at`,
+    [estado, itemId]
+  );
+  return r.rows[0] || null;
+};
+
+export const calcularEstadoPedidoPorItems = async (pedidoId, db = query) => {
+  const r = await execute(db,
+    `SELECT
+       COUNT(*) FILTER (WHERE COALESCE(sin_pedido, false) = false)::int AS total,
+       COUNT(*) FILTER (WHERE COALESCE(sin_pedido, false) = false AND estado <> 'cancelado')::int AS activos,
+       COUNT(*) FILTER (WHERE COALESCE(sin_pedido, false) = false AND estado = 'cancelado')::int AS cancelados,
+       COUNT(*) FILTER (WHERE COALESCE(sin_pedido, false) = false AND estado = 'entregado')::int AS entregados
+     FROM pedido_items
+     WHERE pedido_id = $1`,
+    [pedidoId]
+  );
+  const row = r.rows[0] || { total: 0, activos: 0, cancelados: 0, entregados: 0 };
+  const total = Number(row.total);
+  const activos = Number(row.activos);
+  const entregados = Number(row.entregados);
+  const cancelados = Number(row.cancelados);
+  if (total === 0 || activos === 0) return 'cancelado';
+  if (entregados === activos) return 'completo';
+  if (entregados > 0 || cancelados > 0) return 'en_proceso';
+  return 'pendiente';
 };
 
 export const touchPedido = async (id, db = query) => {

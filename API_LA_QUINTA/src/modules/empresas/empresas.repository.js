@@ -1,8 +1,8 @@
 import { query } from '../../database/connection.js';
 
-const CAMPOS_BASE = 'id, nombre, slug, plan, plan_id, modo_pedido, activo, limite_hora, limite_dia_semana, limite_anticipacion_dias, plazo_override_hasta, dias_laborales, codigo_registro, email, telefono, deleted_at, created_at';
+const CAMPOS_BASE = 'id, nombre, slug, plan_id, modo_pedido, activo, limite_hora, limite_dia_semana, limite_anticipacion_dias, plazo_override_hasta, dias_laborales, codigo_registro, email, telefono, deleted_at, created_at';
 const CAMPOS = `
-  e.id, e.nombre, e.slug, e.plan, e.plan_id, e.modo_pedido, e.activo,
+  e.id, e.nombre, e.slug, e.plan_id, e.modo_pedido, e.activo,
   e.limite_hora, e.limite_dia_semana, e.limite_anticipacion_dias,
   e.plazo_override_hasta, e.dias_laborales, e.codigo_registro,
   e.email, e.telefono, e.deleted_at, e.created_at,
@@ -48,7 +48,7 @@ async function findEnriquecidaById(id) {
   const r = await query(`
     SELECT ${CAMPOS}
     FROM empresas e
-    LEFT JOIN planes_vianda pv ON pv.id = e.plan_id
+    LEFT JOIN planes_comerciales pv ON pv.id = e.plan_id
     WHERE e.id = $1 AND e.deleted_at IS NULL
   `, [id]);
   return r.rows[0] || null;
@@ -57,7 +57,7 @@ async function findEnriquecidaById(id) {
 function normalizarTextoBusqueda(value) {
   return String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .trim()
     .toLowerCase();
 }
@@ -98,7 +98,7 @@ export const findAll = async ({ page = 1, pageSize = 20, search = '', estado = '
   const r = await query(`
     SELECT ${CAMPOS}
     FROM empresas e
-    LEFT JOIN planes_vianda pv ON pv.id = e.plan_id
+    LEFT JOIN planes_comerciales pv ON pv.id = e.plan_id
     ${where}
     ORDER BY e.nombre ASC
     LIMIT $${values.length + 1} OFFSET $${values.length + 2}
@@ -122,7 +122,7 @@ export const findBySlug = async (slug) => {
   const r = await query(`
     SELECT ${CAMPOS}
     FROM empresas e
-    LEFT JOIN planes_vianda pv ON pv.id = e.plan_id
+    LEFT JOIN planes_comerciales pv ON pv.id = e.plan_id
     WHERE LOWER(e.slug) = LOWER($1) AND e.deleted_at IS NULL
   `, [slug]);
   return r.rows[0] || null;
@@ -130,13 +130,13 @@ export const findBySlug = async (slug) => {
 
 export const findByCodigo = async (codigo) => {
   const r = await query(
-    `SELECT e.id, e.nombre, e.dias_laborales, e.activo, e.plan, e.plan_id,
+    `SELECT e.id, e.nombre, e.dias_laborales, e.activo, e.plan_id,
             pv.nombre AS plan_nombre, pv.codigo AS plan_codigo,
             pv.gramaje_min AS plan_gramaje_min, pv.gramaje_max AS plan_gramaje_max,
             pv.incluye_postre AS plan_incluye_postre,
             pv.incluye_bebida AS plan_incluye_bebida
      FROM empresas e
-     LEFT JOIN planes_vianda pv ON pv.id = e.plan_id
+     LEFT JOIN planes_comerciales pv ON pv.id = e.plan_id
      WHERE UPPER(e.codigo_registro) = UPPER($1) AND e.deleted_at IS NULL`,
     [codigo.trim()]
   );
@@ -146,7 +146,6 @@ export const findByCodigo = async (codigo) => {
 export const create = async ({
   nombre,
   slug,
-  plan,
   plan_id,
   modo_pedido,
   dias_laborales,
@@ -159,16 +158,15 @@ export const create = async ({
   const codigo_registro = await codigoUnico();
   const r = await query(
     `INSERT INTO empresas (
-       nombre, slug, plan, plan_id, modo_pedido, dias_laborales,
+       nombre, slug, plan_id, modo_pedido, dias_laborales,
        limite_hora, limite_dia_semana, limite_anticipacion_dias, codigo_registro,
        email, telefono
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id`,
     [
       nombre,
       slug,
-      plan || 'basico',
       plan_id || null,
       modo_pedido || 'semanal',
       dias_laborales || 'lunes_viernes',
@@ -211,7 +209,7 @@ export const getDependenciasEliminacion = async (id) => {
     `SELECT COUNT(*)::int AS total
      FROM pedidos
      WHERE empresa_id = $1
-       AND estado IN ('pendiente', 'en_proceso', 'listo')`,
+       AND estado IN ('pendiente', 'en_proceso', 'completo')`,
     [id],
   );
 

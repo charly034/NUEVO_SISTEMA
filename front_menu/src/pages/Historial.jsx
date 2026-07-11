@@ -4,11 +4,7 @@ import { useUsados, useNoUsados, useHistorialPlato } from '../hooks/useHistorial
 import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import ErrorMessage from '../components/ui/ErrorMessage.jsx';
-
-const DIAS_LABEL = {
-  lunes: 'Lun', martes: 'Mar', miercoles: 'Mié',
-  jueves: 'Jue', viernes: 'Vie', sabado: 'Sáb', domingo: 'Dom',
-};
+import { DIA_ABREV as DIAS_LABEL } from '../lib/dias.js';
 
 function soloFecha(str) {
   return str ? str.split('T')[0] : '—';
@@ -170,7 +166,7 @@ function DetallePlatoModal({ plato, onClose }) {
           </p>
           <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
             {data?.historial?.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">Nunca usado aún</p>
+              <p className="text-sm text-gray-500 text-center py-6">Nunca usado aún</p>
             ) : (
               data?.historial?.map((h) => (
                 <div key={h.id} className="flex items-center justify-between py-2.5">
@@ -178,7 +174,7 @@ function DetallePlatoModal({ plato, onClose }) {
                     <p className="text-sm font-medium text-gray-800">
                       {formatCorto(h.fecha_servicio)}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-500">
                       {h.menu_semanal_nombre ?? 'Semana eliminada'} · {DIAS_LABEL[h.dia]} · opción {h.opcion}
                     </p>
                   </div>
@@ -205,7 +201,7 @@ function TabUsados({ filtros }) {
 
   if (!hayFiltro) {
     return (
-      <div className="text-center py-12 text-gray-400 text-sm">
+      <div className="text-center py-12 text-gray-500 text-sm">
         Seleccioná un período para ver qué platos se usaron.
       </div>
     );
@@ -219,7 +215,7 @@ function TabUsados({ filtros }) {
       {platos.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-3xl mb-2">🍽️</p>
-          <p className="text-sm text-gray-400">Ningun plato fue usado para {filtroLabel}.</p>
+          <p className="text-sm text-gray-500">Ningun plato fue usado para {filtroLabel}.</p>
         </div>
       ) : (
         <div className="card overflow-hidden">
@@ -244,7 +240,7 @@ function TabUsados({ filtros }) {
               >
                 <div>
                   <p className="text-sm font-medium text-gray-800">{p.plato_nombre_snapshot}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-500">
                     Última vez: {formatCorto(p.fecha_servicio)} · {DIAS_LABEL[p.dia]} · opción {p.opcion}
                   </p>
                 </div>
@@ -279,7 +275,7 @@ function TabNoUsados({ filtros }) {
       {platos.length === 0 ? (
         <div className="text-center py-12 space-y-3">
           <p className="text-sm font-medium text-gray-700">Todos los platos se usaron para {filtroLabel}</p>
-          <p className="text-xs text-gray-400">La rotación está bien cubierta. Podés ver el menú de esta semana para agregar más variedad.</p>
+          <p className="text-xs text-gray-500">La rotación está bien cubierta. Podés ver el menú de esta semana para agregar más variedad.</p>
           <Link to="/semanas" className="inline-block text-xs text-brand-600 hover:underline font-medium">
             Ver menú semanal →
           </Link>
@@ -308,7 +304,7 @@ function TabNoUsados({ filtros }) {
                 <div>
                   <p className="text-sm font-medium text-gray-800">{p.nombre}</p>
                   {p.descripcion && (
-                    <p className="text-xs text-gray-400 line-clamp-1">{p.descripcion}</p>
+                    <p className="text-xs text-gray-500 line-clamp-1">{p.descripcion}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -346,7 +342,7 @@ export default function Historial() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Historial de uso</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
+        <p className="text-sm text-gray-500 mt-0.5">
           Controlá cuándo se repite cada plato y descubrí qué conviene poner esta semana
         </p>
       </div>
