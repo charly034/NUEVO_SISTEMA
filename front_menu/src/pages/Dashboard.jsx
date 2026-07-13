@@ -83,7 +83,12 @@ export default function Dashboard() {
 
   const menusQuery = useMenusSemanales({ page: 1, pageSize: 4 });
   const menus = menusQuery.data?.menus ?? [];
-  const menuActual = menus.find(m => m.fecha_inicio === lunesEsta) ?? menus[0] ?? null;
+  // Comparar por fecha (YYYY-MM-DD): fecha_inicio viene como timestamp del
+  // backend, así que hay que recortar (mismo criterio que menuProximo). Sin
+  // fallback a menus[0]: si no hay menú de ESTA semana, menuActual queda null
+  // (la UI muestra el estado "sin menú"), en vez de etiquetar como "semana
+  // actual" a un menú arbitrario (p.ej. uno futuro que encabeza el orden DESC).
+  const menuActual = menus.find(m => m.fecha_inicio?.slice(0, 10) === lunesEsta) ?? null;
   const menuProximo = menus.find(m => m.fecha_inicio?.slice(0, 10) === lunesProxima) ?? null;
   const proximaSinPublicar = !menusQuery.isLoading && (!menuProximo || menuProximo.estado !== 'publicado');
 
