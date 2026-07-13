@@ -199,14 +199,14 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
                 >
                   <NavLink to="/platos" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5">
                     {ICONS['/platos']}
-                    <span className="flex-1">Catalogo</span>
+                    <span className="flex-1">Catálogo</span>
                   </NavLink>
                   <button
                     type="button"
                     onClick={() => setCatalogoOpen(open => !open)}
                     className="rounded p-0.5 hover:bg-gray-100"
                     aria-expanded={mostrarCatalogo}
-                    aria-label={mostrarCatalogo ? 'Cerrar Catalogo' : 'Abrir Catalogo'}
+                    aria-label={mostrarCatalogo ? 'Cerrar Catálogo' : 'Abrir Catálogo'}
                   >
                     <Chevron open={mostrarCatalogo} />
                   </button>
