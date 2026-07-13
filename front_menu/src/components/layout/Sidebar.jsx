@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 const NAV = [
   { to: '/', label: 'Dashboard' },
+  { to: '/menu-actual', label: 'Menú de esta semana' },
   { type: 'clientes' },
   { type: 'catalogo' },
   { type: 'menu-semanal' },
@@ -21,8 +22,10 @@ const CLIENTES_ITEMS = [
 
 const CATALOGO_ITEMS = [
   { to: '/platos', label: 'Platos' },
+  { to: '/viandas', label: 'Viandas' },
   { to: '/guarniciones', label: 'Guarniciones' },
   { to: '/salsas', label: 'Salsas' },
+  { to: '/ciclos-rotativos', label: 'Ciclos rotativos' },
 ];
 
 const MENU_SEMANAL_GROUPS = [
@@ -55,9 +58,11 @@ const ICONS = {
   '/': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M3 12L12 3l9 9" /><path d="M9 21V12h6v9" /></svg>,
   '/clientes': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M3 21h18M9 8h1m5 0h1M9 12h1m5 0h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" /><path d="M7 21v-5h10v5" /></svg>,
   '/platos': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>,
+  '/viandas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M9 4v16M15 4v16" /></svg>,
   '/guarniciones': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M4 10h16" /><path d="M6 10l1.5 9h9L18 10" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>,
   '/salsas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M12 3c2.5 3 4 5.5 4 8a4 4 0 1 1-8 0c0-2.5 1.5-5 4-8z" /></svg>,
   '/semanas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>,
+  '/menu-actual': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M9 16l2 2 4-4" /></svg>,
   '/sugeridor': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>,
   '/historial': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M12 8v4l3 3" /><path d="M3.05 11a9 9 0 1 0 .5-3" /><path d="M3 4v4h4" /></svg>,
   '/estadisticas': <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4"><path d="M18 20V10M12 20V4M6 20v-6" /></svg>,

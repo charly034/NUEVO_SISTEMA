@@ -209,9 +209,13 @@ function VisibilidadEmpresas({ platoId }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Visible para empresas</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Visible para empresas (catálogo)</p>
         {vis?.todas && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Todas</span>}
       </div>
+      <p className="text-xs text-amber-600">
+        Esto ya no se usa para filtrar pedidos: la visibilidad de un fijo ahora se decide semana a semana desde
+        Resumen (Menú semanal), no acá.
+      </p>
       <p className="text-xs text-gray-500">Sin seleccion = visible para todas. Tildando empresas limitás la visibilidad.</p>
       <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto">
         {empresas.map((e) => (

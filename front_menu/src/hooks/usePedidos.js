@@ -21,15 +21,6 @@ export const useUpdateEstadoPedido = () => {
   });
 };
 
-export const useSugerenciasResumen = (semanaInicio, options = {}) =>
-  useQuery({
-    queryKey: ['sugerencias-resumen', semanaInicio],
-    queryFn: () => api.get('/pedidos/sugerencias/resumen', { params: { semana_inicio: semanaInicio } }).then(r => r.data?.data ?? r.data),
-    staleTime: 5 * 60 * 1000,
-    enabled: Boolean(semanaInicio),
-    ...options,
-  });
-
 export const useUpdateEstadoPedidoItem = () => {
   const qc = useQueryClient();
   return useMutation({

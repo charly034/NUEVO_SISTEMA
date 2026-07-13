@@ -18,6 +18,7 @@ function normalizarFechaInput(fecha) {
 const PLANES = { basico: 'Básico', con_postre: 'Con postre', con_postre_bebida: 'Con postre y bebida' };
 const MODOS = { semanal: 'Semanal', diario: 'Diario', ambos: 'Ambos' };
 const DIAS_LAB = { lunes_viernes: 'Lunes a viernes', lunes_sabado: 'Lunes a sábado', lunes_domingo: 'Lunes a domingo' };
+const OPCION_DEFAULT = { '': 'Todas las opciones', A: 'Opción 1', B: 'Opción 2', C: 'Opción 3', D: 'Opción 4', E: 'Opción 5' };
 
 function etiquetaPlan(plan) {
   if (!plan) return 'Sin plan';
@@ -916,6 +917,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
     plan_id: empresa?.plan_id || planes.find(plan => plan.activo)?.id || '',
     modo_pedido: empresa?.modo_pedido || 'semanal',
     dias_laborales: empresa?.dias_laborales || 'lunes_viernes',
+    opcion_default: empresa?.opcion_default || '',
     activo: empresa?.activo ?? true,
     limite_hora: empresa?.limite_hora ? empresa.limite_hora.slice(0, 5) : '',
     limite_dia_semana: empresa?.limite_dia_semana || 'lunes',
@@ -976,6 +978,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
       telefono: form.telefono.trim(),
     };
     if (!data.plan_id) delete data.plan_id;
+    if (!data.opcion_default) data.opcion_default = null;
     // Si no pusieron hora, limpiar los límites
     if (!data.limite_hora) {
       data.limite_hora = null;
@@ -1042,6 +1045,11 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
         <Campo label="Días laborales">
           <select className={input} value={form.dias_laborales} onChange={e => set('dias_laborales', e.target.value)}>
             {Object.entries(DIAS_LAB).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Opción asignada (default estable, se puede excepcionar por semana desde Semana por Opción)">
+          <select className={input} value={form.opcion_default} onChange={e => set('opcion_default', e.target.value)}>
+            {Object.entries(OPCION_DEFAULT).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Campo>
 

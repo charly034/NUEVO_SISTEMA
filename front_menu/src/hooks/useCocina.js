@@ -19,14 +19,6 @@ export const useCocinaSemana = (menuId) =>
     enabled: !!menuId,
   });
 
-export const useOfertaSemanal = (menuId) =>
-  useQuery({
-    queryKey: [COCINA_KEY, 'oferta', menuId],
-    queryFn: () => cocinaService.getOferta(menuId),
-    select: (res) => res.data,
-    enabled: !!menuId,
-  });
-
 export const useEtiquetas = (menuId, dia) =>
   useQuery({
     queryKey: [COCINA_KEY, 'etiquetas', menuId, dia],

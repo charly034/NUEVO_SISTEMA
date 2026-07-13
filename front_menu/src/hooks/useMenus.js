@@ -59,66 +59,6 @@ export const useCambiarEstadoMenu = () => {
   });
 };
 
-export const useDisenoMenu = (id) =>
-  useQuery({
-    queryKey: [MENUS_KEY, id, 'diseno'],
-    queryFn: () => menusService.getDiseno(id),
-    select: (res) => res.data,
-    enabled: !!id,
-  });
-
-export const useAgregarPlato = (menuId) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data) => menusService.agregarPlato(menuId, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId] });
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
-    },
-  });
-};
-
-export const useSetEmpresasSlot = (menuId) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dia, opcion, empresa_ids }) => menusService.setEmpresasSlot(menuId, dia, opcion, { empresa_ids }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
-    },
-  });
-};
-
-export const useActualizarGuarnicionSlot = (menuId) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dia, opcion, ...data }) => menusService.actualizarGuarnicionSlot(menuId, dia, opcion, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
-    },
-  });
-};
-
-export const useActualizarSalsaSlot = (menuId) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dia, opcion, ...data }) => menusService.actualizarSalsaSlot(menuId, dia, opcion, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
-    },
-  });
-};
-
-export const useQuitarPlato = (menuId) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dia, opcion }) => menusService.quitarPlato(menuId, dia, opcion),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId] });
-      qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
-    },
-  });
-};
-
 export const useMarcarSinServicio = (menuId) => {
   const qc = useQueryClient();
   return useMutation({
@@ -126,6 +66,10 @@ export const useMarcarSinServicio = (menuId) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId] });
       qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
+      // 'semana-opciones' (pantalla Resumen) tambien lee sin_servicio desde
+      // que empezo a migrar acciones de Disenar menu (2026-07-13) -- sin
+      // esto, la nueva pantalla queda desactualizada tras la mutacion.
+      qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] });
     },
   });
 };
@@ -137,7 +81,32 @@ export const useQuitarSinServicio = (menuId) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId] });
       qc.invalidateQueries({ queryKey: [MENUS_KEY, menuId, 'diseno'] });
+      qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] });
     },
+  });
+};
+
+export const useAgregarPlato = (menuId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => menusService.agregarPlato(menuId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] }),
+  });
+};
+
+export const useQuitarPlato = (menuId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dia, opcion }) => menusService.quitarPlato(menuId, dia, opcion),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] }),
+  });
+};
+
+export const useSetEmpresasSlot = (menuId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dia, opcion, empresa_ids }) => menusService.setEmpresasSlot(menuId, dia, opcion, { empresa_ids }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] }),
   });
 };
 

@@ -37,3 +37,22 @@ export async function confirmarAccion({ titulo, texto, botonConfirmar = 'Confirm
   });
   return result.isConfirmed;
 }
+
+/**
+ * Pide un texto corto opcional al usuario. Devuelve el texto (puede ser
+ * cadena vacía) o null si canceló.
+ */
+export async function pedirTexto({ titulo, placeholder = '', botonConfirmar = 'Confirmar' } = {}) {
+  const result = await Swal.fire({
+    title: titulo,
+    input: 'text',
+    inputPlaceholder: placeholder,
+    showCancelButton: true,
+    confirmButtonColor: '#276749',
+    cancelButtonColor: '#718096',
+    confirmButtonText: botonConfirmar,
+    cancelButtonText: 'Cancelar',
+    reverseButtons: true,
+  });
+  return result.isConfirmed ? (result.value || '') : null;
+}

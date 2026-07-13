@@ -9,17 +9,13 @@ export const menusService = {
   remove: (id) => apiClient.delete(`/menus-semanales/${id}`),
 
   agregarPlato: (menuId, data) => apiClient.post(`/menus-semanales/${menuId}/dias`, data),
-  actualizarGuarnicionSlot: (menuId, dia, opcion, data) => apiClient.patch(`/menus-semanales/${menuId}/dias/${dia}/${opcion}/guarnicion`, data),
-  actualizarSalsaSlot: (menuId, dia, opcion, data) => apiClient.patch(`/menus-semanales/${menuId}/dias/${dia}/${opcion}/salsa`, data),
-  setEmpresasSlot: (menuId, dia, opcion, data) => apiClient.put(`/menus-semanales/${menuId}/dias/${dia}/${opcion}/empresas`, data),
   quitarPlato: (menuId, dia, opcion) => apiClient.delete(`/menus-semanales/${menuId}/dias/${dia}/${opcion}`),
+  setEmpresasSlot: (menuId, dia, opcion, data) => apiClient.put(`/menus-semanales/${menuId}/dias/${dia}/${opcion}/empresas`, data),
 
   marcarSinServicio: (menuId, data) => apiClient.post(`/menus-semanales/${menuId}/sin-servicio`, data),
   quitarSinServicio: (menuId, dia) => apiClient.delete(`/menus-semanales/${menuId}/sin-servicio/${dia}`),
 
   cambiarEstado: (id, estado, extra = {}) => apiClient.patch(`/menus-semanales/${id}/estado`, { estado, ...extra }),
-
-  getDiseno: (id) => apiClient.get(`/menus-semanales/${id}/diseno`),
 
   getHistorialPlato: (platoId) => apiClient.get(`/menus-semanales/historial/plato/${platoId}`),
   getUsados: (params) => apiClient.get('/menus-semanales/historial/usados', { params }),

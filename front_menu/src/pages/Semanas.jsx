@@ -1,12 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { useMenusSemanales, useCreateMenu, useDeleteMenu, useCambiarEstadoMenu, useDuplicarMenu } from '../hooks/useMenus.js';
-import { usePedidos } from '../hooks/usePedidos.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { useMenusSemanales, useCreateMenu, useCambiarEstadoMenu } from '../hooks/useMenus.js';
 import SideDrawer from '../components/ui/SideDrawer.jsx';
-import Modal from '../components/ui/Modal.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
-import { DIAS_ORDEN as DIAS_SEMANA, DIA_ABREV as DIA_LABEL } from '../lib/dias.js';
+import { DIAS_ORDEN as DIAS_SEMANA } from '../lib/dias.js';
 import { lunesActualISO } from '../lib/fechas.js';
 
 // ── helpers de fecha ──────────────────────────────────────────────────
@@ -22,7 +20,6 @@ function addDias(iso, n) {
   const [y, m, d] = iso.split('-').map(Number);
   return localISO(new Date(y, m - 1, d + n));
 }
-function addSemanas(iso, n) { return addDias(iso, n * 7); }
 function getLunesActual() {
   return lunesActualISO();
 }
@@ -30,15 +27,6 @@ function formatCorto(iso) {
   if (!iso) return '—';
   const [, m, d] = soloFecha(iso).split('-');
   return `${parseInt(d)} ${MESES_CORTO[parseInt(m) - 1]}`;
-}
-function formatLargo(iso) {
-  if (!iso) return '—';
-  const [y, m, d] = soloFecha(iso).split('-');
-  return `${parseInt(d)} ${MESES_LARGO[parseInt(m) - 1]} ${y}`;
-}
-function esSemanaCursada(lunesIso, estado) {
-  if (!['cerrado', 'publicado'].includes(estado)) return false;
-  return addDias(lunesIso, 6) < localISO(new Date());
 }
 function nombreSugerido(lunesIso) {
   const [, lm, ld] = soloFecha(lunesIso).split('-');
@@ -187,310 +175,63 @@ function FilaSemana({ lunesIso, menu, isActiva, onClick, hoyIso, lunesActual }) 
   );
 }
 
-// ── Grilla detallada en SideDrawer ────────────────────────────────────
-function GrillaDias({ menu }) {
-  const { dias = [], sin_servicio = [] } = menu;
-  const diasMap = Object.fromEntries(dias.map(d => [d.dia, d]));
-  const sinSet  = new Set(sin_servicio.map(s => s.dia));
-
-  return (
-    <div className="overflow-x-auto -mx-1 px-1">
-      <div className="grid grid-cols-7 gap-1.5 min-w-[420px]">
-        {DIAS_SEMANA.map((dia, i) => {
-          const fechaDia = addDias(soloFecha(menu.fecha_inicio), i);
-          const platos   = diasMap[dia]?.platos ?? [];
-          const esSin    = sinSet.has(dia);
-          const esFS     = i >= 5;
-          const borderCls = esSin
-            ? 'border-red-200 bg-red-50'
-            : platos.length > 0
-              ? 'border-green-200 bg-green-50'
-              : esFS ? 'border-gray-100 bg-gray-50' : 'border-gray-200 bg-white';
-
-          return (
-            <div key={dia} className={`rounded-xl border ${borderCls} p-2 min-h-[76px]`}>
-              <div className="text-[11px] font-bold text-gray-700">{DIA_LABEL[dia]}</div>
-              <div className="text-[10px] text-gray-500 mb-1.5">{formatCorto(fechaDia)}</div>
-              {esSin ? (
-                <div className="text-[10px] font-semibold text-red-500">Sin servicio</div>
-              ) : platos.length > 0 ? (
-                <div className="flex flex-col gap-1">
-                  {platos.slice(0, 3).map((p, pi) => (
-                    <div key={pi} className="text-[10px] text-green-700 leading-snug">
-                      {p.opcion && <span className="font-bold">{p.opcion}: </span>}
-                      {p.plato_nombre}
-                    </div>
-                  ))}
-                  {platos.length > 3 && (
-                    <div className="text-[10px] text-gray-500">+{platos.length - 3} más</div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-[10px] text-gray-500">Sin platos</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Contenido del SideDrawer ──────────────────────────────────────────
-function DrawerContenido({ lunesIso, menu, onPublicar, onReabrir, onDuplicar, onDelete, estadoMut, estadoPending, totalPedidos, onClose }) {
-  const [creando, setCreando]               = useState(false);
-  const [nombre, setNombre]                 = useState('');
-  const [editandoFecha, setEditandoFecha]   = useState(false);
-  const [fechaLimite, setFechaLimite]       = useState('');
-  const [horaLimite, setHoraLimite]         = useState('10:00');
+// ── Contenido del SideDrawer: solo crear menu para una semana vacia.
+// Publicar/Reabrir/Duplicar/Eliminar/fecha limite viven ahora en la vista
+// Excel (MenuResumen.jsx) -- el click en una semana CON menu navega directo
+// ahi, este drawer ya no se abre para esas semanas (ver onClick en FilaSemana).
+function DrawerContenido({ lunesIso, onCreado, onClose }) {
+  const [creando, setCreando] = useState(false);
+  const [nombre, setNombre]   = useState('');
   const createMut = useCreateMenu();
   const domingo   = addDias(lunesIso, 6);
 
   const handleCreate = async () => {
     try {
       const n = nombre.trim() || nombreSugerido(lunesIso);
-      await createMut.mutateAsync({ nombre: n, fecha_inicio: lunesIso, fecha_fin: domingo });
+      const creado = await createMut.mutateAsync({ nombre: n, fecha_inicio: lunesIso, fecha_fin: domingo });
       toast.success('Menu creado');
       setCreando(false);
       setNombre('');
+      onCreado(creado?.data?.id ?? creado?.id);
     } catch (e) {
       toast.error(e.message);
     }
   };
 
-  if (!menu) {
-    return (
-      <div className="p-5 flex flex-col items-center justify-center text-center py-12">
-        <p className="text-sm font-semibold text-gray-700 mb-1">{formatCorto(lunesIso)} — {formatCorto(domingo)}</p>
-        <p className="text-sm text-gray-500 mb-6">No hay menu registrado para esta semana.</p>
-        {creando ? (
-          <div className="w-full max-w-xs text-left">
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre del menu</label>
-            <input
-              type="text" value={nombre} onChange={e => setNombre(e.target.value)}
-              placeholder={nombreSugerido(lunesIso)} autoFocus
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
-            />
-            <div className="flex gap-2 justify-center">
-              <button onClick={() => { setCreando(false); setNombre(''); }} className="btn-secondary">Cancelar</button>
-              <button onClick={handleCreate} disabled={createMut.isPending} className="btn-primary flex items-center gap-1.5">
-                {createMut.isPending && <Spinner size="sm" />}
-                Crear menu
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <button onClick={() => setCreando(true)} className="btn-primary">+ Crear menu para esta semana</button>
-            <Link to={`/sugeridor?semana=${lunesIso}`} className="btn-secondary" onClick={onClose}>Generar menu</Link>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const { estado = 'borrador', dias = [], sin_servicio = [] } = menu;
-  const totalPlatos = dias.reduce((acc, d) => acc + (d.platos?.length ?? 0), 0);
-  const fechaLimiteStr = menu.fecha_limite_pedidos
-    ? new Date(menu.fecha_limite_pedidos).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    : null;
-
   return (
-    <div className="p-5 space-y-5">
-      <div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
-          <span>{formatLargo(menu.fecha_inicio)} &mdash; {formatLargo(addDias(soloFecha(menu.fecha_inicio), 6))}</span>
-          <span>&middot;</span>
-          <span>{totalPlatos} plato{totalPlatos !== 1 ? 's' : ''}</span>
-          {sin_servicio.length > 0 && (<><span>&middot;</span><span>{sin_servicio.length} feriado{sin_servicio.length !== 1 ? 's' : ''}</span></>)}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {fechaLimiteStr && estado === 'publicado' && (
-            <p className="text-xs text-amber-600 font-medium">Pedidos hasta: {fechaLimiteStr}</p>
-          )}
-          {totalPedidos > 0 && (
-            <p className="text-xs text-blue-600 font-semibold">{totalPedidos} pedido{totalPedidos !== 1 ? 's' : ''} registrado{totalPedidos !== 1 ? 's' : ''}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Link to={`/semanas/${menu.id}`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
-          onClick={onClose}>
-          Editar grilla &rarr;
-        </Link>
-        {estado === 'borrador' && (
-          <button onClick={onPublicar} disabled={estadoPending} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
-            Publicar
-          </button>
-        )}
-        {estado === 'cerrado' && (
-          <button onClick={onReabrir} disabled={estadoPending} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
-            Reabrir pedidos
-          </button>
-        )}
-        <button onClick={onDuplicar} className="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-          Duplicar
-        </button>
-        {esSemanaCursada(lunesIso, estado) && (
-          <Link to={`/estadisticas?desde=${lunesIso}&hasta=${addDias(lunesIso, 6)}`}
-            className="rounded-lg border border-blue-100 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-            onClick={onClose}>
-            Ver estadisticas
-          </Link>
-        )}
-        {estado === 'publicado' && (<div className="w-full border-t border-gray-100 my-1" />)}
-        {estado === 'publicado' && (
-          <>
-            <button onClick={() => estadoMut({ estado: 'cerrado' })} disabled={estadoPending}
-              className="rounded-lg border border-orange-200 bg-orange-50 px-3.5 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 transition-colors disabled:opacity-50">
-              Cerrar pedidos
-            </button>
-            <button onClick={() => estadoMut({ estado: 'borrador' })} disabled={estadoPending}
-              className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50">
-              Volver a borrador
-            </button>
-          </>
-        )}
-        {estado === 'borrador' && (
-          <button onClick={onDelete} className="rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors">
-            Eliminar
-          </button>
-        )}
-      </div>
-
-      {estado === 'publicado' && (
-        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold text-gray-600">Fecha limite de pedidos</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {fechaLimiteStr ? fechaLimiteStr : 'Sin fecha limite — los pedidos quedan abiertos.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setEditandoFecha(v => !v)}
-              className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              {editandoFecha ? 'Cancelar' : fechaLimiteStr ? 'Editar' : 'Agregar'}
+    <div className="p-5 flex flex-col items-center justify-center text-center py-12">
+      <p className="text-sm font-semibold text-gray-700 mb-1">{formatCorto(lunesIso)} — {formatCorto(domingo)}</p>
+      <p className="text-sm text-gray-500 mb-6">No hay menu registrado para esta semana.</p>
+      {creando ? (
+        <div className="w-full max-w-xs text-left">
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre del menu</label>
+          <input
+            type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+            placeholder={nombreSugerido(lunesIso)} autoFocus
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
+          />
+          <div className="flex gap-2 justify-center">
+            <button onClick={() => { setCreando(false); setNombre(''); }} className="btn-secondary">Cancelar</button>
+            <button onClick={handleCreate} disabled={createMut.isPending} className="btn-primary flex items-center gap-1.5">
+              {createMut.isPending && <Spinner size="sm" />}
+              Crear menu
             </button>
           </div>
-          {editandoFecha && (
-            <div className="mt-3 space-y-2">
-              <div className="flex gap-2">
-                <input type="date" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <input type="time" value={horaLimite} onChange={e => setHoraLimite(e.target.value)}
-                  className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={estadoPending}
-                  onClick={async () => {
-                    const fl = fechaLimite ? `${fechaLimite}T${horaLimite}:00` : null;
-                    await estadoMut({ estado: 'publicado', extra: { fecha_limite_pedidos: fl } });
-                    setEditandoFecha(false);
-                  }}
-                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  Guardar
-                </button>
-                {fechaLimiteStr && (
-                  <button
-                    type="button"
-                    disabled={estadoPending}
-                    onClick={async () => {
-                      await estadoMut({ estado: 'publicado', extra: { fecha_limite_pedidos: null } });
-                      setEditandoFecha(false);
-                    }}
-                    className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                  >
-                    Quitar fecha
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-2">
+          <button onClick={() => setCreando(true)} className="btn-primary">+ Crear menu para esta semana</button>
+          <Link to={`/sugeridor?semana=${lunesIso}`} className="btn-secondary" onClick={onClose}>Generar menu</Link>
         </div>
       )}
-
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Detalle diario</p>
-        <GrillaDias menu={menu} />
-      </div>
     </div>
-  );
-}
-
-// ── Modales ───────────────────────────────────────────────────────────
-function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
-  const [fecha, setFecha] = useState('');
-  const [hora, setHora]   = useState('10:00');
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-600">Publicar <strong>{menu?.nombre}</strong> lo hara visible para que los empleados puedan hacer su pedido.</p>
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          Fecha limite de pedidos <span className="font-normal text-gray-500">(opcional)</span>
-        </label>
-        <div className="flex gap-2">
-          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-          <input type="time" value={hora} onChange={e => setHora(e.target.value)}
-            className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-        </div>
-        <p className="text-xs text-gray-500 mt-1.5">Sin fecha: los pedidos quedan abiertos hasta cerrarlos manualmente.</p>
-      </div>
-      <div className="flex gap-2 justify-end pt-1">
-        <button onClick={onCancel} className="btn-secondary">Cancelar</button>
-        <button onClick={() => onConfirm(fecha ? `${fecha}T${hora}:00` : null)} disabled={loading} className="btn-primary flex items-center gap-1.5">
-          {loading && <Spinner size="sm" />}
-          Publicar menu
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ModalDuplicarForm({ menu, onConfirm, onCancel, loading }) {
-  const lunesBase    = soloFecha(menu?.fecha_inicio || getLunesActual());
-  const lunesInicial = addSemanas(lunesBase, 1);
-  const [fechaInicio, setFechaInicio] = useState(lunesInicial);
-  const [nombre, setNombre]           = useState(nombreSugerido(lunesInicial));
-  const fechaFin = addDias(fechaInicio, 6);
-  const cambiarFecha = v => { setFechaInicio(v); setNombre(nombreSugerido(v)); };
-
-  return (
-    <form onSubmit={e => { e.preventDefault(); onConfirm({ nombre, fecha_inicio: fechaInicio, fecha_fin: fechaFin }); }} className="space-y-4">
-      <p className="text-sm text-gray-600">Se copiaran platos, opciones y dias sin servicio de <strong>{menu?.nombre}</strong> a una nueva semana en borrador.</p>
-      <label className="block">
-        <span className="block text-sm font-semibold text-gray-700 mb-1">Lunes de destino</span>
-        <input type="date" value={fechaInicio} onChange={e => cambiarFecha(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none" required />
-      </label>
-      <label className="block">
-        <span className="block text-sm font-semibold text-gray-700 mb-1">Nombre</span>
-        <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none" required />
-      </label>
-      <p className="text-xs text-gray-500">Rango: {formatCorto(fechaInicio)} &mdash; {formatCorto(fechaFin)}</p>
-      <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="btn-secondary">Cancelar</button>
-        <button type="submit" disabled={loading} className="btn-primary flex items-center gap-1.5">
-          {loading && <Spinner size="sm" />}
-          Duplicar semana
-        </button>
-      </div>
-    </form>
   );
 }
 
 // ── Componente principal ──────────────────────────────────────────────
 export default function Semanas() {
+  const navigate     = useNavigate();
   const hoyIso      = localISO(new Date());
   const lunesActual = getLunesActual();
   const hoyDate     = new Date();
@@ -498,15 +239,8 @@ export default function Semanas() {
   const [navYear,  setNavYear]  = useState(hoyDate.getFullYear());
   const [navMonth, setNavMonth] = useState(hoyDate.getMonth());
   const [semanaActiva, setSemanaActiva] = useState(null);
-  const [modalPublicar,  setModalPublicar]  = useState(false);
-  const [modalDuplicar,  setModalDuplicar]  = useState(false);
-  const [confirmDelete,  setConfirmDelete]  = useState(false);
-  const [confirmReabrir, setConfirmReabrir] = useState(false);
 
   const query         = useMenusSemanales({ limit: 200 });
-  const pedidosQ      = usePedidos({ semana_inicio: semanaActiva, limit: 500 }, { enabled: Boolean(semanaActiva) });
-  const deleteMut     = useDeleteMenu();
-  const duplicarMut   = useDuplicarMenu();
   const estadoMutHook = useCambiarEstadoMenu();
 
   const menus = query.data?.menus ?? [];
@@ -539,8 +273,6 @@ export default function Semanas() {
   }, [menus, estadoMutHook]);
 
   const semanasVisibles = useMemo(() => semanasDelMes(navYear, navMonth), [navYear, navMonth]);
-  const menuActivo   = semanaActiva ? (menuByLunes.get(semanaActiva) ?? null) : null;
-  const totalPedidos = pedidosQ.data?.length ?? 0;
 
   const cerrarDrawer = () => setSemanaActiva(null);
 
@@ -559,49 +291,12 @@ export default function Semanas() {
     else setNavMonth(m => m + 1);
   };
 
-  const handleEstado = async ({ estado, extra = {} }) => {
-    if (!menuActivo) return false;
-    try {
-      await estadoMutHook.mutateAsync({ id: menuActivo.id, estado, extra });
-      const labels = { publicado: menuActivo.estado === 'cerrado' ? 'reabierto' : 'publicado', borrador: 'vuelto a borrador', cerrado: 'cerrado' };
-      toast.success(`Menu ${labels[estado]}`);
-      setModalPublicar(false);
-      return true;
-    } catch (e) {
-      toast.error(e?.message || 'Error al cambiar el estado');
-      return false;
-    }
-  };
-
-  const handlePublicar = async (fechaLimite) => {
-    await handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: fechaLimite ?? null } });
-  };
-
-  const handleReabrir = async () => {
-    const ok = await handleEstado({ estado: 'publicado', extra: { fecha_limite_pedidos: null } });
-    if (ok) setConfirmReabrir(false);
-  };
-
-  const handleDelete = async () => {
-    if (!menuActivo) return;
-    try {
-      await deleteMut.mutateAsync(menuActivo.id);
-      toast.success('Menu eliminado');
-      setConfirmDelete(false);
-      cerrarDrawer();
-    } catch (e) {
-      toast.error(e?.message || 'Error al eliminar el menu');
-    }
-  };
-
-  const handleDuplicar = async (data) => {
-    if (!menuActivo) return;
-    try {
-      await duplicarMut.mutateAsync({ id: menuActivo.id, data });
-      toast.success('Semana duplicada');
-      setModalDuplicar(false);
-    } catch (e) {
-      toast.error(e?.message || 'No se pudo duplicar la semana');
+  const irASemana = (lunes) => {
+    const menu = menuByLunes.get(lunes);
+    if (menu) {
+      navigate(`/semanas/${menu.id}/resumen`);
+    } else {
+      setSemanaActiva(semanaActiva === lunes ? null : lunes);
     }
   };
 
@@ -659,7 +354,7 @@ export default function Semanas() {
                   isActiva={semanaActiva === lunes}
                   hoyIso={hoyIso}
                   lunesActual={lunesActual}
-                  onClick={() => setSemanaActiva(semanaActiva === lunes ? null : lunes)}
+                  onClick={() => irASemana(lunes)}
                 />
               ))}
             </div>
@@ -679,75 +374,23 @@ export default function Semanas() {
         )}
       </div>
 
-      {/* SideDrawer */}
+      {/* SideDrawer: solo para crear un menu en una semana vacia. Las
+          semanas que ya tienen menu navegan directo a la vista Excel
+          (irASemana), asi que este drawer nunca las muestra. */}
       <SideDrawer
         open={Boolean(semanaActiva)}
         onClose={cerrarDrawer}
-        title={semanaActiva ? (menuActivo?.nombre ?? nombreSugerido(semanaActiva)) : ''}
+        title={semanaActiva ? nombreSugerido(semanaActiva) : ''}
         width="lg"
       >
         {semanaActiva && (
           <DrawerContenido
             lunesIso={semanaActiva}
-            menu={menuActivo}
-            estadoMut={handleEstado}
-            estadoPending={estadoMutHook.isPending}
-            onPublicar={() => setModalPublicar(true)}
-            onReabrir={() => setConfirmReabrir(true)}
-            onDuplicar={() => setModalDuplicar(true)}
-            onDelete={() => setConfirmDelete(true)}
-            totalPedidos={totalPedidos}
+            onCreado={(menuId) => { cerrarDrawer(); if (menuId) navigate(`/semanas/${menuId}/resumen`); }}
             onClose={cerrarDrawer}
           />
         )}
       </SideDrawer>
-
-      <Modal open={modalPublicar} onClose={() => setModalPublicar(false)} title="Publicar menu">
-        {menuActivo && (
-          <ModalPublicarForm
-            menu={menuActivo}
-            onConfirm={handlePublicar}
-            onCancel={() => setModalPublicar(false)}
-            loading={estadoMutHook.isPending}
-          />
-        )}
-      </Modal>
-
-      <Modal open={modalDuplicar} onClose={() => setModalDuplicar(false)} title="Duplicar semana">
-        {menuActivo && (
-          <ModalDuplicarForm
-            menu={menuActivo}
-            onConfirm={handleDuplicar}
-            onCancel={() => setModalDuplicar(false)}
-            loading={duplicarMut.isPending}
-          />
-        )}
-      </Modal>
-
-      <Modal open={confirmReabrir} onClose={() => setConfirmReabrir(false)} title="Reabrir pedidos">
-        <p className="text-sm text-gray-700 mb-2">Reabrir <strong>{menuActivo?.nombre}</strong>?</p>
-        <p className="text-xs text-gray-500 mb-5">La semana volvera a estar publicada y los empleados podran cargar o modificar pedidos.</p>
-        <div className="flex gap-2 justify-end">
-          <button onClick={() => setConfirmReabrir(false)} className="btn-secondary">Cancelar</button>
-          <button onClick={handleReabrir} disabled={estadoMutHook.isPending} className="btn-primary flex items-center gap-1.5">
-            {estadoMutHook.isPending && <Spinner size="sm" />}
-            Reabrir
-          </button>
-        </div>
-      </Modal>
-
-      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Eliminar menu">
-        <p className="text-sm text-gray-700 mb-2">Eliminar <strong>{menuActivo?.nombre}</strong>?</p>
-        <p className="text-xs text-gray-500 mb-5">Se eliminaran todos los platos y dias sin servicio asignados a esta semana.</p>
-        <div className="flex gap-2 justify-end">
-          <button onClick={() => setConfirmDelete(false)} className="btn-secondary">Cancelar</button>
-          <button onClick={handleDelete} disabled={deleteMut.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50">
-            {deleteMut.isPending && <Spinner size="sm" />}
-            Eliminar
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }

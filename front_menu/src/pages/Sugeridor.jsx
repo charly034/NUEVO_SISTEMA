@@ -359,7 +359,7 @@ export default function Sugeridor() {
       }
 
       toast.success('Menú creado con las sugerencias');
-      navigate(`/semanas/${menu.id}`);
+      navigate(`/semanas/${menu.id}/resumen`);
     } catch (e) {
       toast.error(e.message);
     } finally {

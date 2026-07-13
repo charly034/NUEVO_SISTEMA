@@ -178,10 +178,10 @@ export default function Dashboard() {
           {menuActual ? (
             <div className="mt-3 flex gap-2">
               <Link
-                to={`/semanas/${menuActual.id}/diseno`}
+                to={`/semanas/${menuActual.id}/resumen`}
                 className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-800"
               >
-                Editar menu
+                Ver menu
               </Link>
               <Link
                 to="/semanas"
