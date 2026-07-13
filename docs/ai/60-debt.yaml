@@ -1,5 +1,5 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-07-06"
+updated_at: "2026-07-11"
 
 technical_debt:
   - id: "debt-notificaciones-filtro-plan-legacy"
@@ -255,6 +255,36 @@ technical_debt:
       - "API_LA_QUINTA/src/database/migrations/1719000037000_notificaciones-dedupe-key.js agrega dedupe_key para evitar duplicados automaticos."
     risk: "Bajo; existe scheduler semanal para pedido_semanal_pendiente, pero no hay aun politicas mas complejas de frecuencia/reintentos/cierre por empresa."
     recommended_cut: "Agregar recordatorios por vencimiento u horarios multiples solo si se define una politica operativa mas especifica."
+
+  - id: "debt-plato-disponibilidad-local-sin-excepcion-por-dia"
+    status: open
+    area: "API_LA_QUINTA.platos"
+    evidence:
+      - "2026-07-11: /plan-eng-review sobre el diseno de la vista semanal coordinada (viandas+por-kilo) confirmo que plato_disponibilidad_local solo admite reglas recurrentes (diario/dia_semana) o puntuales (fecha), sin una tabla de excepcion por semana."
+      - "Un plato con disponibilidad='siempre' o 'fijo_dia' no puede desactivarse para un dia puntual sin mutar la regla global (lo que afectaria todas las semanas futuras) o agregar una tabla de excepcion nueva."
+      - "Decision tomada: la vista semanal nueva muestra estos platos de solo lectura en v1, sin permitir romper la regla por dia; no hay evidencia de demanda real para este caso todavia."
+    risk: "Bajo hoy. Si en el futuro se necesita apagar puntualmente un plato 'siempre'/'fijo_dia' un dia especifico, requiere una migracion nueva (tabla de excepcion) antes de poder construir esa UI."
+    recommended_cut: "Reevaluar solo si aparece un caso real de negocio que lo necesite; no construir la excepcion de forma especulativa."
+
+  - id: "debt-menu-semanal-sin-bloqueo-por-estado-publicado"
+    status: open
+    area: "API_LA_QUINTA.menus_semanales"
+    evidence:
+      - "2026-07-11: /plan-eng-review confirmo que el trigger trg_bloquear_desactivar_vianda (migracion 1719000067000) NO esta gateado por menus_semanales.estado -- su WHERE solo chequea ms.fecha_fin >= CURRENT_DATE, y solo se dispara al desactivar una vianda del catalogo, no al editar filas de menu_semanal_dias."
+      - "Verificado en menus-semanales.service.js (agregarPlatoDia, quitarPlatoDia, setEmpresasSlot): hoy no existe ningun bloqueo por estado al editar la grilla/dias de una semana publicado o cerrado."
+      - "DisenoMenu.jsx permite editar una semana ya publicada (a la que empleados pueden haber hecho pedidos) sin ninguna confirmacion ni proteccion."
+    risk: "Medio: editar una semana publicada sin aviso puede desincronizar lo que un empleado ya pidio con lo que finalmente se cocina/factura, sin que quede registro de que cambio ni cuando."
+    recommended_cut: "Evaluar agregar una confirmacion explicita (o bloqueo) al editar menu_semanal_dias de una semana con estado='publicado', como feature de seguridad separada -- no mezclar con la vista semanal coordinada."
+
+  - id: "debt-pedidos-test-fecha-fin-de-semana"
+    status: open
+    area: "API_LA_QUINTA.test"
+    evidence:
+      - "2026-07-11: npm test corrido dos veces en la misma sesion (antes y despues de la migracion 1719000068000) muestra el mismo set de 8 fallos, siempre en test/pedidos.http-db.test.js (tests 15,16,18,27,29,32,38,39), nunca en menus-semanales."
+      - "test/pedidos.http-db.test.js:64-79 (lunesSemanaActualTest/lunesSemanaProximaTest) calculan la semana actual con new Date() real, no con una fecha fija inyectada."
+      - "El reloj real crevio de viernes a sabado durante esta sesion (confirmado por system-reminder de cambio de fecha), lo que corrio la semana de referencia de los fixtures y produjo errores como 'Todavia no hay menu publicado para elegir plato especial el martes/lunes/jueves'."
+    risk: "Bajo funcionalmente (no es un bug de negocio), pero alto en confianza de CI: estos tests fallan o pasan segun que dia de la semana se ejecuten, especialmente cerca del fin de semana."
+    recommended_cut: "Inyectar una fecha de referencia fija (env var o parametro de test) en vez de new Date() real en los fixtures de pedidos.http-db.test.js, para que la suite sea determinista sin importar el dia real de ejecucion."
 
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."

@@ -1,5 +1,5 @@
 schema: la_quinta_modules_v2
-updated_at: "2026-07-10"
+updated_at: "2026-07-13"
 
 modules:
   - owner_module: "API_LA_QUINTA.auth"
@@ -282,6 +282,37 @@ modules:
     owns: ["home Inicio de pedido", "lectura de menu semanal", "pedido semanal mobile (WeeklyOrderView.jsx, unico componente vivo del flujo)", "seleccion por dia", "guarniciones", "salsa a eleccion en paralelo a guarnicion", "crear/modificar/confirmar", "sugerencias de semana sin menu en bottom sheet", "estado local de semana", "mapa de navegacion cliente"]
     boundaries:
       - "reglasSeleccionPedido.js, useSeleccionDia.js, SemanaCardMenuInteractivo.jsx, BottomSheetSeleccionDia.jsx, SemanaCardEditable.jsx, SemanaContainer.jsx, SemanaPedidoCard.jsx, SelectorGuarnicion.jsx y OpcionPlatoCard.jsx son codigo muerto (no se llega a ellos desde PedidoPage.jsx) — no invertir tiempo en mantenerlos sincronizados con cambios de dominio."
+
+  - owner_module: "API_LA_QUINTA.categorias"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/categorias"
+      - "API_LA_QUINTA/src/database/migrations/1719000075000_categorias-fase-a.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000076000_categorias-fase-b-indices-fijos.js"
+    routes_file: "API_LA_QUINTA/src/modules/categorias/categorias.routes.js"
+    owns:
+      - "Teardown 'la semana es el contenedor' (design doc 2026-07-13): categorias como DATOS, no hardcodeadas."
+      - "CRUD /categorias (GET/POST/PATCH/DELETE) + POST /categorias/:id/duplicar, bajo requireAdmin."
+      - "Grupos de rotacion propios: /categorias/:id/grupos[/:grupoId[/platos[/:platoId]]] + GET /categorias/:id/grupos-activos."
+      - "Motor de rotacion puro (gruposActivosParaSemana): siempre/pares/impares por semana ISO, ciclo por offset desde rotacion_config."
+      - "materializarFijosMenu/desmaterializarFijosMenu: fijos como filas de menu_semanal_dias (Fase B/C)."
+    boundaries:
+      - "es_sistema=true (Especiales, Fijos x dia, Fijos de siempre, Guarniciones, Salsas) no se borra ni cambia tipo_dato."
+      - "Categorias custom son siempre tipo_dato='platos' (van a menu_semanal_dias); guarniciones/salsas solo existen como categorias de sistema sobre sus tablas."
+      - "Borrar una categoria nunca borra platos: menu_semanal_dias.categoria_id queda NULL (Sin categorizar) por ON DELETE SET NULL."
+
+  - owner_module: "API_LA_QUINTA.menu-items"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/menu-items"
+    routes_file: "API_LA_QUINTA/src/modules/menu-items/menu-items.routes.js"
+    owns:
+      - "Operaciones sobre una celda (fila de menu_semanal_dias) por id: PATCH /menu-items/:id (reasignar categoria_id) y DELETE /menu-items/:id (borrar una celda puntual)."
+    boundaries:
+      - "Reasignar solo a categorias tipo_dato='platos'; categoria_id NULL = bucket 'Sin categorizar'."
+      - "DELETE borra una sola celda, no la fila/opcion entera (eso es quitarPlatoDia en menus-semanales)."
 
 safe_refactor_zones:
   verified_in_repo:
