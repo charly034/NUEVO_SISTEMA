@@ -1,6 +1,9 @@
 import * as repo from './menus-semanales.repository.js';
 import * as platosRepository from '../platos/platos.repository.js';
 import * as viandasRepository from '../viandas/viandas.repository.js';
+import { setSlotVianda } from '../semana-opciones/semana-opciones.repository.js';
+import { materializarFijosMenu } from '../categorias/categorias.repository.js';
+import { materializarRotacionMenu } from '../categorias/categorias.service.js';
 import * as historialRepo from './historial.repository.js';
 import * as notificacionesService from '../notificaciones/notificaciones.service.js';
 import * as auditoriaService from '../admin-auditoria/admin-auditoria.service.js';
@@ -34,6 +37,13 @@ export const getMenuSemanalById = async (id) => {
 
 export const createMenuSemanal = async (data, admin_id = null, adminUser = null) => {
   const menu = await repo.create({ ...data, admin_id });
+  // Sembrar los fijos "recurrentes" del catalogo como filas por-semana
+  // (teardown Fase C): garantiza el invariante "todo menu tiene sus fijos
+  // materializados", que es lo que hace seguro leer los fijos desde
+  // menu_semanal_dias en vez del catalogo.
+  await materializarFijosMenu(undefined, menu.id);
+  // Sembrar tambien la rotacion de categorias con grupos para la semana del menu.
+  await materializarRotacionMenu(undefined, menu.id, menu.fecha_inicio);
   await auditoriaService.registrarAdminAction({
     adminUser,
     accion: 'crear',
@@ -102,11 +112,16 @@ export const duplicarMenuSemanal = async (id, data, adminUser = null) => {
     );
     const nuevo = creadoResult.rows[0];
 
+    // Copiar SOLO los especiales (opcion IS NOT NULL), llevando su categoria y
+    // su vianda anclada. Los fijos NO se copian: son "recurrentes" y se
+    // siembran frescos del catalogo mas abajo (teardown Fase C/D). Sin el
+    // AND opcion IS NOT NULL, tras materializar el origen se copiarian los
+    // fijos con categoria_id/vianda_id perdidos.
     await client.query(
-      `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id)
-       SELECT $1, dia, opcion, plato_id
+      `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, categoria_id, vianda_id)
+       SELECT $1, dia, opcion, plato_id, categoria_id, vianda_id
        FROM menu_semanal_dias
-       WHERE menu_semanal_id = $2
+       WHERE menu_semanal_id = $2 AND opcion IS NOT NULL
        ORDER BY dia, opcion`,
       [nuevo.id, id]
     );
@@ -118,6 +133,9 @@ export const duplicarMenuSemanal = async (id, data, adminUser = null) => {
        WHERE menu_semanal_id = $2`,
       [nuevo.id, id]
     );
+
+    // Sembrar los fijos del catalogo en la semana nueva (recurrentes).
+    await materializarFijosMenu(client, nuevo.id);
 
     await client.query(
       `INSERT INTO historial_uso_platos (
@@ -135,7 +153,7 @@ export const duplicarMenuSemanal = async (id, data, adminUser = null) => {
           WHEN 'domingo' THEN 6 END) * INTERVAL '1 day')::date
        FROM menu_semanal_dias msd
        JOIN platos p ON p.id = msd.plato_id
-       WHERE msd.menu_semanal_id = $3
+       WHERE msd.menu_semanal_id = $3 AND msd.opcion IS NOT NULL
        ON CONFLICT DO NOTHING`,
       [nuevo.id, data.fecha_inicio, id]
     );
@@ -152,6 +170,9 @@ export const duplicarMenuSemanal = async (id, data, adminUser = null) => {
     }, client.query.bind(client));
 
     await client.query('COMMIT');
+    // Rotacion: mejor-esfuerzo, fuera de la transaccion (no debe abortar el
+    // duplicado si una categoria cambia justo ahora).
+    await materializarRotacionMenu(undefined, nuevo.id, nuevo.fecha_inicio);
     return nuevo;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -210,7 +231,7 @@ export const getDisenoMenuSemanal = async (id) => {
   return diseno;
 };
 
-export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_id, guarnicion_modo_override = null, guarnicion_fija_override_id = null, salsa_modo_override = null, salsa_fija_override_id = null, allow_duplicate = false, visible_empresas }, adminUser = null) => {
+export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_id, guarnicion_modo_override = null, guarnicion_fija_override_id = null, salsa_modo_override = null, salsa_fija_override_id = null, allow_duplicate = false }, adminUser = null) => {
   const menu = await repo.findById(menuSemanalId);
   if (!menu) throw ApiError.notFound(`Menú semanal con id ${menuSemanalId} no encontrado`);
 
@@ -246,8 +267,16 @@ export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_
     guarnicionFijaOverrideId: guarnicion_fija_override_id,
     salsaModoOverride: salsa_modo_override,
     salsaFijaOverrideId: salsa_fija_override_id,
-    visibleEmpresas: visible_empresas,
   });
+
+  // Los especiales se ofrecen como vianda por defecto (decision 2026-07-13):
+  // si el plato tiene una vianda general activa en el catalogo, se ancla al
+  // slot apenas se crea -- vianda_activa arranca en true sin que el admin
+  // tenga que ir a activarla a mano despues de agregar el plato.
+  const viandaGeneral = await viandasRepository.findGeneralActivaParaPlato(plato_id);
+  if (viandaGeneral) {
+    await setSlotVianda(resultado.id, viandaGeneral.id);
+  }
 
   // Registrar en el historial permanente
   await historialRepo.registrar({

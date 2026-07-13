@@ -22,10 +22,10 @@ export const findAll = async ({ limit = 10, offset = 0, desde, hasta } = {}) => 
             SELECT json_agg(jsonb_build_object('opcion', msd2.opcion, 'plato_id', msd2.plato_id, 'plato_nombre', p.nombre))
             FROM menu_semanal_dias msd2
             JOIN platos p ON p.id = msd2.plato_id
-            WHERE msd2.menu_semanal_id = ms.id AND msd2.dia = d.dia
+            WHERE msd2.menu_semanal_id = ms.id AND msd2.dia = d.dia AND msd2.opcion IS NOT NULL
           )
         ))
-        FROM (SELECT DISTINCT dia FROM menu_semanal_dias WHERE menu_semanal_id = ms.id) d),
+        FROM (SELECT DISTINCT dia FROM menu_semanal_dias WHERE menu_semanal_id = ms.id AND opcion IS NOT NULL) d),
         '[]'::json
       ) AS dias,
       COALESCE(
@@ -114,7 +114,7 @@ export const findByIdWithDias = async (id) => {
               p.nombre AS plato_nombre, p.descripcion AS plato_descripcion
        FROM menu_semanal_dias msd
        JOIN platos p ON p.id = msd.plato_id
-       WHERE msd.menu_semanal_id = $1
+       WHERE msd.menu_semanal_id = $1 AND msd.opcion IS NOT NULL
        ORDER BY ${ORDEN_DIA}, msd.opcion ASC`,
       [id]
     ),
@@ -194,7 +194,7 @@ export const findPlatosByDia = async (menuSemanalId, dia) => {
     `SELECT msd.id, msd.opcion, msd.plato_id, p.nombre, p.descripcion
      FROM menu_semanal_dias msd
      JOIN platos p ON p.id = msd.plato_id
-     WHERE msd.menu_semanal_id = $1 AND msd.dia = $2
+     WHERE msd.menu_semanal_id = $1 AND msd.dia = $2 AND msd.opcion IS NOT NULL
      ORDER BY msd.opcion ASC`,
     [menuSemanalId, dia]
   );
@@ -206,21 +206,22 @@ export const agregarPlato = async (menuSemanalId, dia, opcion, platoId, {
   guarnicionFijaOverrideId = null,
   salsaModoOverride = null,
   salsaFijaOverrideId = null,
-  visibleEmpresas = undefined,
 } = {}) => {
   const result = await query(
-    `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id, salsa_modo_override, salsa_fija_override_id, visible_empresas)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, true))
-     ON CONFLICT (menu_semanal_id, dia, opcion)
+    // categoria_id de "Especiales": desde el teardown Fase A toda fila de
+    // especial creada debe llevar su categoria (los fijos van por otra via).
+    `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id, salsa_modo_override, salsa_fija_override_id, categoria_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, (SELECT id FROM categorias WHERE slug = 'especiales'))
+     ON CONFLICT (menu_semanal_id, categoria_id, dia, opcion)
      DO UPDATE SET plato_id = EXCLUDED.plato_id,
        guarnicion_modo_override = EXCLUDED.guarnicion_modo_override,
        guarnicion_fija_override_id = EXCLUDED.guarnicion_fija_override_id,
        salsa_modo_override = EXCLUDED.salsa_modo_override,
        salsa_fija_override_id = EXCLUDED.salsa_fija_override_id,
-       visible_empresas = COALESCE($9, menu_semanal_dias.visible_empresas),
+       categoria_id = EXCLUDED.categoria_id,
        created_at = NOW()
-     RETURNING id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id, salsa_modo_override, salsa_fija_override_id, visible_empresas, created_at`,
-    [menuSemanalId, dia, opcion, platoId, guarnicionModoOverride, guarnicionFijaOverrideId, salsaModoOverride, salsaFijaOverrideId, visibleEmpresas ?? null]
+     RETURNING id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id, salsa_modo_override, salsa_fija_override_id, created_at`,
+    [menuSemanalId, dia, opcion, platoId, guarnicionModoOverride, guarnicionFijaOverrideId, salsaModoOverride, salsaFijaOverrideId]
   );
   return result.rows[0];
 };
@@ -293,8 +294,11 @@ export const quitarPlato = async (menuSemanalId, dia, opcion) => {
 };
 
 export const quitarTodosLosPlatosDelDia = async (menuSemanalId, dia) => {
+  // Solo especiales: marcar un dia sin servicio no debe borrar fijos
+  // materializados (teardown Fase C). La interaccion sin_servicio<->fijos se
+  // define en Fase D.
   await query(
-    'DELETE FROM menu_semanal_dias WHERE menu_semanal_id = $1 AND dia = $2',
+    'DELETE FROM menu_semanal_dias WHERE menu_semanal_id = $1 AND dia = $2 AND opcion IS NOT NULL',
     [menuSemanalId, dia]
   );
 };
@@ -388,7 +392,7 @@ export const findDisenoById = async (id) => {
        LEFT JOIN salsas so ON so.id = msd.salsa_fija_override_id
        LEFT JOIN menu_empresa_visibilidad mev ON mev.menu_semanal_dia_id = msd.id
        LEFT JOIN empresas e ON e.id = mev.empresa_id AND e.activo = true
-       WHERE msd.menu_semanal_id = $1
+       WHERE msd.menu_semanal_id = $1 AND msd.opcion IS NOT NULL
        GROUP BY msd.id, msd.dia, msd.opcion, msd.created_at,
          msd.guarnicion_modo_override, msd.guarnicion_fija_override_id, go.nombre,
          msd.salsa_modo_override, msd.salsa_fija_override_id, so.nombre,
@@ -479,7 +483,7 @@ export const historialPorPlato = async (platoId) => {
             msd.dia, msd.opcion
      FROM menu_semanal_dias msd
      JOIN menus_semanales ms ON ms.id = msd.menu_semanal_id
-     WHERE msd.plato_id = $1
+     WHERE msd.plato_id = $1 AND msd.opcion IS NOT NULL
      ORDER BY ms.fecha_inicio DESC, ${ORDEN_DIA}, msd.opcion ASC`,
     [platoId]
   );

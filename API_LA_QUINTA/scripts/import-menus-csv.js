@@ -178,6 +178,34 @@ async function main() {
       cachePlatos.set(normalizar(row.nombre), row.id);
     }
 
+    // Vianda "general" (sin guarnicion/salsa) por plato -- especiales se
+    // ofrecen como vianda por defecto (decision 2026-07-13, mismo criterio
+    // que agregarPlatoDia en vivo), asi que cada fila de menu_semanal_dias
+    // que este script crea arranca con vianda_id seteado. Sin esto, un
+    // reseed completo volveria a dejar todos los especiales sin vianda
+    // anclada (hallazgo real: 222 de 223 en produccion antes del backfill
+    // de scripts/backfill-vianda-anchors.js).
+    const cacheViandas = new Map();
+    async function obtenerOCrearViandaGeneral(platoId) {
+      if (cacheViandas.has(platoId)) return cacheViandas.get(platoId);
+      const existente = await client.query(
+        'SELECT id FROM viandas WHERE plato_id = $1 AND empresa_id IS NULL AND activo = true LIMIT 1',
+        [platoId]
+      );
+      let viandaId;
+      if (existente.rows.length > 0) {
+        viandaId = existente.rows[0].id;
+      } else {
+        const inserted = await client.query(
+          'INSERT INTO viandas (plato_id, activo) VALUES ($1, true) RETURNING id',
+          [platoId]
+        );
+        viandaId = inserted.rows[0].id;
+      }
+      cacheViandas.set(platoId, viandaId);
+      return viandaId;
+    }
+
     async function obtenerOCrearPlato(nombre) {
       const nombreCanonico = canonicalizarNombrePlato(nombre);
       const key = normalizar(nombreCanonico);
@@ -291,11 +319,12 @@ async function main() {
         const nombreA = canonicalizarNombrePlato(limpiarNombre(celdaA));
         if (nombreA) {
           const platoId = await obtenerOCrearPlato(nombreA);
+          const viandaId = await obtenerOCrearViandaGeneral(platoId);
           await client.query(
-            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id)
-             VALUES ($1, $2, 'A', $3)
+            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, vianda_id)
+             VALUES ($1, $2, 'A', $3, $4)
              ON CONFLICT DO NOTHING`,
-            [menuId, dia, platoId]
+            [menuId, dia, platoId, viandaId]
           );
         }
 
@@ -303,11 +332,12 @@ async function main() {
         const nombreC = canonicalizarNombrePlato(limpiarNombre(celdaC));
         if (nombreC) {
           const platoId = await obtenerOCrearPlato(nombreC);
+          const viandaId = await obtenerOCrearViandaGeneral(platoId);
           await client.query(
-            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id)
-             VALUES ($1, $2, 'C', $3)
+            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, vianda_id)
+             VALUES ($1, $2, 'C', $3, $4)
              ON CONFLICT DO NOTHING`,
-            [menuId, dia, platoId]
+            [menuId, dia, platoId, viandaId]
           );
         }
       }
@@ -343,6 +373,31 @@ async function main() {
     `);
     const metadataActualizada = await actualizarMetadataPlatos(client);
 
+    // ── Anclar fijos como vianda para cada semana importada ───────
+    // Mismo criterio que los especiales: un fijo se ofrece como vianda por
+    // defecto (decision 2026-07-13). Sin esto, un reseed completo dejaria
+    // los fijos sin anclaje por semana (ver scripts/backfill-vianda-anchors.js,
+    // que resuelve el mismo gap sobre datos que ya existian).
+    const { rows: menusImportados } = await client.query('SELECT id FROM menus_semanales');
+    const { rows: fijosDelCatalogo } = await client.query(
+      `SELECT id AS plato_id FROM platos
+       WHERE activo = true AND (tipo = 'fijo' OR disponibilidad IN ('fijo_dia', 'siempre'))`
+    );
+    let fijosAnclados = 0;
+    for (const menu of menusImportados) {
+      for (const fijo of fijosDelCatalogo) {
+        const viandaId = await obtenerOCrearViandaGeneral(fijo.plato_id);
+        const res = await client.query(
+          `INSERT INTO menu_semanal_fijos_vianda (menu_semanal_id, plato_id, vianda_id)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (menu_semanal_id, plato_id) DO NOTHING
+           RETURNING id`,
+          [menu.id, fijo.plato_id, viandaId]
+        );
+        if (res.rowCount > 0) fijosAnclados++;
+      }
+    }
+
     console.log('');
     console.log('✅  Importación completada exitosamente.');
     console.log(`   📅  ${semanasImportadas} semanas importadas`);
@@ -350,6 +405,7 @@ async function main() {
     console.log(`   📦  ${cachePlatos.size} platos totales en la base de datos`);
     console.log(`   🧾  ${metadataActualizada} platos con metadata aproximada`);
     console.log(`   📖  ${historialRows} registros de historial generados`);
+    console.log(`   🍱  ${fijosAnclados} anclaje(s) de fijo(s) como vianda por semana`);
     console.log('');
     console.log('   Tags asignados automáticamente:');
     console.log('   Pollo · Carnes · Cerdo · Pescado · Vegetariano');

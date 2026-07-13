@@ -18,6 +18,12 @@ import adminAuditoriaRoutes from '../modules/admin-auditoria/admin-auditoria.rou
 import planesRoutes from '../modules/planes/planes.routes.js';
 import finanzasRoutes from '../modules/finanzas/finanzas.routes.js';
 import cocinaRoutes from '../modules/cocina/cocina.routes.js';
+import viandasRoutes from '../modules/viandas/viandas.routes.js';
+import vistaSemanalRoutes from '../modules/vista-semanal/vista-semanal.routes.js';
+import gruposRotativosRoutes from '../modules/grupos-rotativos/grupos-rotativos.routes.js';
+import semanaOpcionesRoutes from '../modules/semana-opciones/semana-opciones.routes.js';
+import categoriasRoutes from '../modules/categorias/categorias.routes.js';
+import menuItemsRoutes from '../modules/menu-items/menu-items.routes.js';
 
 const router = Router();
 
@@ -40,5 +46,11 @@ router.use('/planes', planesRoutes);
 router.use('/notificaciones', notificacionesRoutes);
 router.use('/finanzas', finanzasRoutes);
 router.use('/cocina', cocinaRoutes);
+router.use('/viandas', viandasRoutes);
+router.use('/vista-semanal', vistaSemanalRoutes);
+router.use('/grupos-rotativos', gruposRotativosRoutes);
+router.use('/semana-opciones', semanaOpcionesRoutes);
+router.use('/categorias', categoriasRoutes);
+router.use('/menu-items', menuItemsRoutes);
 
 export default router;

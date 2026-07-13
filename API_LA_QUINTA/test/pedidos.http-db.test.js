@@ -78,6 +78,21 @@ function lunesSemanaProximaTest() {
   return fechaISOTest(fecha);
 }
 
+// Lunes de la semana anterior a la actual -- para probar una semana ya
+// vencida/cerrada que siga apareciendo en GET /pedidos/semanas (esa lista
+// filtra por fecha_inicio >= inicio_semana_actual - 2 semanas, ver
+// menusPublicadosList en pedidos.repository.js). Un literal fijo como
+// '2026-06-22' cae fuera de esa ventana en cuanto pasan mas de ~3 semanas
+// reales -- mismo problema de fecha-hardcodeada-que-vence que el default
+// de crearFixturePedido (ver pedidos-http.helper.js).
+function lunesSemanaAnteriorTest() {
+  const fecha = new Date();
+  fecha.setHours(0, 0, 0, 0);
+  const dia = fecha.getDay();
+  fecha.setDate(fecha.getDate() + (dia === 0 ? -6 : 1 - dia) - 7);
+  return fechaISOTest(fecha);
+}
+
 test('POST /api/v1/pedidos sin token devuelve 401', async () => {
   const respuesta = await requestJson(servidor.baseUrl, 'POST', '/pedidos', {
     payload: { semana_inicio: '2026-07-06', items: [] },
@@ -666,7 +681,7 @@ test('PUT con dia vencido por regla diaria devuelve 409', async () => {
 
 test('GET /pedidos/semanas marca cerrada una semana diaria sin dias editables', async () => {
   await conFixture({
-    semanaInicio: '2026-06-22',
+    semanaInicio: lunesSemanaAnteriorTest(),
     modoPedido: 'diario',
     limiteHora: '00:01',
     limiteAnticipacionDias: 0,

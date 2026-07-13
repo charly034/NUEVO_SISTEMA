@@ -1,11 +1,11 @@
 import { query } from '../../database/connection.js';
 
-const CAMPOS_BASE = 'id, nombre, slug, plan_id, modo_pedido, activo, limite_hora, limite_dia_semana, limite_anticipacion_dias, plazo_override_hasta, dias_laborales, codigo_registro, email, telefono, deleted_at, created_at';
+const CAMPOS_BASE = 'id, nombre, slug, plan_id, modo_pedido, activo, limite_hora, limite_dia_semana, limite_anticipacion_dias, plazo_override_hasta, dias_laborales, codigo_registro, email, telefono, opcion_default, deleted_at, created_at';
 const CAMPOS = `
   e.id, e.nombre, e.slug, e.plan_id, e.modo_pedido, e.activo,
   e.limite_hora, e.limite_dia_semana, e.limite_anticipacion_dias,
   e.plazo_override_hasta, e.dias_laborales, e.codigo_registro,
-  e.email, e.telefono, e.deleted_at, e.created_at,
+  e.email, e.telefono, e.opcion_default, e.deleted_at, e.created_at,
   pv.nombre AS plan_nombre,
   pv.codigo AS plan_codigo,
   pv.gramaje_min AS plan_gramaje_min,
@@ -154,15 +154,16 @@ export const create = async ({
   limite_anticipacion_dias,
   email = null,
   telefono = null,
+  opcion_default = null,
 }) => {
   const codigo_registro = await codigoUnico();
   const r = await query(
     `INSERT INTO empresas (
        nombre, slug, plan_id, modo_pedido, dias_laborales,
        limite_hora, limite_dia_semana, limite_anticipacion_dias, codigo_registro,
-       email, telefono
+       email, telefono, opcion_default
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id`,
     [
       nombre,
@@ -176,6 +177,7 @@ export const create = async ({
       codigo_registro,
       email || null,
       telefono || null,
+      opcion_default || null,
     ]
   );
   return findEnriquecidaById(r.rows[0].id);

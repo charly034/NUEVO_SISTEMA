@@ -70,10 +70,6 @@ export const agregarPlatoDiaSchema = z.object({
   salsa_modo_override: z.enum(['sin_salsa', 'libre', 'fija']).nullable().optional(),
   salsa_fija_override_id: z.number().int().positive().nullable().optional(),
   allow_duplicate: z.boolean().optional().default(false),
-  // Sin default: distingue "no enviado" (preserva el valor existente al
-  // editar un slot) de "enviado explicitamente". agregarPlato() en el
-  // repositorio aplica el default (true) solo cuando el slot es nuevo.
-  visible_empresas: z.boolean().optional(),
 });
 
 // Actualizar empresas visibles para un slot ([] = todas las empresas)

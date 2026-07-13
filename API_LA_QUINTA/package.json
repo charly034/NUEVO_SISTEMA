@@ -20,6 +20,8 @@
     "seed:test-data": "node scripts/seed-test-data.js",
     "seed:admin": "node scripts/seed-admin.js",
     "seed:demo-profiles": "node scripts/backfill-demo-perfiles.js",
+    "backfill:vianda-anchors": "node scripts/backfill-vianda-anchors.js",
+    "materializar:fijos": "node scripts/materializar-fijos.js",
     "datos-prueba:limpiar": "node scripts/limpiar-datos-prueba.js",
     "datos-prueba:limpiar:apply": "node scripts/limpiar-datos-prueba.js --apply",
     "platos:limpiar-placeholders": "node scripts/limpiar-descripciones-placeholder-platos.js",

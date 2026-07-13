@@ -114,9 +114,36 @@ export async function limpiarDatosTest(prefijo) {
   await query('DELETE FROM salsas WHERE nombre LIKE $1', [`${prefijo}%`]);
 }
 
+function fechaISOHelper(fecha) {
+  return [
+    fecha.getFullYear(),
+    String(fecha.getMonth() + 1).padStart(2, '0'),
+    String(fecha.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+// Lunes de la semana que empieza despues de hoy -- su plazo semanal (que se
+// calcula a partir de semanaInicio) todavia no vencio bajo ningun
+// limite_dia_semana/limite_hora posible. Reemplaza al literal fijo
+// '2026-07-06' que este fixture tenia antes: un lunes hardcodeado termina
+// quedando en el pasado a medida que corre el tiempo real, y entonces
+// CUALQUIER test que dependa del fixture default empieza a fallar con 409
+// "plazo vencido" sin que el codigo de pedidos tenga ningun bug real
+// (encontrado en vivo 2026-07-13, ver test/pedidos.http-db.test.js que ya
+// usa este mismo patron via lunesSemanaProximaTest/lunesSemanaActualTest
+// para los pocos casos que ya lo necesitaban).
+function lunesSemanaProximaHelper() {
+  const fecha = new Date();
+  fecha.setHours(0, 0, 0, 0);
+  const dia = fecha.getDay();
+  const diasHastaLunes = dia === 0 ? 1 : (8 - dia) % 7 || 7;
+  fecha.setDate(fecha.getDate() + diasHastaLunes);
+  return fechaISOHelper(fecha);
+}
+
 export async function crearFixturePedido({
   prefijo = crearPrefijoTest(),
-  semanaInicio = '2026-07-06',
+  semanaInicio = lunesSemanaProximaHelper(),
   fechaLimitePedidos = '2099-01-01T12:00:00-03:00',
   modoPedido = 'semanal',
   limiteHora = '23:59',
@@ -268,16 +295,19 @@ export async function crearFixturePedido({
     [`${prefijo} Menu semanal`, semanaInicio, fechaLimitePedidos],
   )).rows[0];
 
+  const catEspeciales = (await query(`SELECT id FROM categorias WHERE slug = 'especiales'`)).rows[0].id;
   await query(
-    `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id)
+    `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, categoria_id)
      VALUES
-       ($1, 'lunes', 'A', $2),
-       ($1, 'martes', 'A', $3),
-       ($1, 'miercoles', 'A', $3),
-       ($1, 'jueves', 'A', $3),
-       ($1, 'viernes', 'A', $3)`,
-    [menu.id, platoConGuarnicion.id, platoSinGuarnicion.id],
+       ($1, 'lunes', 'A', $2, $4),
+       ($1, 'martes', 'A', $3, $4),
+       ($1, 'miercoles', 'A', $3, $4),
+       ($1, 'jueves', 'A', $3, $4),
+       ($1, 'viernes', 'A', $3, $4)`,
+    [menu.id, platoConGuarnicion.id, platoSinGuarnicion.id, catEspeciales],
   );
+  // Los fijos de este menu de fixture NO se materializan: cargarPlatosFijosDesdeMenu
+  // cae al catalogo cuando un menu no tiene fijos materializados (ver su fallback).
 
   if (incluirDiaSinServicio) {
     await query(

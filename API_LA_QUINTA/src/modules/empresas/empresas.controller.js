@@ -22,6 +22,13 @@ function validarEmpresa(fields) {
   ) {
     throw ApiError.badRequest('limite_anticipacion_dias debe ser 0 o 1');
   }
+  if (
+    fields.opcion_default !== undefined
+    && fields.opcion_default !== null
+    && !/^[A-Z]$/.test(fields.opcion_default)
+  ) {
+    throw ApiError.badRequest('opcion_default debe ser una letra (A-Z) o null para todas las opciones');
+  }
 }
 
 async function resolverPlanEmpresa(fields) {
@@ -61,7 +68,7 @@ export const createEmpresa = asyncHandler(async (req, res) => {
   const {
     nombre, slug, plan_id, modo_pedido, dias_laborales,
     limite_hora, limite_dia_semana, limite_anticipacion_dias,
-    email, telefono,
+    email, telefono, opcion_default,
   } = req.body;
   if (!nombre?.trim() || !slug?.trim()) throw ApiError.badRequest('nombre y slug son requeridos');
   const fields = {
@@ -75,6 +82,7 @@ export const createEmpresa = asyncHandler(async (req, res) => {
     limite_anticipacion_dias: Number(limite_anticipacion_dias ?? 0),
     email: email?.trim() || null,
     telefono: telefono?.trim() || null,
+    opcion_default: opcion_default || null,
   };
   validarEmpresa(fields);
   await resolverPlanEmpresa(fields);
@@ -89,7 +97,7 @@ export const updateEmpresa = asyncHandler(async (req, res) => {
   const allowed = [
     'nombre', 'slug', 'plan_id', 'modo_pedido', 'activo',
     'limite_hora', 'limite_dia_semana', 'limite_anticipacion_dias', 'dias_laborales',
-    'email', 'telefono',
+    'email', 'telefono', 'opcion_default',
   ];
   const fields = Object.fromEntries(
     Object.entries(req.body).filter(([key]) => allowed.includes(key))

@@ -69,7 +69,11 @@ const SLOTS_SELECT = `
 `;
 
 const findSlots = async (menuSemanalId, dia = null) => {
-  const where = dia ? 'WHERE msd.menu_semanal_id = $1 AND msd.dia = $2' : 'WHERE msd.menu_semanal_id = $1';
+  // opcion IS NOT NULL: solo especiales; los fijos (opcion NULL) tienen su
+  // propia vista (findFijosYSiempre). Teardown Fase C.
+  const where = dia
+    ? 'WHERE msd.menu_semanal_id = $1 AND msd.dia = $2 AND msd.opcion IS NOT NULL'
+    : 'WHERE msd.menu_semanal_id = $1 AND msd.opcion IS NOT NULL';
   const orderBy = dia ? 'msd.opcion ASC' : `${ORDEN_DIA}, msd.opcion ASC`;
   const params = dia ? [menuSemanalId, dia] : [menuSemanalId];
   const result = await query(`${SLOTS_SELECT} ${where} ORDER BY ${orderBy}`, params);
@@ -215,7 +219,7 @@ export const findOfertaSemanal = async (menuSemanalId) => {
      LEFT JOIN viandas v ON v.id = msd.vianda_id
      LEFT JOIN menu_empresa_visibilidad mev ON mev.menu_semanal_dia_id = msd.id
      LEFT JOIN empresas e ON e.id = mev.empresa_id
-     WHERE msd.menu_semanal_id = $1
+     WHERE msd.menu_semanal_id = $1 AND msd.opcion IS NOT NULL
      GROUP BY msd.id, msd.dia, msd.opcion, p.id, p.nombre, v.nombre_vianda, p.descripcion
      ORDER BY msd.dia, msd.opcion`,
     [menuSemanalId]

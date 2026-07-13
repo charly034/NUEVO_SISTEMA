@@ -1,24 +1,15 @@
 import { query } from '../../database/connection.js';
+import { filtroVisibilidadSlot, filtroVisibilidadPlato, filtroVisibilidadFijoSemana } from '../../utils/visibilidadEmpresa.js';
 
 const DIAS_ES = { 1: 'lunes', 2: 'martes', 3: 'miercoles', 4: 'jueves', 5: 'viernes', 6: 'sabado', 0: 'domingo' };
 const execute = (db, text, params) => (
   typeof db === 'function' ? db(text, params) : db.query(text, params)
 );
 
-// Filtro de visibilidad por empresa: un slot/plato sin filas en la tabla de
-// visibilidad es visible para todas las empresas; si tiene filas, solo para
-// las empresas listadas. Si empresaId es null (sin contexto de empresa),
-// no se restringe nada.
-const FILTRO_VISIBILIDAD_SLOT = `(
-  $2::integer IS NULL
-  OR NOT EXISTS (SELECT 1 FROM menu_empresa_visibilidad mev WHERE mev.menu_semanal_dia_id = msd.id)
-  OR EXISTS (SELECT 1 FROM menu_empresa_visibilidad mev WHERE mev.menu_semanal_dia_id = msd.id AND mev.empresa_id = $2)
-)`;
-const FILTRO_VISIBILIDAD_PLATO = `(
-  $2::integer IS NULL
-  OR NOT EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id)
-  OR EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id AND pev.empresa_id = $2)
-)`;
+// Filtro de visibilidad por empresa (ver utils/visibilidadEmpresa.js). En
+// menuSemana/cargarDetallesMenu el parametro empresaId siempre va en $2.
+const FILTRO_VISIBILIDAD_SLOT = filtroVisibilidadSlot(2);
+const FILTRO_VISIBILIDAD_PLATO = filtroVisibilidadPlato(2);
 
 // Resolución de guarnición/salsa efectiva de un slot: override del slot > default de
 // la vianda del catálogo (mismo patrón de precedencia que cocina.repository.js).
@@ -56,7 +47,17 @@ const VIANDA_SLOT_JOINS = `
 // ── Menú de la semana para el cliente ────────────────────────────────────────
 
 export const menuSemana = async (semanaInicio, empresaId = null) => {
-  // Solo menús publicados
+  // La visibilidad de fijos ahora es por semana (menu_semanal_fijos_visibilidad,
+  // ver migracion 1719000073000), asi que cargarPlatosFijos necesita saber
+  // el menu_semanal_id de esta semana -- lo resolvemos con una consulta chica
+  // aparte porque, si la semana no tiene NINGUN especial todavia, variablesRes
+  // puede venir vacio y nunca exponer ms.id.
+  const menuRow = await query(
+    `SELECT id FROM menus_semanales WHERE fecha_inicio = $1 AND estado = 'publicado' LIMIT 1`,
+    [semanaInicio]
+  );
+  const menuSemanalId = menuRow.rows[0]?.id ?? null;
+
   const variablesRes = await query(
     `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
             p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
@@ -69,13 +70,14 @@ export const menuSemana = async (semanaInicio, empresaId = null) => {
      JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
      JOIN platos p ON p.id = msd.plato_id${VIANDA_SLOT_JOINS}
      WHERE ms.fecha_inicio = $1 AND ms.estado = 'publicado' AND p.activo = true
+       AND msd.opcion IS NOT NULL  -- solo especiales/opcion-based; los fijos (opcion NULL) los trae cargarPlatosFijos (teardown Fase C)
        AND ${FILTRO_VISIBILIDAD_SLOT}
        AND ${FILTRO_VISIBILIDAD_PLATO}
      ORDER BY msd.dia::text, msd.opcion ASC`,
     [semanaInicio, empresaId]
   );
 
-  const fijosRes = await cargarPlatosFijos(query, empresaId);
+  const fijosRes = await cargarPlatosFijosDesdeMenu(query, empresaId, menuSemanalId);
 
   return { variables: variablesRes.rows, fijos: fijosRes.rows };
 };
@@ -83,7 +85,9 @@ export const menuSemana = async (semanaInicio, empresaId = null) => {
 // Platos candidatos a "fijo" para el menú: tipo='fijo' clásico, o disponibilidad
 // fijo_dia/siempre del catálogo -- en ambos casos, solo si tienen una vianda activa
 // (ver create-viandas-table). Sin eso no hay guarnición/salsa efectiva que resolver.
-function cargarPlatosFijos(db = query, empresaId = null) {
+// menuSemanalId es obligatorio para resolver la visibilidad POR SEMANA de cada fijo
+// (ver filtroVisibilidadFijoSemana) -- si no se conoce (null), el filtro no restringe.
+export function cargarPlatosFijos(db = query, empresaId = null, menuSemanalId = null) {
   return execute(db,
     `SELECT p.id AS plato_id, p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
             p.tags, p.tiene_guarnicion, p.vegetariano, p.calorias, p.alergenos, p.foto_url,
@@ -98,14 +102,53 @@ function cargarPlatosFijos(db = query, empresaId = null) {
      LEFT JOIN salsas sf ON sf.id = v.salsa_id
      WHERE p.activo = true
        AND (p.tipo = 'fijo' OR p.disponibilidad IN ('fijo_dia', 'siempre'))
-       AND (
-         $1::integer IS NULL
-         OR NOT EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id)
-         OR EXISTS (SELECT 1 FROM plato_empresa_visibilidad pev WHERE pev.plato_id = p.id AND pev.empresa_id = $1)
-       )
+       AND ${filtroVisibilidadFijoSemana(1, 2)}
      ORDER BY p.nombre ASC`,
-    [empresaId]
+    [empresaId, menuSemanalId]
   );
+}
+
+// Fase B del teardown "la semana es el contenedor": mismo output que
+// cargarPlatosFijos, pero el CONJUNTO de fijos sale de menu_semanal_dias
+// (categorias fijos-x-dia/fijos-de-siempre) en vez de platos.disponibilidad.
+// Las columnas de catalogo (disponibilidad, dia_fijo, tipo) se siguen
+// exponiendo desde platos para paridad byte a byte -- lo que cambia es de
+// donde viene la MEMBRESIA (categoria_id), no las columnas. La composicion
+// (guarnicion/salsa) sale de la vianda anclada al slot (msd.vianda_id), que
+// el backfill dejo igual a la vianda general que usa cargarPlatosFijos. La
+// visibilidad usa el MISMO filtro por-semana (menu_semanal_fijos_visibilidad),
+// asi que es identica por construccion. En Fase C esta funcion reemplaza a
+// cargarPlatosFijos como fuente del menu.
+//
+// Fallback (transitorio): si un menu NO tiene fijos materializados, cae al
+// catalogo (cargarPlatosFijos). Cubre menus creados por fuera del flujo normal
+// (ej. fixtures de test que insertan menus por SQL directo) sin acoplar nada.
+// En produccion todos los menus estan materializados (script materializar-fijos
+// + siembra al crear/duplicar), asi que el fallback no se dispara. Se remueve
+// cuando exista edicion de fijos por-semana (Fase F/G), donde "cero fijos"
+// pasa a ser un estado valido que NO debe caer al catalogo.
+export async function cargarPlatosFijosDesdeMenu(db = query, empresaId = null, menuSemanalId = null) {
+  const res = await execute(db,
+    `SELECT p.id AS plato_id, p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
+            p.tags, p.tiene_guarnicion, p.vegetariano, p.calorias, p.alergenos, p.foto_url,
+            p.tipo, p.disponibilidad, p.dia_fijo,
+            CASE WHEN v.guarnicion_id IS NOT NULL THEN 'fija' WHEN p.tiene_guarnicion THEN 'libre' ELSE 'sin_guarnicion' END AS guarnicion_modo,
+            v.guarnicion_id AS guarnicion_fija_id, gf.nombre AS guarnicion_fija_nombre,
+            CASE WHEN v.salsa_id IS NOT NULL THEN 'fija' WHEN v.salsa_libre THEN 'libre' ELSE 'sin_salsa' END AS salsa_modo,
+            v.salsa_id AS salsa_fija_id, sf.nombre AS salsa_fija_nombre
+     FROM menu_semanal_dias msd
+     JOIN categorias c ON c.id = msd.categoria_id AND c.slug IN ('fijos-x-dia', 'fijos-de-siempre')
+     JOIN platos p ON p.id = msd.plato_id AND p.activo = true
+     JOIN viandas v ON v.id = msd.vianda_id AND v.activo = true
+     LEFT JOIN guarniciones gf ON gf.id = v.guarnicion_id
+     LEFT JOIN salsas sf ON sf.id = v.salsa_id
+     WHERE msd.menu_semanal_id = $2
+       AND ${filtroVisibilidadFijoSemana(1, 2)}
+     ORDER BY p.nombre ASC`,
+    [empresaId, menuSemanalId]
+  );
+  if (res.rows.length > 0 || menuSemanalId == null) return res;
+  return cargarPlatosFijos(db, empresaId, menuSemanalId);
 }
 
 async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null, empresaId = null) {
@@ -119,12 +162,13 @@ async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null, emp
        JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
        JOIN platos p ON p.id = msd.plato_id${VIANDA_SLOT_JOINS}
        WHERE ms.id = $1 AND p.activo = true
+         AND msd.opcion IS NOT NULL  -- solo especiales; fijos via cargarPlatosFijos (teardown Fase C)
          AND ${FILTRO_VISIBILIDAD_SLOT}
          AND ${FILTRO_VISIBILIDAD_PLATO}
        ORDER BY msd.dia::text, msd.opcion ASC`,
       [menu.id, empresaId]
     );
-  const fijos = fijosPrecargados || (await cargarPlatosFijos(db, empresaId)).rows;
+  const fijos = fijosPrecargados || (await cargarPlatosFijosDesdeMenu(db, empresaId, menu.id)).rows;
   return { ...menu, variables: variablesRes.rows, fijos };
 }
 
@@ -142,9 +186,11 @@ export const menusPublicadosList = async (empresaId = null) => {
        AND fecha_inicio >= date_trunc('week', CURRENT_DATE)::date - INTERVAL '2 weeks'
      ORDER BY fecha_inicio ASC`
   );
-  // Cargar platos de todos los menús en paralelo
-  const fijosRes = await cargarPlatosFijos(query, empresaId);
-  return Promise.all(result.rows.map(m => cargarDetallesMenu(m, query, fijosRes.rows, empresaId)));
+  // La visibilidad de fijos ahora es por semana, asi que ya no se puede
+  // precargar una sola vez para todos los menus de la lista (cada semana
+  // puede tener una configuracion distinta) -- se resuelve por-menu dentro
+  // de cargarDetallesMenu (fijosPrecargados=null).
+  return Promise.all(result.rows.map(m => cargarDetallesMenu(m, query, null, empresaId)));
 };
 
 // Devuelve un menú publicado específico por su ID (para validar al guardar pedido)
@@ -217,6 +263,14 @@ export const menuHoy = async () => {
   const diaStr = DIAS_ES[hoy.getDay()];
   const fechaHoy = hoy.toISOString().split('T')[0];
 
+  // Menu que cubre la fecha de hoy -- necesario para leer los fijos por-semana
+  // (teardown Fase C, cargarPlatosFijosDesdeMenu necesita el menu_semanal_id).
+  const menuRow = await query(
+    `SELECT id FROM menus_semanales WHERE fecha_inicio <= $1 AND fecha_fin >= $1 ORDER BY fecha_inicio DESC LIMIT 1`,
+    [fechaHoy]
+  );
+  const menuSemanalId = menuRow.rows[0]?.id ?? null;
+
   const variablesRes = await query(
     `SELECT msd.dia::text AS dia, msd.opcion, msd.plato_id,
             p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
@@ -228,6 +282,7 @@ export const menuHoy = async () => {
      JOIN platos p ON p.id = msd.plato_id
      WHERE ms.fecha_inicio <= $2 AND ms.fecha_fin >= $2
        AND msd.dia::text = $1 AND p.activo = true
+       AND msd.opcion IS NOT NULL  -- solo especiales; fijos via cargarPlatosFijos (teardown Fase C)
        AND NOT EXISTS (
          SELECT 1 FROM menu_semanal_sin_servicio ss
          WHERE ss.menu_semanal_id = ms.id AND ss.dia::text = $1
@@ -236,7 +291,7 @@ export const menuHoy = async () => {
     [diaStr, fechaHoy]
   );
 
-  const fijosRes = await cargarPlatosFijos();
+  const fijosRes = await cargarPlatosFijosDesdeMenu(query, null, menuSemanalId);
 
   return { dia: diaStr, fecha: fechaHoy, variables: variablesRes.rows, fijos: fijosRes.rows };
 };
