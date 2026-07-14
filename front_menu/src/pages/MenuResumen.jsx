@@ -63,7 +63,7 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
       <p className="text-sm text-gray-600">Publicar <strong>{menu?.nombre}</strong> lo hara visible para que los empleados puedan hacer su pedido.</p>
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-          Fecha limite de pedidos <span className="font-normal text-gray-500">(opcional)</span>
+          Fecha límite de pedidos <span className="font-normal text-gray-500">(opcional)</span>
         </label>
         <div className="flex gap-2">
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
@@ -230,9 +230,9 @@ function BarraAcciones({ id, menu, totalPedidos }) {
         <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 max-w-md">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold text-gray-600">Fecha limite de pedidos</p>
+              <p className="text-xs font-semibold text-gray-600">Fecha límite de pedidos</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {fechaLimiteStr ? fechaLimiteStr : 'Sin fecha limite — los pedidos quedan abiertos.'}
+                {fechaLimiteStr ? fechaLimiteStr : 'Sin fecha límite — los pedidos quedan abiertos.'}
               </p>
             </div>
             <button type="button" onClick={() => setEditandoFecha(v => !v)}
