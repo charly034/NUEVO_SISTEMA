@@ -19,30 +19,70 @@ const FILTRO_VISIBILIDAD_PLATO = filtroVisibilidadPlato(2);
 // pero sí puede ser 'libre' como default de la vianda (v.salsa_libre) -- ver
 // create-viandas-table para por qué salsa necesitó su propio campo en vez de un
 // legacy booleano.
+//
+// RESOLUCIÓN ATÓMICA POR CAPA (plan-eng-review T2/T4): cada capa aporta modo+id como
+// bloque indivisible, en orden de precedencia: excepción por empresa (emo) → override
+// de celda (msd) → vianda (v) → plato (p) → sin. Si una capa gana el modo, el id
+// también sale de esa capa, NO de un COALESCE que mezclaría el id de una con el modo
+// de otra ("fija con la guarnición de otra capa"). La validación al escribir garantiza
+// fija ⇒ id no-nulo. NOTA: cada expresión de id se repite en el JOIN de gf/sf porque
+// SQL no deja referenciar el alias del SELECT en el ON.
+//
+// CAPA EMPRESA (T4): emo es el override de guarnición/salsa POR EMPRESA de esta celda.
+// El JOIN (ver VIANDA_SLOT_JOINS) une por claves de negocio + empresa ($2) y aplica la
+// GUARDA ANTI-RANCIO emo.plato_id_origen = msd.plato_id: si la rotación cambió el plato
+// del slot, la excepción no matchea y no se aplica (nunca impone p.ej. puré sobre
+// pescado). Con empresa=NULL (admin/cocina) emo nunca matchea → resolución base.
 const VIANDA_SLOT_COLS = `
             COALESCE(v.nombre_vianda, p.nombre) AS nombre_vianda,
             CASE
-              WHEN msd.guarnicion_modo_override = 'fija' THEN 'fija'
-              WHEN msd.guarnicion_modo_override IN ('sin_guarnicion', 'libre') THEN msd.guarnicion_modo_override
+              WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_modo_override
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_modo_override
               WHEN v.guarnicion_id IS NOT NULL THEN 'fija'
               WHEN p.tiene_guarnicion THEN 'libre'
               ELSE 'sin_guarnicion'
             END AS guarnicion_modo,
-            COALESCE(msd.guarnicion_fija_override_id, v.guarnicion_id) AS guarnicion_fija_id,
+            CASE
+              WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_fija_override_id
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_fija_override_id
+              ELSE v.guarnicion_id
+            END AS guarnicion_fija_id,
             gf.nombre AS guarnicion_fija_nombre,
             CASE
-              WHEN msd.salsa_modo_override = 'fija' THEN 'fija'
-              WHEN msd.salsa_modo_override IN ('sin_salsa', 'libre') THEN msd.salsa_modo_override
+              WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_modo_override
+              WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_modo_override
               WHEN v.salsa_id IS NOT NULL THEN 'fija'
               WHEN v.salsa_libre THEN 'libre'
               ELSE 'sin_salsa'
             END AS salsa_modo,
-            COALESCE(msd.salsa_fija_override_id, v.salsa_id) AS salsa_fija_id,
+            CASE
+              WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_fija_override_id
+              WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_fija_override_id
+              ELSE v.salsa_id
+            END AS salsa_fija_id,
             sf.nombre AS salsa_fija_nombre`;
 const VIANDA_SLOT_JOINS = `
      LEFT JOIN viandas v ON v.id = msd.vianda_id
-     LEFT JOIN guarniciones gf ON gf.id = COALESCE(msd.guarnicion_fija_override_id, v.guarnicion_id)
-     LEFT JOIN salsas sf ON sf.id = COALESCE(msd.salsa_fija_override_id, v.salsa_id)`;
+     LEFT JOIN menu_semanal_dia_empresa_override emo
+       ON emo.menu_semanal_id = msd.menu_semanal_id
+      AND emo.categoria_id = msd.categoria_id
+      AND emo.dia IS NOT DISTINCT FROM msd.dia
+      AND emo.opcion IS NOT DISTINCT FROM msd.opcion
+      AND emo.empresa_id = $2
+      AND emo.plato_id_origen = msd.plato_id
+     LEFT JOIN guarniciones gf ON gf.id = CASE
+       WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_fija_override_id
+       WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_fija_override_id
+       ELSE v.guarnicion_id END
+     LEFT JOIN salsas sf ON sf.id = CASE
+       WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_fija_override_id
+       WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_fija_override_id
+       ELSE v.salsa_id END`;
+
+// Exportados para el test de regresión byte-idéntico (shadow-read): el test compara
+// la fórmula anterior (per-columna, congelada como literal) contra ESTA (atómica)
+// sobre los menús reales, y valida overrides sintéticos bien formados.
+export { VIANDA_SLOT_COLS, VIANDA_SLOT_JOINS };
 
 // ── Menú de la semana para el cliente ────────────────────────────────────────
 
@@ -128,20 +168,54 @@ export function cargarPlatosFijos(db = query, empresaId = null, menuSemanalId = 
 // cuando exista edicion de fijos por-semana (Fase F/G), donde "cero fijos"
 // pasa a ser un estado valido que NO debe caer al catalogo.
 export async function cargarPlatosFijosDesdeMenu(db = query, empresaId = null, menuSemanalId = null) {
+  // Capa empresa (plan-eng-review T9): los fijos también son filas menu_semanal_dias
+  // (categoria fijos-*, opcion NULL), así que la excepción por empresa se ancla con las
+  // MISMAS claves (dia/opcion pueden ser NULL → IS NOT DISTINCT FROM). Cascada:
+  // excepción empresa (emo) → vianda → plato → sin. Guarda anti-rancio
+  // emo.plato_id_origen = msd.plato_id. Con empresaId NULL (admin) emo no matchea → base.
   const res = await execute(db,
     `SELECT p.id AS plato_id, p.nombre AS plato_nombre, p.descripcion, p.descripcion_larga,
             p.tags, p.tiene_guarnicion, p.vegetariano, p.calorias, p.alergenos, p.foto_url,
             p.tipo, p.disponibilidad, p.dia_fijo,
-            CASE WHEN v.guarnicion_id IS NOT NULL THEN 'fija' WHEN p.tiene_guarnicion THEN 'libre' ELSE 'sin_guarnicion' END AS guarnicion_modo,
-            v.guarnicion_id AS guarnicion_fija_id, gf.nombre AS guarnicion_fija_nombre,
-            CASE WHEN v.salsa_id IS NOT NULL THEN 'fija' WHEN v.salsa_libre THEN 'libre' ELSE 'sin_salsa' END AS salsa_modo,
-            v.salsa_id AS salsa_fija_id, sf.nombre AS salsa_fija_nombre
+            CASE
+              WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_modo_override
+              WHEN v.guarnicion_id IS NOT NULL THEN 'fija'
+              WHEN p.tiene_guarnicion THEN 'libre'
+              ELSE 'sin_guarnicion'
+            END AS guarnicion_modo,
+            CASE
+              WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_fija_override_id
+              ELSE v.guarnicion_id
+            END AS guarnicion_fija_id,
+            gf.nombre AS guarnicion_fija_nombre,
+            CASE
+              WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_modo_override
+              WHEN v.salsa_id IS NOT NULL THEN 'fija'
+              WHEN v.salsa_libre THEN 'libre'
+              ELSE 'sin_salsa'
+            END AS salsa_modo,
+            CASE
+              WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_fija_override_id
+              ELSE v.salsa_id
+            END AS salsa_fija_id,
+            sf.nombre AS salsa_fija_nombre
      FROM menu_semanal_dias msd
      JOIN categorias c ON c.id = msd.categoria_id AND c.slug IN ('fijos-x-dia', 'fijos-de-siempre')
      JOIN platos p ON p.id = msd.plato_id AND p.activo = true
      JOIN viandas v ON v.id = msd.vianda_id AND v.activo = true
-     LEFT JOIN guarniciones gf ON gf.id = v.guarnicion_id
-     LEFT JOIN salsas sf ON sf.id = v.salsa_id
+     LEFT JOIN menu_semanal_dia_empresa_override emo
+       ON emo.menu_semanal_id = msd.menu_semanal_id
+      AND emo.categoria_id = msd.categoria_id
+      AND emo.dia IS NOT DISTINCT FROM msd.dia
+      AND emo.opcion IS NOT DISTINCT FROM msd.opcion
+      AND emo.empresa_id = $1
+      AND emo.plato_id_origen = msd.plato_id
+     LEFT JOIN guarniciones gf ON gf.id = CASE
+       WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_fija_override_id
+       ELSE v.guarnicion_id END
+     LEFT JOIN salsas sf ON sf.id = CASE
+       WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_fija_override_id
+       ELSE v.salsa_id END
      WHERE msd.menu_semanal_id = $2
        AND ${filtroVisibilidadFijoSemana(1, 2)}
      ORDER BY p.nombre ASC`,
@@ -582,7 +656,7 @@ export const deleteItemsNotInDays = async (pedidoId, dias, db = query) => {
 // Resuelve la vianda efectiva del ítem: la del slot de menú si el plato pertenece a un
 // menú semanal ese día/opción (msd.vianda_id), o la vianda global del plato si es un
 // "fijo" sin slot (ver create-viandas-table, "un poco de ambas" del design doc).
-export const validateItemForMenu = async (menuId, item, db = query) => {
+export const validateItemForMenu = async (menuId, item, db = query, empresaId = null) => {
   const result = await execute(
     db,
     `SELECT p.id, p.nombre, p.tipo, p.activo, p.disponibilidad, p.dia_fijo, p.tiene_guarnicion,
@@ -595,22 +669,35 @@ export const validateItemForMenu = async (menuId, item, db = query) => {
                 AND msd.opcion = $4
             ) AS pertenece_menu,
             (v_slot.id IS NOT NULL OR v_global.id IS NOT NULL) AS tiene_vianda,
+            -- Resolución atómica por capa (plan-eng-review T2/T4): precedencia
+            -- excepción empresa (emo) → override de celda (msd) → vianda → plato. El
+            -- write path resuelve con la MISMA cascada que el read (VIANDA_SLOT_COLS)
+            -- para que el snapshot del pedido use la guarnición/salsa por empresa. emo
+            -- se aplica con la guarda plato_id_origen (ver join).
             CASE
-              WHEN msd.guarnicion_modo_override = 'fija' THEN 'fija'
-              WHEN msd.guarnicion_modo_override IN ('sin_guarnicion', 'libre') THEN msd.guarnicion_modo_override
+              WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_modo_override
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_modo_override
               WHEN COALESCE(v_slot.guarnicion_id, v_global.guarnicion_id) IS NOT NULL THEN 'fija'
               WHEN p.tiene_guarnicion THEN 'libre'
               ELSE 'sin_guarnicion'
             END AS guarnicion_modo,
-            COALESCE(msd.guarnicion_fija_override_id, v_slot.guarnicion_id, v_global.guarnicion_id) AS guarnicion_fija_id,
             CASE
-              WHEN msd.salsa_modo_override = 'fija' THEN 'fija'
-              WHEN msd.salsa_modo_override IN ('sin_salsa', 'libre') THEN msd.salsa_modo_override
+              WHEN emo.guarnicion_modo_override IS NOT NULL THEN emo.guarnicion_fija_override_id
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_fija_override_id
+              ELSE COALESCE(v_slot.guarnicion_id, v_global.guarnicion_id)
+            END AS guarnicion_fija_id,
+            CASE
+              WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_modo_override
+              WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_modo_override
               WHEN COALESCE(v_slot.salsa_id, v_global.salsa_id) IS NOT NULL THEN 'fija'
               WHEN COALESCE(v_slot.salsa_libre, v_global.salsa_libre, false) THEN 'libre'
               ELSE 'sin_salsa'
             END AS salsa_modo,
-            COALESCE(msd.salsa_fija_override_id, v_slot.salsa_id, v_global.salsa_id) AS salsa_fija_id,
+            CASE
+              WHEN emo.salsa_modo_override IS NOT NULL THEN emo.salsa_fija_override_id
+              WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_fija_override_id
+              ELSE COALESCE(v_slot.salsa_id, v_global.salsa_id)
+            END AS salsa_fija_id,
             CASE WHEN $5::integer IS NULL THEN true ELSE EXISTS (
               SELECT 1 FROM guarniciones g WHERE g.id = $5 AND g.activo = true
             ) END AS guarnicion_valida,
@@ -624,10 +711,27 @@ export const validateItemForMenu = async (menuId, item, db = query) => {
      FROM platos p
      LEFT JOIN menu_semanal_dias msd
        ON msd.menu_semanal_id = $2 AND msd.dia::text = $3 AND msd.plato_id = p.id AND msd.opcion = $4
+     -- Slot de FIJO (plan-eng-review T9): los fijos son filas menu_semanal_dias con
+     -- opcion NULL que el join de especiales de arriba NO matchea (opcion NULL vs $4, y
+     -- dia NULL en fijos-de-siempre). Este lookup los ubica para poder anclar su
+     -- excepción por empresa. fijos-x-dia matchea el día del pedido; fijos-de-siempre
+     -- (dia NULL) aplica cualquier día.
+     LEFT JOIN menu_semanal_dias msd_fijo
+       ON msd_fijo.menu_semanal_id = $2 AND msd_fijo.plato_id = p.id AND msd_fijo.opcion IS NULL
+      AND (msd_fijo.dia::text = $3 OR msd_fijo.dia IS NULL)
+      AND msd_fijo.categoria_id IN (SELECT id FROM categorias WHERE slug IN ('fijos-x-dia', 'fijos-de-siempre'))
      LEFT JOIN viandas v_slot ON v_slot.id = msd.vianda_id
      LEFT JOIN viandas v_global ON v_global.plato_id = p.id AND v_global.empresa_id IS NULL AND v_global.activo = true
+     -- emo ancla vía la celda que corresponda: especial (msd) o fijo (msd_fijo).
+     LEFT JOIN menu_semanal_dia_empresa_override emo
+       ON emo.menu_semanal_id = COALESCE(msd.menu_semanal_id, msd_fijo.menu_semanal_id)
+      AND emo.categoria_id = COALESCE(msd.categoria_id, msd_fijo.categoria_id)
+      AND emo.dia IS NOT DISTINCT FROM COALESCE(msd.dia, msd_fijo.dia)
+      AND emo.opcion IS NOT DISTINCT FROM COALESCE(msd.opcion, msd_fijo.opcion)
+      AND emo.empresa_id = $7
+      AND emo.plato_id_origen = p.id
      WHERE p.id = $1`,
-    [item.plato_id, menuId, item.dia, item.opcion, item.guarnicion_id || null, item.salsa_id || null]
+    [item.plato_id, menuId, item.dia, item.opcion, item.guarnicion_id || null, item.salsa_id || null, empresaId]
   );
   return result.rows[0] || null;
 };

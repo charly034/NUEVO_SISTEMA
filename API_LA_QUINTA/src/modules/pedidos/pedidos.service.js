@@ -1050,7 +1050,7 @@ export const guardarPedido = async (empleadoId, empresaId, payload, actor = {}) 
     for (const item of items) {
       if (item.sin_pedido) continue;
 
-      const plato = await repo.validateItemForMenu(menuActivo?.id || null, item, client);
+      const plato = await repo.validateItemForMenu(menuActivo?.id || null, item, client, empresaId);
       if (!plato || !plato.activo || !plato.tiene_vianda) {
         throw ApiError.unprocessable(`El plato seleccionado para el ${item.dia} ya no esta disponible`);
       }

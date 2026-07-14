@@ -40,6 +40,16 @@ export const findMenuActivoPorFecha = async (fechaISO) => {
 // findDetalleEtiquetas): override del slot semanal > default de la vianda del catálogo.
 // 'sin_guarnicion'/'sin_salsa'/'libre' en el override anulan explícitamente el default
 // de la vianda (no es "no hay override", es "este día no lleva" o "se define al pedir").
+//
+// SIN capa por-empresa a propósito (plan-eng-review T5): esta es la vista del TABLERO
+// del menú de la semana (qué ofrece cada slot en general), no una resolución por
+// pedido. La guarnición/salsa POR EMPRESA llega a la cocina por otro camino: el
+// SNAPSHOT de pedido_items (pi.guarnicion_id/salsa_id), que validateItemForMenu (T4)
+// resuelve por empresa al guardar. findDetalleEtiquetas lee ese snapshot, así que las
+// etiquetas ya reflejan la excepción por empresa sin que cocina resuelva nada extra.
+// Los conteos (findConteosPedidos) agregan por PLATO, no por guarnición. Ver el test
+// cocina-consistencia-guarnicion.db.test.js: esta resolución del tablero coincide slot
+// por slot con la resolución base de pedidos.
 const SLOTS_SELECT = `
   SELECT
     msd.id, msd.dia, msd.opcion,

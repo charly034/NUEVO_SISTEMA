@@ -121,14 +121,20 @@ async function seed() {
           const pid = platoId.get(cell.plato);
           if (!pid) throw new Error(`Plato no encontrado en catalogo: ${cell.plato}`);
           const gid = cell.guarnicion ? guarnId.get(cell.guarnicion) : null;
+          // Coherencia atómica (plan-eng-review T2): si se pinnea una guarnición
+          // por id, se fija también el modo. Antes se seteaba solo el id y el read
+          // per-columna lo arrastraba vía COALESCE; con resolución atómica el modo
+          // debe acompañar al id o el pin se ignora.
+          const gModo = gid ? 'fija' : null;
           await client.query(
             `INSERT INTO menu_semanal_dias
-               (menu_semanal_id, dia, opcion, plato_id, guarnicion_fija_override_id)
-             VALUES ($1, $2, $3, $4, $5)
+               (menu_semanal_id, dia, opcion, plato_id, guarnicion_modo_override, guarnicion_fija_override_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (menu_semanal_id, dia, opcion)
                DO UPDATE SET plato_id = EXCLUDED.plato_id,
+                             guarnicion_modo_override = EXCLUDED.guarnicion_modo_override,
                              guarnicion_fija_override_id = EXCLUDED.guarnicion_fija_override_id`,
-            [menuId, dia, opcion, pid, gid]
+            [menuId, dia, opcion, pid, gModo, gid]
           );
         }
       }
