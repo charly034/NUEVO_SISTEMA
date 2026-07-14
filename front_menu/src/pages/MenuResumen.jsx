@@ -227,16 +227,14 @@ function BarraAcciones({ id, menu, totalPedidos }) {
       </div>
 
       {estado === 'publicado' && (
-        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 max-w-md">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold text-gray-600">Fecha límite de pedidos</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {fechaLimiteStr ? fechaLimiteStr : 'Sin fecha límite — los pedidos quedan abiertos.'}
-              </p>
-            </div>
+        <div className="max-w-md">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <span className="font-semibold text-gray-600">Fecha límite de pedidos:</span>
+            <span className="text-gray-500">
+              {fechaLimiteStr ? fechaLimiteStr : 'sin límite (pedidos abiertos)'}
+            </span>
             <button type="button" onClick={() => setEditandoFecha(v => !v)}
-              className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
+              className="font-semibold text-brand-600 hover:underline">
               {editandoFecha ? 'Cancelar' : fechaLimiteStr ? 'Editar' : 'Agregar'}
             </button>
           </div>
@@ -366,7 +364,8 @@ function Leyenda() {
     { cls: 'bg-white border-gray-200', label: 'Ninguno' },
   ];
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-gray-500">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+      <span className="font-semibold text-gray-600">Se ofrece como:</span>
       {items.map((it) => (
         <div key={it.label} className="flex items-center gap-1.5">
           <span className={`inline-block w-3 h-3 rounded border ${it.cls}`} />
@@ -1410,9 +1409,13 @@ function BotonEliminarFila({ onEliminar, title }) {
         type="button"
         onClick={onEliminar}
         title={title || 'Eliminar fila'}
-        className="w-full h-full flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs"
+        aria-label={title || 'Eliminar fila'}
+        className="w-full h-full flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
       >
-        ✕
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+          <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+          <path d="M10 11v6M14 11v6" />
+        </svg>
       </button>
     </td>
   );
@@ -1643,7 +1646,12 @@ function ListaSiempreBloque({ cat, dias, menuId, onAbrirDetalle, onAbrirAgregarF
               <button type="button" onClick={() => onAbrirDetalle({ item, tipo: tipoDrawer(cat), cat, dia: null, diaLabel: 'Todos los días' })} className="flex-1 text-left p-1.5 min-w-0">
                 <p className="text-xs text-gray-800 truncate">{item.plato_nombre}</p>
               </button>
-              <button type="button" onClick={() => eliminar(item)} title="Eliminar fila" className="shrink-0 px-2.5 h-full text-xs text-gray-300 hover:text-red-500 transition-colors">✕</button>
+              <button type="button" onClick={() => eliminar(item)} title="Eliminar de la semana" aria-label="Eliminar de la semana" className="shrink-0 flex items-center px-2.5 h-full text-gray-300 hover:text-red-500 transition-colors">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+                  <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+                  <path d="M10 11v6M14 11v6" />
+                </svg>
+              </button>
             </div>
           </td>
         </tr>
@@ -1763,19 +1771,25 @@ function TablaSemana({
     <table className="border-collapse w-full min-w-[940px] table-fixed">
       <colgroup>
         <col className="w-28" />
-        {dias.map((dia) => <col key={dia.dia} />)}
+        {dias.map((dia) => {
+          const finde = dia.dia === 'sabado' || dia.dia === 'domingo';
+          return <col key={dia.dia} className={finde ? 'w-20' : ''} />;
+        })}
         <col className="w-9" />
       </colgroup>
       <thead>
         <tr>
           <th className="border border-gray-100 bg-gray-50 w-28" />
-          {dias.map((dia) => (
-            <th key={dia.dia} className={`border border-gray-100 p-1.5 text-center ${dia.sin_servicio ? 'bg-red-50' : 'bg-gray-50'}`}>
-              <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">{DIA_ABREV[dia.dia]}</div>
-              <div className="text-[10px] text-gray-500 mb-1">{formatFechaCorta(dia.fecha)}</div>
-              <ToggleSinServicio dia={dia} marcar={marcarSinServicio} quitar={quitarSinServicio} />
-            </th>
-          ))}
+          {dias.map((dia) => {
+            const finde = dia.dia === 'sabado' || dia.dia === 'domingo';
+            return (
+              <th key={dia.dia} className={`border border-gray-100 p-1.5 text-center ${dia.sin_servicio ? 'bg-red-50' : finde ? 'bg-gray-100' : 'bg-gray-50'}`}>
+                <div className={`text-xs font-bold uppercase tracking-wide ${finde ? 'text-gray-400' : 'text-gray-900'}`}>{DIA_ABREV[dia.dia]}</div>
+                <div className="text-[10px] text-gray-500 mb-1">{formatFechaCorta(dia.fecha)}</div>
+                <ToggleSinServicio dia={dia} marcar={marcarSinServicio} quitar={quitarSinServicio} />
+              </th>
+            );
+          })}
           <th className="border border-gray-100 bg-gray-50" />
         </tr>
       </thead>
@@ -1869,14 +1883,20 @@ export default function MenuResumen() {
       {menuQ.data && <BarraAcciones id={id} menu={menuQ.data} totalPedidos={pedidosQ.data?.length ?? 0} />}
 
       <div className="card p-4 md:p-6">
-        <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center justify-between gap-3 mb-3">
           <Leyenda />
           <button
             type="button"
             onClick={() => setGestionAbierta(true)}
-            className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors"
           >
-            Categorías
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+              <path d="M3 5h18M3 12h18M3 19h18" />
+              <circle cx="7" cy="5" r="1.6" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+              <circle cx="17" cy="19" r="1.6" fill="currentColor" stroke="none" />
+            </svg>
+            Gestionar categorías
           </button>
         </div>
         <div className="overflow-x-auto -mx-1 px-1">
