@@ -3,6 +3,7 @@ import * as categoriasRepository from '../categorias/categorias.repository.js';
 import * as platosRepository from '../platos/platos.repository.js';
 import * as viandasRepository from '../viandas/viandas.repository.js';
 import * as menusSemanalesRepository from '../menus-semanales/menus-semanales.repository.js';
+import * as empresasRepository from '../empresas/empresas.repository.js';
 import { ApiError } from '../../utils/ApiError.js';
 
 // Agrega un plato a una categoría desde la tabla (celda nueva). vianda_activa y
@@ -63,4 +64,50 @@ export const eliminar = async (id) => {
   const item = await repo.findById(id);
   if (!item) throw ApiError.notFound(`Item de menú con id ${id} no encontrado`);
   await repo.remove(id);
+};
+
+// ── Excepciones de guarnición/salsa por empresa sobre una celda (T8) ──────────
+//
+// El cliente manda solo el slot_id: acá se resuelve la celda y de ella salen el
+// ancla (menu, categoria, dia, opcion) y la guarda (plato_id_origen = el plato que
+// la celda tiene HOY). Si mañana la rotación cambia ese plato, la excepción queda
+// "stale" y la resolución la ignora (ver migración 1719000080000).
+
+const cargarSlot = async (id) => {
+  const slot = await repo.findById(id);
+  if (!slot) throw ApiError.notFound(`Item de menú con id ${id} no encontrado`);
+  if (slot.categoria_id == null) {
+    throw ApiError.badRequest('No se pueden configurar excepciones por empresa en una celda sin categoría');
+  }
+  return slot;
+};
+
+export const listarExcepciones = async (id) => {
+  const slot = await cargarSlot(id);
+  return repo.findExcepciones(slot);
+};
+
+export const guardarExcepcion = async (id, empresaId, datos) => {
+  const slot = await cargarSlot(id);
+
+  const empresa = await empresasRepository.findById(empresaId);
+  if (!empresa) throw ApiError.notFound(`Empresa con id ${empresaId} no encontrada`);
+  if (!empresa.activo) throw ApiError.conflict(`La empresa "${empresa.nombre}" está inactiva`);
+
+  // No tiene sentido una excepción para una empresa que ni siquiera recibe este
+  // plato ese día (allowlist real de visibilidad).
+  const ve = await repo.empresaVeSlot(slot.id, empresaId);
+  if (!ve) {
+    throw ApiError.conflict(`"${empresa.nombre}" no recibe este plato en este día, así que no puede tener una excepción`);
+  }
+
+  await repo.upsertExcepcion(slot, { empresa_id: empresaId, ...datos });
+  return repo.findExcepciones(slot);
+};
+
+export const borrarExcepcion = async (id, empresaId) => {
+  const slot = await cargarSlot(id);
+  const borrada = await repo.deleteExcepcion(slot, empresaId);
+  if (!borrada) throw ApiError.notFound('Esa empresa no tiene una excepción en esta celda');
+  return repo.findExcepciones(slot);
 };

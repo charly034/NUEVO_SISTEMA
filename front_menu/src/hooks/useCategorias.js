@@ -154,6 +154,44 @@ export const useReasignarMenuItem = (menuSemanalId) => {
   });
 };
 
+// ── Excepciones de guarnición/salsa por empresa sobre una celda (T8) ──────────
+//
+// Se cuelgan de la celda (/menu-items/:slotId/excepciones-empresa): el backend
+// deriva el ancla por claves de negocio y la guarda plato_id_origen, así que el
+// front solo manda el slot y la empresa. Al mutar se invalida el resumen de la
+// semana porque los contadores del chip (+N empresas / N desactualizadas) viajan
+// en el payload de la celda.
+export const useExcepcionesEmpresa = (slotId) =>
+  useQuery({
+    queryKey: ['excepciones-empresa', slotId],
+    queryFn: () => apiClient.get(`/menu-items/${slotId}/excepciones-empresa`).then((r) => r.data),
+    enabled: !!slotId,
+  });
+
+export const useGuardarExcepcionEmpresa = (menuSemanalId, slotId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ empresaId, ...datos }) =>
+      apiClient.put(`/menu-items/${slotId}/excepciones-empresa/${empresaId}`, datos).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['excepciones-empresa', slotId] });
+      qc.invalidateQueries({ queryKey: [SEMANA_KEY, menuSemanalId] });
+    },
+  });
+};
+
+export const useBorrarExcepcionEmpresa = (menuSemanalId, slotId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (empresaId) =>
+      apiClient.delete(`/menu-items/${slotId}/excepciones-empresa/${empresaId}`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['excepciones-empresa', slotId] });
+      qc.invalidateQueries({ queryKey: [SEMANA_KEY, menuSemanalId] });
+    },
+  });
+};
+
 // Agrega un plato a una categoría desde la tabla (celda nueva). dia/opcion
 // según el tipo de categoría (matriz: ambos; lista por día: dia; modo único: nada).
 export const useAgregarItemCategoria = (menuSemanalId) => {

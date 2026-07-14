@@ -83,6 +83,61 @@ export const findItemsPlatosCategorizados = async (menuSemanalId) => {
             p.nombre AS plato_nombre, msd.vianda_id, v.nombre_vianda,
             v.guarnicion_id, v.salsa_id, v.salsa_libre,
             msd.disponible_por_kilo,
+            -- Modo efectivo + PROCEDENCIA (plan-eng-review T7/B1). Se resuelve en el
+            -- MISMO SQL que el modo para que el front no reimplemente la cascada (sería
+            -- una copia más que se desincroniza justo en la capa cuyo trabajo es no
+            -- mentir sobre el origen). Contexto admin: sin capa empresa, la cascada es
+            -- override de celda → vianda → plato → sin (misma precedencia atómica que
+            -- pedidos.repository.js VIANDA_SLOT_COLS).
+            CASE
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_modo_override
+              WHEN v.guarnicion_id IS NOT NULL THEN 'fija'
+              WHEN p.tiene_guarnicion THEN 'libre'
+              ELSE 'sin_guarnicion'
+            END AS guarnicion_modo,
+            CASE
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN 'celda'
+              WHEN v.guarnicion_id IS NOT NULL THEN 'vianda'
+              WHEN p.tiene_guarnicion THEN 'plato'
+              ELSE 'ninguna'
+            END AS guarnicion_procedencia,
+            CASE
+              WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_fija_override_id
+              ELSE v.guarnicion_id
+            END AS guarnicion_efectiva_id,
+            gf.nombre AS guarnicion_efectiva_nombre,
+            CASE
+              WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_modo_override
+              WHEN v.salsa_id IS NOT NULL THEN 'fija'
+              WHEN v.salsa_libre THEN 'libre'
+              ELSE 'sin_salsa'
+            END AS salsa_modo,
+            CASE
+              WHEN msd.salsa_modo_override IS NOT NULL THEN 'celda'
+              WHEN v.salsa_id IS NOT NULL OR v.salsa_libre THEN 'vianda'
+              ELSE 'ninguna'
+            END AS salsa_procedencia,
+            CASE
+              WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_fija_override_id
+              ELSE v.salsa_id
+            END AS salsa_efectiva_id,
+            sf.nombre AS salsa_efectiva_nombre,
+            -- Excepciones por empresa sobre esta celda (T4/T9). Las "vigentes" cumplen
+            -- la guarda plato_id_origen = plato actual; las "stale" quedaron apuntando a
+            -- un plato que la rotación cambió y NO se aplican (el admin las reconfirma
+            -- o borra). El front las muestra como "+N empresas" / "N desactualizadas".
+            (SELECT COUNT(*)::int FROM menu_semanal_dia_empresa_override emo
+              WHERE emo.menu_semanal_id = msd.menu_semanal_id
+                AND emo.categoria_id = msd.categoria_id
+                AND emo.dia IS NOT DISTINCT FROM msd.dia
+                AND emo.opcion IS NOT DISTINCT FROM msd.opcion
+                AND emo.plato_id_origen = msd.plato_id) AS excepciones_empresas,
+            (SELECT COUNT(*)::int FROM menu_semanal_dia_empresa_override emo
+              WHERE emo.menu_semanal_id = msd.menu_semanal_id
+                AND emo.categoria_id = msd.categoria_id
+                AND emo.dia IS NOT DISTINCT FROM msd.dia
+                AND emo.opcion IS NOT DISTINCT FROM msd.opcion
+                AND emo.plato_id_origen <> msd.plato_id) AS excepciones_stale,
             COALESCE(vis.empresa_ids, '{}') AS visible_empresa_ids,
             COALESCE(
               json_agg(
@@ -95,12 +150,19 @@ export const findItemsPlatosCategorizados = async (menuSemanalId) => {
      JOIN platos p ON p.id = msd.plato_id
      LEFT JOIN categorias c ON c.id = msd.categoria_id
      LEFT JOIN viandas v ON v.id = msd.vianda_id
+     LEFT JOIN guarniciones gf ON gf.id = CASE
+       WHEN msd.guarnicion_modo_override IS NOT NULL THEN msd.guarnicion_fija_override_id
+       ELSE v.guarnicion_id END
+     LEFT JOIN salsas sf ON sf.id = CASE
+       WHEN msd.salsa_modo_override IS NOT NULL THEN msd.salsa_fija_override_id
+       ELSE v.salsa_id END
      LEFT JOIN visibilidad vis ON vis.menu_semanal_dia_id = msd.id
      LEFT JOIN efectiva ef ON true
      WHERE msd.menu_semanal_id = $1
        AND (msd.categoria_id IS NULL OR c.slug NOT IN ('fijos-x-dia', 'fijos-de-siempre'))
      GROUP BY msd.id, msd.dia, msd.opcion, msd.plato_id, msd.categoria_id, c.slug, p.nombre,
-              msd.vianda_id, v.nombre_vianda, v.guarnicion_id, v.salsa_id, v.salsa_libre,
+              p.tiene_guarnicion, msd.vianda_id, v.nombre_vianda, v.guarnicion_id, v.salsa_id,
+              v.salsa_libre, gf.nombre, sf.nombre,
               msd.disponible_por_kilo, vis.empresa_ids
      ORDER BY msd.dia::text NULLS LAST, msd.opcion ASC NULLS LAST, p.nombre ASC`,
     [menuSemanalId]

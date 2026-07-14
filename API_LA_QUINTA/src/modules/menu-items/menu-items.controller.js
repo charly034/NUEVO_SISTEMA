@@ -16,3 +16,27 @@ export const deleteMenuItem = asyncHandler(async (req, res) => {
   await service.eliminar(Number(req.params.id));
   sendSuccess(res, { ok: true }, 'Item de menú eliminado');
 });
+
+// ── Excepciones de guarnición/salsa por empresa sobre una celda (T8) ──────────
+
+export const getExcepcionesEmpresa = asyncHandler(async (req, res) => {
+  const excepciones = await service.listarExcepciones(Number(req.params.id));
+  sendSuccess(res, excepciones);
+});
+
+export const putExcepcionEmpresa = asyncHandler(async (req, res) => {
+  const excepciones = await service.guardarExcepcion(
+    Number(req.params.id),
+    Number(req.params.empresaId),
+    req.body
+  );
+  sendSuccess(res, excepciones, 'Excepción por empresa guardada');
+});
+
+export const deleteExcepcionEmpresa = asyncHandler(async (req, res) => {
+  const excepciones = await service.borrarExcepcion(
+    Number(req.params.id),
+    Number(req.params.empresaId)
+  );
+  sendSuccess(res, excepciones, 'Excepción por empresa eliminada');
+});

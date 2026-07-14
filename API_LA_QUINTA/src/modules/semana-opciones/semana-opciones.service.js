@@ -56,6 +56,21 @@ function celdaSlot(s) {
     empresas: s.empresas,
     visible_empresa_ids: s.visible_empresa_ids ?? [],
     categoria_id: s.categoria_id,
+    // Cascada legible (T7/B1): modo efectivo + de QUÉ CAPA sale, resuelto en el
+    // repositorio (no se recalcula en el front). procedencia: celda | vianda | plato |
+    // ninguna. excepciones_empresas = excepciones por empresa vigentes sobre esta
+    // celda; excepciones_stale = las que quedaron apuntando a un plato viejo tras una
+    // rotación (no se aplican; el admin las reconfirma o borra).
+    guarnicion_modo: s.guarnicion_modo,
+    guarnicion_procedencia: s.guarnicion_procedencia,
+    guarnicion_efectiva_id: s.guarnicion_efectiva_id,
+    guarnicion_efectiva_nombre: s.guarnicion_efectiva_nombre,
+    salsa_modo: s.salsa_modo,
+    salsa_procedencia: s.salsa_procedencia,
+    salsa_efectiva_id: s.salsa_efectiva_id,
+    salsa_efectiva_nombre: s.salsa_efectiva_nombre,
+    excepciones_empresas: s.excepciones_empresas ?? 0,
+    excepciones_stale: s.excepciones_stale ?? 0,
   };
 }
 

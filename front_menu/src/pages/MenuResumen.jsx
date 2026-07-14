@@ -17,7 +17,10 @@ import { usePlatos, useCreatePlato, useUpdatePlato } from '../hooks/usePlatos.js
 import { useCreateVianda, useUpdateVianda } from '../hooks/useViandas.js';
 import { useGuarniciones, useCreateGuarnicion } from '../hooks/useGuarniciones.js';
 import { useSalsas, useCreateSalsa } from '../hooks/useSalsas.js';
-import { useCategorias, useDeleteMenuItem, useReasignarMenuItem, useAgregarItemCategoria } from '../hooks/useCategorias.js';
+import {
+  useCategorias, useDeleteMenuItem, useReasignarMenuItem, useAgregarItemCategoria,
+  useExcepcionesEmpresa, useGuardarExcepcionEmpresa, useBorrarExcepcionEmpresa,
+} from '../hooks/useCategorias.js';
 import Spinner from '../components/ui/Spinner.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import SideDrawer from '../components/ui/SideDrawer.jsx';
@@ -704,6 +707,299 @@ function ReasignarYBorrar({ menuId, item, onClose }) {
 
 // ── Drawer de detalle: vianda si/no (con editor de composicion), venta por
 // kilo, y (solo especiales) para que empresas es visible ──
+// Cascada legible (T7/B1): muestra el valor EFECTIVO de guarnicion/salsa y de que
+// capa sale. La procedencia la resuelve el backend en el mismo SQL que el modo
+// (semana-opciones): el front no reimplementa la cascada, solo la muestra -- si la
+// recalculara, seria otra copia que se desincroniza justo en la capa cuyo unico
+// trabajo es no mentir sobre el origen.
+const PROCEDENCIA_CHIP = {
+  celda: { label: 'Pisado esta semana', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  vianda: { label: 'De la vianda', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  plato: { label: 'Default del plato', cls: 'bg-gray-50 text-gray-600 border-gray-200' },
+  ninguna: { label: 'Sin definir', cls: 'bg-gray-50 text-gray-400 border-gray-200' },
+};
+
+function textoGuarnicion(item) {
+  if (item.guarnicion_modo === 'fija') {
+    return item.guarnicion_efectiva_nombre
+      ? `Con guarnición fija: ${item.guarnicion_efectiva_nombre}`
+      : 'Con guarnición fija (sin definir)';
+  }
+  if (item.guarnicion_modo === 'libre') return 'Guarnición a elección del cliente';
+  return 'Sin guarnición';
+}
+
+function textoSalsa(item) {
+  if (item.salsa_modo === 'fija') {
+    return item.salsa_efectiva_nombre
+      ? `Con salsa fija: ${item.salsa_efectiva_nombre}`
+      : 'Con salsa fija (sin definir)';
+  }
+  if (item.salsa_modo === 'libre') return 'Salsa a elección del cliente';
+  return 'Sin salsa';
+}
+
+function FilaProcedencia({ titulo, texto, procedencia }) {
+  const chip = PROCEDENCIA_CHIP[procedencia] ?? PROCEDENCIA_CHIP.ninguna;
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wide text-gray-400">{titulo}</p>
+        <p className="text-sm font-medium text-gray-900 mt-0.5">{texto}</p>
+      </div>
+      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${chip.cls}`}>
+        {chip.label}
+      </span>
+    </div>
+  );
+}
+
+function ProcedenciaCard({ item }) {
+  // Solo celdas slot (especiales/custom) traen la resolucion del backend; los fijos
+  // se computan por otro camino y todavia no la exponen en este payload.
+  if (!item?.guarnicion_modo) return null;
+
+  const esCompuesto = item.guarnicion_procedencia === 'vianda' && item.guarnicion_modo === 'fija';
+  const excepciones = item.excepciones_empresas ?? 0;
+  const stale = item.excepciones_stale ?? 0;
+
+  return (
+    <div className="rounded-lg border border-gray-100 p-4 space-y-3">
+      <FilaProcedencia titulo="Guarnición" texto={textoGuarnicion(item)} procedencia={item.guarnicion_procedencia} />
+      <FilaProcedencia titulo="Salsa" texto={textoSalsa(item)} procedencia={item.salsa_procedencia} />
+
+      {esCompuesto && (
+        <p className="text-xs text-gray-500">
+          Menú compuesto: la vianda ya trae la guarnición armada. Se puede pisar solo para esta semana.
+        </p>
+      )}
+
+      {(excepciones > 0 || stale > 0) && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {excepciones > 0 && (
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+              +{excepciones} {excepciones === 1 ? 'empresa distinta' : 'empresas distintas'}
+            </span>
+          )}
+          {stale > 0 && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+              {stale} {stale === 1 ? 'excepción desactualizada' : 'excepciones desactualizadas'}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Excepciones de guarnición/salsa POR EMPRESA sobre esta celda (T8).
+//
+// Colapsada y vacía por defecto: sin excepciones, la celda aplica igual a todas las
+// empresas (opt-in real, no se crea ninguna fila). El backend deriva el ancla y la
+// guarda plato_id_origen del slot, así que acá solo se manda empresa + modos.
+function ExcepcionesEmpresaSection({ menuId, item, empresas = [] }) {
+  const slotId = item.slot_id;
+  const [abierto, setAbierto] = useState(false);
+  const [nuevaEmpresa, setNuevaEmpresa] = useState('');
+
+  const { data: excepciones = [], isLoading } = useExcepcionesEmpresa(abierto ? slotId : null);
+  const guardar = useGuardarExcepcionEmpresa(menuId, slotId);
+  const borrar = useBorrarExcepcionEmpresa(menuId, slotId);
+
+  const total = item.excepciones_empresas ?? 0;
+  const stale = item.excepciones_stale ?? 0;
+
+  // Solo las empresas que REALMENTE reciben esta celda ([] = todas).
+  const visibles = (item.visible_empresa_ids?.length
+    ? empresas.filter((e) => item.visible_empresa_ids.includes(e.id))
+    : empresas
+  ).filter((e) => e.activo);
+  const yaConExcepcion = new Set(excepciones.map((e) => e.empresa_id));
+  const disponibles = visibles.filter((e) => !yaConExcepcion.has(e.id));
+
+  const onAgregar = () => {
+    if (!nuevaEmpresa) return;
+    // Arranca pisando la guarnición a "sin guarnición": es el cambio más común y
+    // deja la fila válida (el modo 'fija' exigiría elegir cuál).
+    guardar.mutate(
+      { empresaId: Number(nuevaEmpresa), guarnicion_modo_override: 'sin_guarnicion' },
+      {
+        onSuccess: () => setNuevaEmpresa(''),
+        onError: (e) => toast.error(e?.message || 'No se pudo guardar la excepción'),
+      }
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-gray-100">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
+      >
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Excepciones por empresa</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {total === 0 && stale === 0
+              ? 'Esta celda sale igual para todas las empresas.'
+              : `${total} ${total === 1 ? 'empresa' : 'empresas'} con guarnición o salsa distinta${stale > 0 ? ` · ${stale} desactualizada${stale === 1 ? '' : 's'}` : ''}`}
+          </p>
+        </div>
+        <span className="shrink-0 text-xs text-gray-400">{abierto ? 'Ocultar' : 'Configurar'}</span>
+      </button>
+
+      {abierto && (
+        <div className="space-y-3 border-t border-gray-100 p-4">
+          {isLoading && <Spinner />}
+
+          {!isLoading && excepciones.length === 0 && (
+            <p className="text-xs text-gray-400">Todavía no hay excepciones. Agregá una para que una empresa reciba este plato con otra guarnición o salsa.</p>
+          )}
+
+          {excepciones.map((exc) => (
+            <ExcepcionEmpresaRow
+              key={exc.empresa_id}
+              exc={exc}
+              onGuardar={(datos) =>
+                guardar.mutate(
+                  { empresaId: exc.empresa_id, ...datos },
+                  { onError: (e) => toast.error(e?.message || 'No se pudo guardar la excepción') }
+                )
+              }
+              onBorrar={() =>
+                borrar.mutate(exc.empresa_id, {
+                  onError: (e) => toast.error(e?.message || 'No se pudo borrar la excepción'),
+                })
+              }
+              pendiente={guardar.isPending || borrar.isPending}
+            />
+          ))}
+
+          {disponibles.length > 0 && (
+            <div className="flex items-center gap-2 pt-1">
+              <select
+                value={nuevaEmpresa}
+                onChange={(e) => setNuevaEmpresa(e.target.value)}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Agregar excepción para...</option>
+                {disponibles.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={onAgregar}
+                disabled={!nuevaEmpresa || guardar.isPending}
+                className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Agregar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Una fila de excepción: los modos de guarnición/salsa de UNA empresa. El modo
+// 'fija' exige elegir cuál (misma invariante que valida el backend), así que el
+// select de la fija solo aparece con ese modo.
+function ExcepcionEmpresaRow({ exc, onGuardar, onBorrar, pendiente }) {
+  const { data: guarniciones = [] } = useGuarniciones();
+  const { data: salsas = [] } = useSalsas();
+
+  const [gModo, setGModo] = useState(exc.guarnicion_modo_override ?? '');
+  const [gId, setGId] = useState(exc.guarnicion_fija_override_id ?? '');
+  const [sModo, setSModo] = useState(exc.salsa_modo_override ?? '');
+  const [sId, setSId] = useState(exc.salsa_fija_override_id ?? '');
+
+  const puedeGuardar = (gModo || sModo)
+    && !(gModo === 'fija' && !gId)
+    && !(sModo === 'fija' && !sId);
+
+  const guardar = () => onGuardar({
+    guarnicion_modo_override: gModo || null,
+    guarnicion_fija_override_id: gModo === 'fija' ? Number(gId) : null,
+    salsa_modo_override: sModo || null,
+    salsa_fija_override_id: sModo === 'fija' ? Number(sId) : null,
+  });
+
+  return (
+    <div className={`rounded-lg border p-3 space-y-2 ${exc.stale ? 'border-amber-200 bg-amber-50' : 'border-gray-100'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800">{exc.empresa_nombre}</p>
+        <button
+          type="button"
+          onClick={onBorrar}
+          disabled={pendiente}
+          className="text-xs text-red-600 hover:underline disabled:opacity-50"
+        >
+          Quitar
+        </button>
+      </div>
+
+      {exc.stale && (
+        <p className="text-xs text-amber-700">
+          Desactualizada: se cargó para otro plato y la rotación cambió esta celda. No se está aplicando. Reconfirmala o quitala.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={gModo}
+          onChange={(e) => { setGModo(e.target.value); if (e.target.value !== 'fija') setGId(''); }}
+          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          <option value="">Guarnición: sin cambio</option>
+          <option value="sin_guarnicion">Sin guarnición</option>
+          <option value="libre">A elección</option>
+          <option value="fija">Fija...</option>
+        </select>
+        {gModo === 'fija' ? (
+          <select
+            value={gId}
+            onChange={(e) => setGId(e.target.value)}
+            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">Elegí cuál...</option>
+            {guarniciones.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+          </select>
+        ) : <div />}
+
+        <select
+          value={sModo}
+          onChange={(e) => { setSModo(e.target.value); if (e.target.value !== 'fija') setSId(''); }}
+          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          <option value="">Salsa: sin cambio</option>
+          <option value="sin_salsa">Sin salsa</option>
+          <option value="libre">A elección</option>
+          <option value="fija">Fija...</option>
+        </select>
+        {sModo === 'fija' ? (
+          <select
+            value={sId}
+            onChange={(e) => setSId(e.target.value)}
+            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">Elegí cuál...</option>
+            {salsas.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+          </select>
+        ) : <div />}
+      </div>
+
+      <button
+        type="button"
+        onClick={guardar}
+        disabled={!puedeGuardar || pendiente}
+        className="w-full rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+      >
+        Guardar
+      </button>
+    </div>
+  );
+}
+
 function DetalleCeldaDrawer({ celda, menuId, onClose }) {
   const marcarSlotVianda = useMarcarSlotVianda(menuId);
   const quitarSlotVianda = useQuitarSlotVianda(menuId);
@@ -821,8 +1117,16 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
             </div>
           </div>
 
+          {item.vianda_activa && <ProcedenciaCard item={item} />}
+
           {item.vianda_activa && (
             <ComposicionViandaEditor key={`${tipo}-${item.slot_id ?? item.plato_id}-${item.vianda_id}`} item={item} />
+          )}
+
+          {/* Excepciones por empresa: solo celdas slot (tienen id de celda, del que
+              el backend deriva el ancla). Los fijos se configuran por catálogo. */}
+          {item.vianda_activa && item.slot_id && item.categoria_id && (
+            <ExcepcionesEmpresaSection key={item.slot_id} menuId={menuId} item={item} empresas={empresas} />
           )}
 
           {item.vianda_activa ? (
