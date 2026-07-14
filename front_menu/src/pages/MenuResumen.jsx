@@ -356,6 +356,16 @@ function colorCeldaCls(item) {
   return 'bg-white hover:bg-gray-50';
 }
 
+// Mismo código de color pero para chips (borde + texto del mismo tono).
+function chipColorCls(item) {
+  const v = item.vianda_activa;
+  const k = item.disponible_por_kilo;
+  if (v && k) return 'bg-purple-50 border-purple-200 text-purple-800';
+  if (v) return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+  if (k) return 'bg-blue-50 border-blue-200 text-blue-800';
+  return 'bg-white border-gray-200 text-gray-700';
+}
+
 function Leyenda() {
   const items = [
     { cls: 'bg-emerald-50 border-emerald-200', label: 'Vianda' },
@@ -1743,6 +1753,128 @@ function SinCategorizarBloque({ cat, dias, onAbrirDetalle }) {
   );
 }
 
+// ── "Sueltos de la semana": categorías-lista (fijos de siempre, guarniciones,
+// salsas, custom modo-único y rotaciones) que NO son por-día. Se dibujan como
+// tarjetas con chips fuera de la grilla, para no romperla ni forzar el ancho de
+// 7 columnas. Cada tarjeta conserva ⚙ (config), + agregar, click-en-chip
+// (detalle) y borrar-chip. ──
+const CHIP_CAP = 6;
+
+function TarjetaSueltos({ cat, menuId, onAbrirDetalle, onAbrirAgregarFijo, onAbrirAgregarCatalogo, onAbrirAgregarCategoria, onConfigurar }) {
+  const [verTodos, setVerTodos] = useState(false);
+  const esCatalogo = cat.render === 'lista_catalogo';
+  const esFijo = cat.tipo_item === 'fijo';
+  const esGuarnicion = cat.tipo_dato === 'guarniciones';
+  const updatePlato = useUpdatePlato();
+  const deleteItem = useDeleteMenuItem(menuId);
+  const quitarGuarnicion = useQuitarGuarnicionSemana(menuId);
+  const quitarSalsa = useQuitarSalsaSemana(menuId);
+
+  const lista = esCatalogo
+    ? cat.items
+    : [...cat.items].sort((a, b) => (a.plato_nombre || '').localeCompare(b.plato_nombre || ''));
+  const visibles = verTodos ? lista : lista.slice(0, CHIP_CAP);
+
+  const agregar = () => {
+    if (esCatalogo) onAbrirAgregarCatalogo({ tipo: esGuarnicion ? 'guarnicion' : 'salsa' });
+    else if (esFijo) onAbrirAgregarFijo({ modo: 'siempre' });
+    else onAbrirAgregarCategoria({ categoria_id: cat.id, nombre: cat.nombre, dia: null, opcion: null });
+  };
+
+  const eliminarCatalogo = async (item) => {
+    const ok = await confirmar({ titulo: `¿Quitar "${item.nombre}" de esta semana?`, botonConfirmar: 'Quitar' });
+    if (!ok) return;
+    const mut = esGuarnicion ? quitarGuarnicion : quitarSalsa;
+    mut.mutate(item.id, { onError: (e) => toast.error(e?.message || 'No se pudo quitar') });
+  };
+  const eliminarPlato = async (item) => {
+    const ok = await confirmar({
+      titulo: `¿Sacar "${item.plato_nombre}" de ${cat.nombre}?`,
+      texto: esFijo ? 'Es propiedad del catálogo: se saca de fijos en TODAS las semanas.' : 'Se quita de esta semana.',
+      botonConfirmar: 'Eliminar',
+    });
+    if (!ok) return;
+    try {
+      if (esFijo) await updatePlato.mutateAsync({ id: item.plato_id, data: { disponibilidad: 'especial' } });
+      else await deleteItem.mutateAsync(item.slot_id);
+      toast.success('Quitado');
+    } catch (e) {
+      toast.error(e?.message || 'No se pudo quitar');
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <button type="button" onClick={() => onConfigurar(cat)} title="Configurar categoría"
+          className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-gray-700 hover:underline">
+          {cat.nombre}<span className="opacity-40 font-normal normal-case">⚙</span>
+        </button>
+        <button type="button" onClick={agregar} className="shrink-0 text-xs font-semibold text-emerald-700 hover:underline">+ agregar</button>
+      </div>
+      {lista.length === 0 ? (
+        <p className="text-xs text-gray-400">Sin ítems esta semana.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {visibles.map((item) => (esCatalogo ? (
+            <span key={`c-${item.id}`} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 pl-2.5 pr-1 py-0.5 text-xs text-blue-800">
+              {item.nombre}
+              <button type="button" onClick={() => eliminarCatalogo(item)} title="Quitar" aria-label="Quitar" className="text-blue-300 hover:text-red-500 px-0.5">×</button>
+            </span>
+          ) : (
+            <span key={`s-${item.slot_id ?? item.plato_id}`} className={`inline-flex items-center rounded-full border py-0.5 text-xs ${chipColorCls(item)}`}>
+              <button type="button" onClick={() => onAbrirDetalle({ item, tipo: tipoDrawer(cat), cat, dia: null, diaLabel: 'Todos los días' })} className="pl-2.5 pr-1 hover:underline">{item.plato_nombre}</button>
+              <button type="button" onClick={() => eliminarPlato(item)} title="Eliminar" aria-label="Eliminar" className="opacity-40 hover:opacity-100 hover:text-red-500 pr-1.5">×</button>
+            </span>
+          )))}
+          {lista.length > CHIP_CAP && !verTodos && (
+            <button type="button" onClick={() => setVerTodos(true)} className="rounded-full border border-dashed border-gray-300 px-2.5 py-0.5 text-xs text-gray-500 hover:text-gray-700">
+              ver todos ({lista.length})
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SueltosDeLaSemana({ categorias, ...handlers }) {
+  if (!categorias || categorias.length === 0) return null;
+  return (
+    <div className="card p-4 md:p-6">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Sueltos de la semana</p>
+      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+        {categorias.map((cat) => <TarjetaSueltos key={cat.slug} cat={cat} {...handlers} />)}
+      </div>
+    </div>
+  );
+}
+
+// Bloque "Sin categorizar" al final: platos huérfanos (perdieron su categoría).
+// Chips con etiqueta de día; click abre el drawer para reasignar o borrar.
+function SinCategorizarSuelto({ cat, onAbrirDetalle }) {
+  const lista = cat?.items ?? [];
+  if (lista.length === 0) return null;
+  const ctx = (it) => [it.dia ? DIA_NOMBRE[it.dia] : 'Todos los días', it.opcion ? `Opción ${it.opcion}` : null].filter(Boolean).join(' · ');
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+      <p className="text-xs font-semibold text-amber-800 mb-2">
+        Sin categorizar — {lista.length} plato{lista.length !== 1 ? 's' : ''} que perdieron su categoría. Reasignalos o borralos.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {lista.map((item) => (
+          <button key={`sin-${item.slot_id}`} type="button"
+            onClick={() => onAbrirDetalle({ item, tipo: 'especial', cat, dia: item.dia, diaLabel: ctx(item), opcionLabel: item.opcion })}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${chipColorCls(item)}`}>
+            {item.nombre_vianda || item.plato_nombre}
+            <span className="text-[10px] text-gray-400">· {item.dia ? DIA_ABREV[item.dia] : 'todos'}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Despacha cada categoría a su renderer según `render`.
 function CategoriaBloque({ cat, dias, menuId, onAbrirDetalle, onAbrirAgregar, onAbrirAgregarFijo, onAbrirAgregarCatalogo, onAbrirAgregarCategoria, onConfigurar }) {
   switch (cat.render) {
@@ -1768,7 +1900,7 @@ function TablaSemana({
   onAbrirDetalle, onAbrirAgregar, onAbrirAgregarFijo, onAbrirAgregarCatalogo, onAbrirAgregarCategoria, onConfigurar,
 }) {
   return (
-    <table className="border-collapse w-full min-w-[940px] table-fixed">
+    <table className="border-collapse w-full min-w-[680px] table-fixed">
       <colgroup>
         <col className="w-28" />
         {dias.map((dia) => {
@@ -1852,6 +1984,15 @@ export default function MenuResumen() {
     .map((dia) => data.dias.find((d) => d.dia === dia))
     .filter(Boolean);
 
+  // Split de categorías en dos zonas (rediseño): la grilla por-día solo lleva
+  // lo que es realmente por-día (matriz + lista por día); las categorías-lista
+  // (fijos de siempre, guarniciones, salsas, custom modo-único y rotaciones)
+  // salen a la sección "Sueltos"; "Sin categorizar" va a un bloque al final.
+  const categorias = data.categorias ?? [];
+  const gridCats = categorias.filter((c) => c.render === 'matriz' || c.render === 'lista_dia');
+  const sueltosCats = categorias.filter((c) => c.render === 'lista_siempre' || c.render === 'lista_catalogo');
+  const sinCategorizar = categorias.find((c) => c.render === 'sin_categorizar');
+
   // Mantiene el drawer sincronizado con la data fresca tras cada mutacion
   // (el item que tenia guardado el drawer puede quedar desactualizado). Busca
   // el item actualizado en cualquier categoria del payload nuevo: por slot_id
@@ -1901,7 +2042,7 @@ export default function MenuResumen() {
         </div>
         <div className="overflow-x-auto -mx-1 px-1">
           <TablaSemana
-            categorias={data?.categorias ?? []}
+            categorias={gridCats}
             dias={diasOrdenados}
             menuId={id}
             marcarSinServicio={marcarSinServicio}
@@ -1915,6 +2056,18 @@ export default function MenuResumen() {
           />
         </div>
       </div>
+
+      <SueltosDeLaSemana
+        categorias={sueltosCats}
+        menuId={id}
+        onAbrirDetalle={setCeldaSeleccionada}
+        onAbrirAgregarFijo={setFijoVacio}
+        onAbrirAgregarCatalogo={setCatalogoVacio}
+        onAbrirAgregarCategoria={setCategoriaVacia}
+        onConfigurar={abrirConfigCategoria}
+      />
+
+      {sinCategorizar && <SinCategorizarSuelto cat={sinCategorizar} onAbrirDetalle={setCeldaSeleccionada} />}
 
       <DetalleCeldaDrawer celda={celdaSincronizada} menuId={id} onClose={() => setCeldaSeleccionada(null)} />
       <AgregarMenuDrawer celdaVacia={celdaVacia} menuId={id} onClose={() => setCeldaVacia(null)} />
