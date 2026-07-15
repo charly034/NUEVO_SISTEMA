@@ -478,7 +478,7 @@ function SelectorEmpresas({ empresas, initialIds, onGuardar, guardando, nota }) 
 
   const puedeGuardar = todas || empresaIds.length > 0;
   const actualIds = todas ? [] : empresaIds;
-  const dirty = JSON.stringify([...actualIds].sort((a, b) => a - b)) !== JSON.stringify([...inicial].sort((a, b) => a - b));
+  const dirty = !mismosIds(actualIds, inicial);
 
   return (
     <div className="rounded-lg border border-gray-100 p-4">
@@ -575,6 +575,25 @@ function EmpresasEditorFijo({ menuId, platoId, empresas, initialIds }) {
 // y, si no, el id más bajo (el canónico/original del sistema). NOTA: es un parche de
 // presentación; la limpieza real del catálogo (mergear ids y repuntar referencias)
 // es una tarea de datos aparte.
+// Switch on/off accesible reutilizable (por-kilo, vianda, etc.). `color` es la clase
+// de fondo cuando está activo.
+function ToggleSwitch({ checked, onChange, disabled = false, color = 'bg-emerald-500', label }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      disabled={disabled}
+      aria-label={label}
+      className={`shrink-0 relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${checked ? color : 'bg-gray-300'}`}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : ''}`} />
+    </button>
+  );
+}
+
+// Comparación de dos listas de ids como conjuntos (orden-independiente).
+const mismosIds = (a, b) => JSON.stringify([...a].sort((x, y) => x - y)) === JSON.stringify([...b].sort((x, y) => x - y));
+
 function dedupPorNombre(items, mantenerId = null) {
   const idActual = mantenerId != null && mantenerId !== '' ? Number(mantenerId) : null;
   const porNombre = new Map();
@@ -892,23 +911,21 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
     ? (nombrePorId(salsas, item.salsa_id) ?? 'salsa de la vianda')
     : (item.salsa_libre ? 'a elección del cliente' : 'sin salsa');
 
-  const guarnicionEfectiva = () => {
-    if (gModo === 'fija') return { txt: nombrePorId(guarniciones, gId) ?? 'Fija (elegí cuál)', chip: 'Pisado esta semana', pisado: true };
-    if (gModo === 'libre') return { txt: 'A elección del cliente', chip: 'Pisado esta semana', pisado: true };
-    if (gModo === 'sin_guarnicion') return { txt: 'Sin guarnición', chip: 'Pisado esta semana', pisado: true };
-    return { txt: baseGuarnicionTexto, chip: 'De la vianda', pisado: false };
+  // Texto + chip efectivo de una dimensión según el override de celda del borrador.
+  // sinLabel es "Sin guarnición" / "Sin salsa"; baseTexto es lo que trae la vianda.
+  const efectivo = (modo, id, lista, sinLabel, baseTexto) => {
+    if (modo === 'fija') return { txt: nombrePorId(lista, id) ?? 'Fija (elegí cuál)', chip: 'Pisado esta semana', pisado: true };
+    if (modo === 'libre') return { txt: 'A elección del cliente', chip: 'Pisado esta semana', pisado: true };
+    if (modo === 'sin_guarnicion' || modo === 'sin_salsa') return { txt: sinLabel, chip: 'Pisado esta semana', pisado: true };
+    return { txt: baseTexto, chip: 'De la vianda', pisado: false };
   };
-  const salsaEfectiva = () => {
-    if (sModo === 'fija') return { txt: nombrePorId(salsas, sId) ?? 'Fija (elegí cuál)', chip: 'Pisado esta semana', pisado: true };
-    if (sModo === 'libre') return { txt: 'A elección del cliente', chip: 'Pisado esta semana', pisado: true };
-    if (sModo === 'sin_salsa') return { txt: 'Sin salsa', chip: 'Pisado esta semana', pisado: true };
-    return { txt: baseSalsaTexto, chip: 'De la vianda', pisado: false };
-  };
+  const guarnicionEfectiva = () => efectivo(gModo, gId, guarniciones, 'Sin guarnición', baseGuarnicionTexto);
+  const salsaEfectiva = () => efectivo(sModo, sId, salsas, 'Sin salsa', baseSalsaTexto);
 
   // ── Dirty + validez ─────────────────────────────────────────────────────────
   const norm = (l) => JSON.stringify(l.map((e) => [e.empresa_id, e.g_modo, String(e.g_id), e.s_modo, String(e.s_id)]).sort());
   const visActuales = todas ? [] : empresaIds;
-  const visDirty = JSON.stringify([...visActuales].sort((a, b) => a - b)) !== JSON.stringify([...visIni].sort((a, b) => a - b));
+  const visDirty = !mismosIds(visActuales, visIni);
   const dirty = String(gModo) !== String(gModoIni) || String(gId) !== String(gIdIni)
     || String(sModo) !== String(sModoIni) || String(sId) !== String(sIdIni)
     || norm(exc) !== norm(excIni)
@@ -986,10 +1003,10 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
       ops.push(() => reasignar.mutateAsync({ itemId: item.slot_id, categoria_id: categoriaId === '' ? null : Number(categoriaId) }));
     }
 
-    const errores = [];
-    for (const op of ops) {
-      try { await op(); } catch (err) { errores.push(err); }
-    }
+    // Endpoints independientes -> en paralelo (Postgres serializa a nivel de fila los
+    // que tocan la misma celda). allSettled conserva el "continuar ante error".
+    const resultados = await Promise.allSettled(ops.map((op) => op()));
+    const errores = resultados.filter((r) => r.status === 'rejected').map((r) => r.reason);
     setGuardando(false);
     if (errores.length === 0) {
       toast.success('Cambios guardados');
@@ -1036,10 +1053,7 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
           <p className="text-sm font-semibold text-gray-800">Venta por kilo en el local</p>
           <p className="text-xs text-gray-500 mt-0.5">{porKilo ? 'Disponible esta semana.' : 'Excluido esta semana.'}</p>
         </div>
-        <button type="button" onClick={() => setPorKiloDraft((v) => !v)} aria-label="Alternar venta por kilo"
-          className={`shrink-0 relative w-11 h-6 rounded-full transition-colors ${porKilo ? 'bg-blue-500' : 'bg-gray-300'}`}>
-          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${porKilo ? 'translate-x-5' : ''}`} />
-        </button>
+        <ToggleSwitch checked={porKilo} onChange={() => setPorKiloDraft((v) => !v)} color="bg-blue-500" label="Alternar venta por kilo" />
       </div>
 
       <div className="border-t border-gray-100 pt-3" />
@@ -1336,15 +1350,7 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
                     {item.disponible_por_kilo ? 'Disponible esta semana.' : 'Excluido de la venta por kilo esta semana.'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={onTogglePorKilo}
-                  disabled={porKiloPending}
-                  aria-label="Alternar venta por kilo"
-                  className={`shrink-0 relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${item.disponible_por_kilo ? 'bg-blue-500' : 'bg-gray-300'}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${item.disponible_por_kilo ? 'translate-x-5' : ''}`} />
-                </button>
+                <ToggleSwitch checked={item.disponible_por_kilo} onChange={onTogglePorKilo} disabled={porKiloPending} color="bg-blue-500" label="Alternar venta por kilo" />
               </div>
             </div>
           )}
@@ -1362,15 +1368,7 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={onToggleVianda}
-                disabled={viandaPending}
-                aria-label="Alternar vianda"
-                className={`shrink-0 relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${item.vianda_activa ? 'bg-emerald-500' : 'bg-gray-300'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${item.vianda_activa ? 'translate-x-5' : ''}`} />
-              </button>
+              <ToggleSwitch checked={item.vianda_activa} onChange={onToggleVianda} disabled={viandaPending} color="bg-emerald-500" label="Alternar vianda" />
             </div>
           </div>
 

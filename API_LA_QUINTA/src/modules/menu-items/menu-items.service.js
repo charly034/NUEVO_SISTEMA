@@ -88,9 +88,8 @@ export const listarExcepciones = async (id) => {
 };
 
 export const guardarExcepcion = async (id, empresaId, datos) => {
-  const slot = await cargarSlot(id);
-
-  const empresa = await empresasRepository.findById(empresaId);
+  // slot y empresa son lookups independientes -> en paralelo.
+  const [slot, empresa] = await Promise.all([cargarSlot(id), empresasRepository.findById(empresaId)]);
   if (!empresa) throw ApiError.notFound(`Empresa con id ${empresaId} no encontrada`);
   if (!empresa.activo) throw ApiError.conflict(`La empresa "${empresa.nombre}" está inactiva`);
 
