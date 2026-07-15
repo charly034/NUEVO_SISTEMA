@@ -948,47 +948,56 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
 
   const guardar = async () => {
     setGuardando(true);
-    try {
-      const dia = celda.dia; const opcion = item.opcion;
-      if (String(gModo) !== String(gModoIni) || String(gId) !== String(gIdIni)) {
-        await setGuarnicionSlot.mutateAsync({ dia, opcion, guarnicion_modo_override: gModo || null, guarnicion_fija_override_id: gModo === 'fija' ? Number(gId) : null });
+    // Sin transacción del lado servidor (son endpoints independientes), así que se
+    // arman todas las operaciones que cambiaron y se corren CONTINUANDO ante error: una
+    // falla no debe dejar sin aplicar los demás cambios. Se junta el detalle para
+    // avisar cuántos fallaron. Solo se cierra el drawer si TODO se aplicó (si algo
+    // falló, queda abierto para reintentar lo que resta).
+    const dia = celda.dia; const opcion = item.opcion;
+    const ops = [];
+    if (String(gModo) !== String(gModoIni) || String(gId) !== String(gIdIni)) {
+      ops.push(() => setGuarnicionSlot.mutateAsync({ dia, opcion, guarnicion_modo_override: gModo || null, guarnicion_fija_override_id: gModo === 'fija' ? Number(gId) : null }));
+    }
+    if (String(sModo) !== String(sModoIni) || String(sId) !== String(sIdIni)) {
+      ops.push(() => setSalsaSlot.mutateAsync({ dia, opcion, salsa_modo_override: sModo || null, salsa_fija_override_id: sModo === 'fija' ? Number(sId) : null }));
+    }
+    // Excepciones: upsert las nuevas/cambiadas, borrar las removidas.
+    const iniPorEmpresa = new Map(excIni.map((e) => [e.empresa_id, e]));
+    for (const e of exc) {
+      const prev = iniPorEmpresa.get(e.empresa_id);
+      const cambio = !prev || prev.g_modo !== e.g_modo || String(prev.g_id) !== String(e.g_id) || prev.s_modo !== e.s_modo || String(prev.s_id) !== String(e.s_id);
+      if (cambio) {
+        ops.push(() => guardarExc.mutateAsync({
+          empresaId: e.empresa_id,
+          guarnicion_modo_override: e.g_modo || null, guarnicion_fija_override_id: e.g_modo === 'fija' ? Number(e.g_id) : null,
+          salsa_modo_override: e.s_modo || null, salsa_fija_override_id: e.s_modo === 'fija' ? Number(e.s_id) : null,
+        }));
       }
-      if (String(sModo) !== String(sModoIni) || String(sId) !== String(sIdIni)) {
-        await setSalsaSlot.mutateAsync({ dia, opcion, salsa_modo_override: sModo || null, salsa_fija_override_id: sModo === 'fija' ? Number(sId) : null });
-      }
-      // Excepciones: upsert las nuevas/cambiadas, borrar las removidas.
-      const iniPorEmpresa = new Map(excIni.map((e) => [e.empresa_id, e]));
-      for (const e of exc) {
-        const prev = iniPorEmpresa.get(e.empresa_id);
-        const cambio = !prev || prev.g_modo !== e.g_modo || String(prev.g_id) !== String(e.g_id) || prev.s_modo !== e.s_modo || String(prev.s_id) !== String(e.s_id);
-        if (cambio) {
-          await guardarExc.mutateAsync({
-            empresaId: e.empresa_id,
-            guarnicion_modo_override: e.g_modo || null, guarnicion_fija_override_id: e.g_modo === 'fija' ? Number(e.g_id) : null,
-            salsa_modo_override: e.s_modo || null, salsa_fija_override_id: e.s_modo === 'fija' ? Number(e.s_id) : null,
-          });
-        }
-      }
-      const empresasAhora = new Set(exc.map((e) => e.empresa_id));
-      for (const e of excIni) if (!empresasAhora.has(e.empresa_id)) await borrarExc.mutateAsync(e.empresa_id);
+    }
+    const empresasAhora = new Set(exc.map((e) => e.empresa_id));
+    for (const e of excIni) if (!empresasAhora.has(e.empresa_id)) ops.push(() => borrarExc.mutateAsync(e.empresa_id));
+    if (porKilo !== Boolean(item.disponible_por_kilo)) {
+      ops.push(() => setPorKilo.mutateAsync({ slotId: item.slot_id, disponible: porKilo }));
+    }
+    if (visDirty) {
+      ops.push(() => setEmpresasSlot.mutateAsync({ dia, opcion, empresa_ids: todas ? [] : empresaIds }));
+    }
+    if (String(categoriaId) !== String(item.categoria_id ?? '')) {
+      ops.push(() => reasignar.mutateAsync({ itemId: item.slot_id, categoria_id: categoriaId === '' ? null : Number(categoriaId) }));
+    }
 
-      // Por-kilo, visibilidad y categoría (plegados al mismo Guardar).
-      if (porKilo !== Boolean(item.disponible_por_kilo)) {
-        await setPorKilo.mutateAsync({ slotId: item.slot_id, disponible: porKilo });
-      }
-      if (visDirty) {
-        await setEmpresasSlot.mutateAsync({ dia, opcion, empresa_ids: todas ? [] : empresaIds });
-      }
-      if (String(categoriaId) !== String(item.categoria_id ?? '')) {
-        await reasignar.mutateAsync({ itemId: item.slot_id, categoria_id: categoriaId === '' ? null : Number(categoriaId) });
-      }
-
+    const errores = [];
+    for (const op of ops) {
+      try { await op(); } catch (err) { errores.push(err); }
+    }
+    setGuardando(false);
+    if (errores.length === 0) {
       toast.success('Cambios guardados');
       onClose?.();
-    } catch (err) {
-      toast.error(err?.message || 'No se pudieron guardar todos los cambios');
-    } finally {
-      setGuardando(false);
+    } else {
+      toast.error(errores.length === ops.length
+        ? (errores[0]?.message || 'No se pudieron guardar los cambios')
+        : `Se guardaron algunos cambios, pero ${errores.length} fallaron: ${errores[0]?.message || 'error'}`);
     }
   };
 
@@ -1080,7 +1089,10 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
           ))}
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>Las demás</span>
-            <span className="text-gray-600">{baseGuarnicionTexto} <span className="text-gray-400">(de la vianda)</span></span>
+            {/* Lo que reciben las empresas SIN excepción = la resolución de la celda
+                (override de semana si lo hay, si no la vianda). Mostrar gEf, no la base
+                de la vianda: si el admin pisó la guarnición, "las demás" reciben eso. */}
+            <span className="text-gray-600">{gEf.txt} <span className="text-gray-400">({gEf.pisado ? 'pisado esta semana' : 'de la vianda'})</span></span>
           </div>
         </div>
         {disponibles.length > 0 && (
@@ -1134,10 +1146,13 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
             <span className="font-medium">Todas las empresas</span>
           </label>
           <div className={`space-y-1 max-h-40 overflow-y-auto pl-1 ${todas ? 'opacity-40' : ''}`}>
-            {empresas.filter((e) => e.activo).map((emp) => (
+            {/* Activas + cualquier empresa ya en el allowlist aunque esté inactiva: si
+                no, una empresa que se desactivó después de agregarla al slot quedaría
+                invisible e imposible de quitar, y se re-enviaría en silencio. */}
+            {empresas.filter((e) => e.activo || empresaIds.includes(e.id)).map((emp) => (
               <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" disabled={todas} checked={empresaIds.includes(emp.id)} onChange={() => toggleEmpresaVis(emp.id)} />
-                {emp.nombre}
+                {emp.nombre}{!emp.activo && <span className="text-xs text-gray-400">(inactiva)</span>}
               </label>
             ))}
           </div>
@@ -1234,7 +1249,14 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
   // Especiales con vianda activa usan el bloque unificado (mockup): guarnición/salsa
   // con override de celda + excepciones inline + un solo Guardar/Cancelar. Los fijos y
   // las celdas sin opción siguen con el editor por-secciones.
-  const esUnificado = tipo === 'especial' && Boolean(item?.slot_id) && Boolean(item?.categoria_id);
+  //
+  // Exige item.opcion: el override de celda y la excepción por empresa se anclan por
+  // (menu, categoria, dia, opcion), que SOLO identifica un plato único cuando hay
+  // opción (matriz/especiales). En categorías tipo lista (opcion NULL) varios platos
+  // comparten (menu, categoria, NULL, NULL): el endpoint de override rutea por
+  // dia/opcion (rompería con NULL en la URL) y la excepción colisionaría en el unique.
+  // Esas celdas caen al editor legacy (edita la vianda), sin override de semana.
+  const esUnificado = tipo === 'especial' && Boolean(item?.slot_id) && Boolean(item?.categoria_id) && Boolean(item?.opcion);
   const excQ = useExcepcionesEmpresa(esUnificado && item?.vianda_activa ? item.slot_id : null);
   // Cuando el bloque unificado está en pantalla, por-kilo/visibilidad/categoría/borrar
   // viven ADENTRO de él (mismo Guardar), así que las secciones sueltas se ocultan.

@@ -715,11 +715,18 @@ export const validateItemForMenu = async (menuId, item, db = query, empresaId = 
      -- opcion NULL que el join de especiales de arriba NO matchea (opcion NULL vs $4, y
      -- dia NULL en fijos-de-siempre). Este lookup los ubica para poder anclar su
      -- excepción por empresa. fijos-x-dia matchea el día del pedido; fijos-de-siempre
-     -- (dia NULL) aplica cualquier día.
-     LEFT JOIN menu_semanal_dias msd_fijo
-       ON msd_fijo.menu_semanal_id = $2 AND msd_fijo.plato_id = p.id AND msd_fijo.opcion IS NULL
-      AND (msd_fijo.dia::text = $3 OR msd_fijo.dia IS NULL)
-      AND msd_fijo.categoria_id IN (SELECT id FROM categorias WHERE slug IN ('fijos-x-dia', 'fijos-de-siempre'))
+     -- (dia NULL) aplica cualquier día. LATERAL + LIMIT 1: si el mismo plato existe como
+     -- fijos-x-dia (dia=$3) Y como fijos-de-siempre (dia NULL) en el mismo menú, se
+     -- toma UNA sola fila (prioriza el día específico), evitando duplicar el resultado.
+     LEFT JOIN LATERAL (
+       SELECT mf.menu_semanal_id, mf.categoria_id, mf.dia, mf.opcion, mf.plato_id
+       FROM menu_semanal_dias mf
+       WHERE mf.menu_semanal_id = $2 AND mf.plato_id = p.id AND mf.opcion IS NULL
+         AND (mf.dia::text = $3 OR mf.dia IS NULL)
+         AND mf.categoria_id IN (SELECT id FROM categorias WHERE slug IN ('fijos-x-dia', 'fijos-de-siempre'))
+       ORDER BY (mf.dia IS NOT NULL) DESC
+       LIMIT 1
+     ) msd_fijo ON true
      LEFT JOIN viandas v_slot ON v_slot.id = msd.vianda_id
      LEFT JOIN viandas v_global ON v_global.plato_id = p.id AND v_global.empresa_id IS NULL AND v_global.activo = true
      -- emo ancla vía la celda que corresponda: especial (msd) o fijo (msd_fijo).
