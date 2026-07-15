@@ -846,6 +846,12 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
   const setSalsaSlot = useSetSalsaSlot(menuId);
   const guardarExc = useGuardarExcepcionEmpresa(menuId, item.slot_id);
   const borrarExc = useBorrarExcepcionEmpresa(menuId, item.slot_id);
+  const setPorKilo = useSetDisponiblePorKilo(menuId);
+  const setEmpresasSlot = useSetEmpresasSlot(menuId);
+  const reasignar = useReasignarMenuItem(menuId);
+  const deleteItem = useDeleteMenuItem(menuId);
+  const { data: categorias = [] } = useCategorias();
+  const categoriasPlatos = (categorias || []).filter((c) => c.tipo_dato === 'platos');
 
   // Estado inicial del override de celda: si la procedencia guardada es 'celda' hay
   // override; si no, no hay (queda '' = "de la vianda").
@@ -871,6 +877,13 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
   const [exc, setExc] = useState(excIni);
   const [nuevaEmpresa, setNuevaEmpresa] = useState('');
 
+  // Otros campos plegados al mismo Guardar: por-kilo, visibilidad, categoría.
+  const visIni = item.visible_empresa_ids || [];
+  const [porKilo, setPorKiloDraft] = useState(Boolean(item.disponible_por_kilo));
+  const [todas, setTodas] = useState(visIni.length === 0);
+  const [empresaIds, setEmpresaIds] = useState(visIni);
+  const [categoriaId, setCategoriaId] = useState(item.categoria_id ?? '');
+
   // ── Texto efectivo (según el borrador) ──────────────────────────────────────
   const baseGuarnicionTexto = item.guarnicion_id
     ? (nombrePorId(guarniciones, item.guarnicion_id) ?? 'guarnición de la vianda')
@@ -894,13 +907,19 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
 
   // ── Dirty + validez ─────────────────────────────────────────────────────────
   const norm = (l) => JSON.stringify(l.map((e) => [e.empresa_id, e.g_modo, String(e.g_id), e.s_modo, String(e.s_id)]).sort());
+  const visActuales = todas ? [] : empresaIds;
+  const visDirty = JSON.stringify([...visActuales].sort((a, b) => a - b)) !== JSON.stringify([...visIni].sort((a, b) => a - b));
   const dirty = String(gModo) !== String(gModoIni) || String(gId) !== String(gIdIni)
     || String(sModo) !== String(sModoIni) || String(sId) !== String(sIdIni)
-    || norm(exc) !== norm(excIni);
+    || norm(exc) !== norm(excIni)
+    || porKilo !== Boolean(item.disponible_por_kilo)
+    || visDirty
+    || String(categoriaId) !== String(item.categoria_id ?? '');
   const gInvalido = gModo === 'fija' && !gId;
   const sInvalido = sModo === 'fija' && !sId;
   const excInvalida = exc.some((e) => (!e.g_modo && !e.s_modo) || (e.g_modo === 'fija' && !e.g_id) || (e.s_modo === 'fija' && !e.s_id));
-  const puedeGuardar = dirty && !gInvalido && !sInvalido && !excInvalida && !guardando;
+  const visInvalida = !todas && empresaIds.length === 0;
+  const puedeGuardar = dirty && !gInvalido && !sInvalido && !excInvalida && !visInvalida && !guardando;
 
   const visibles = (item.visible_empresa_ids?.length
     ? empresas.filter((e) => item.visible_empresa_ids.includes(e.id))
@@ -953,6 +972,17 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
       const empresasAhora = new Set(exc.map((e) => e.empresa_id));
       for (const e of excIni) if (!empresasAhora.has(e.empresa_id)) await borrarExc.mutateAsync(e.empresa_id);
 
+      // Por-kilo, visibilidad y categoría (plegados al mismo Guardar).
+      if (porKilo !== Boolean(item.disponible_por_kilo)) {
+        await setPorKilo.mutateAsync({ slotId: item.slot_id, disponible: porKilo });
+      }
+      if (visDirty) {
+        await setEmpresasSlot.mutateAsync({ dia, opcion, empresa_ids: todas ? [] : empresaIds });
+      }
+      if (String(categoriaId) !== String(item.categoria_id ?? '')) {
+        await reasignar.mutateAsync({ itemId: item.slot_id, categoria_id: categoriaId === '' ? null : Number(categoriaId) });
+      }
+
       toast.success('Cambios guardados');
       onClose?.();
     } catch (err) {
@@ -960,6 +990,26 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
     } finally {
       setGuardando(false);
     }
+  };
+
+  const borrar = async () => {
+    const ok = await confirmar({
+      titulo: `¿Borrar "${item.plato_nombre}" de esta celda?`,
+      texto: 'Se quita solo esta celda del menú de la semana; el plato del catálogo no se toca.',
+      botonConfirmar: 'Borrar',
+    });
+    if (!ok) return;
+    deleteItem.mutate(item.slot_id, {
+      onSuccess: () => { toast.success('Celda borrada'); onClose?.(); },
+      onError: (er) => toast.error(er?.message || 'No se pudo borrar'),
+    });
+  };
+
+  const toggleEmpresaVis = (id) => setEmpresaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleTodasVis = () => {
+    const siguiente = !todas;
+    setTodas(siguiente);
+    if (siguiente) setEmpresaIds([]); // volver a "todas" limpia la selección individual
   };
 
   const gEf = guarnicionEfectiva();
@@ -971,6 +1021,20 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
 
   return (
     <div className="rounded-lg border border-gray-100 p-4 space-y-4">
+      {/* Venta por kilo (plegado al Guardar) */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Venta por kilo en el local</p>
+          <p className="text-xs text-gray-500 mt-0.5">{porKilo ? 'Disponible esta semana.' : 'Excluido esta semana.'}</p>
+        </div>
+        <button type="button" onClick={() => setPorKiloDraft((v) => !v)} aria-label="Alternar venta por kilo"
+          className={`shrink-0 relative w-11 h-6 rounded-full transition-colors ${porKilo ? 'bg-blue-500' : 'bg-gray-300'}`}>
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${porKilo ? 'translate-x-5' : ''}`} />
+        </button>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3" />
+
       {/* GUARNICIÓN */}
       <div>
         <div className="flex items-baseline justify-between">
@@ -1061,6 +1125,36 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
         )}
       </div>
 
+      {/* Visible para (plegado al Guardar) */}
+      {item.opcion && (
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Visible para</p>
+          <label className="flex items-center gap-2 text-sm text-gray-800 mb-1.5">
+            <input type="checkbox" checked={todas} onChange={toggleTodasVis} />
+            <span className="font-medium">Todas las empresas</span>
+          </label>
+          <div className={`space-y-1 max-h-40 overflow-y-auto pl-1 ${todas ? 'opacity-40' : ''}`}>
+            {empresas.filter((e) => e.activo).map((emp) => (
+              <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" disabled={todas} checked={empresaIds.includes(emp.id)} onChange={() => toggleEmpresaVis(emp.id)} />
+                {emp.nombre}
+              </label>
+            ))}
+          </div>
+          {visInvalida && <p className="text-xs text-amber-600 mt-1">Elegí al menos una empresa (o marcá "Todas").</p>}
+        </div>
+      )}
+
+      {/* Categoría (plegado al Guardar) */}
+      <div className="border-t border-gray-100 pt-3">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Categoría</label>
+        <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="">Sin categorizar</option>
+          {categoriasPlatos.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+      </div>
+
       {/* Guardar / Cancelar */}
       <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
         <button type="button" onClick={guardar} disabled={!puedeGuardar}
@@ -1068,11 +1162,20 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
           {guardando && <Spinner size="sm" />}
           Guardar
         </button>
-        <button type="button" onClick={cancelar} disabled={!dirty || guardando}
+        <button type="button" onClick={cancelar} disabled={guardando}
           className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors">
           Cancelar
         </button>
         {excInvalida && <span className="text-xs text-amber-600">Completá las excepciones</span>}
+      </div>
+
+      {/* Borrar celda: inmediato (destructivo), fuera del borrador. */}
+      <div className="border-t border-gray-100 pt-3">
+        <button type="button" onClick={borrar} disabled={deleteItem.isPending}
+          className="w-full rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
+          {deleteItem.isPending && <Spinner size="sm" />}
+          Borrar esta celda del menú
+        </button>
       </div>
     </div>
   );
@@ -1133,6 +1236,9 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
   // las celdas sin opción siguen con el editor por-secciones.
   const esUnificado = tipo === 'especial' && Boolean(item?.slot_id) && Boolean(item?.categoria_id);
   const excQ = useExcepcionesEmpresa(esUnificado && item?.vianda_activa ? item.slot_id : null);
+  // Cuando el bloque unificado está en pantalla, por-kilo/visibilidad/categoría/borrar
+  // viven ADENTRO de él (mismo Guardar), así que las secciones sueltas se ocultan.
+  const enUnificado = esUnificado && Boolean(item?.vianda_activa);
 
   // Activar vianda para un plato que todavia no tiene ninguna en el
   // catalogo tiraba 400 ("no tiene una vianda activa...") y mandaba al
@@ -1199,25 +1305,27 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
             {item.grupo_nombre ? ` · ${item.grupo_nombre}` : ''}
           </p>
 
-          <div className="rounded-lg border border-gray-100 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Venta por kilo en el local</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {item.disponible_por_kilo ? 'Disponible esta semana.' : 'Excluido de la venta por kilo esta semana.'}
-                </p>
+          {!enUnificado && (
+            <div className="rounded-lg border border-gray-100 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Venta por kilo en el local</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {item.disponible_por_kilo ? 'Disponible esta semana.' : 'Excluido de la venta por kilo esta semana.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onTogglePorKilo}
+                  disabled={porKiloPending}
+                  aria-label="Alternar venta por kilo"
+                  className={`shrink-0 relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${item.disponible_por_kilo ? 'bg-blue-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${item.disponible_por_kilo ? 'translate-x-5' : ''}`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={onTogglePorKilo}
-                disabled={porKiloPending}
-                aria-label="Alternar venta por kilo"
-                className={`shrink-0 relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${item.disponible_por_kilo ? 'bg-blue-500' : 'bg-gray-300'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${item.disponible_por_kilo ? 'translate-x-5' : ''}`} />
-              </button>
             </div>
-          </div>
+          )}
 
           <div className="rounded-lg border border-gray-100 p-4">
             <div className="flex items-center justify-between gap-3">
@@ -1274,7 +1382,7 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
             </div>
           )}
 
-          {item.vianda_activa ? (
+          {item.vianda_activa && !enUnificado ? (
             (tipo === 'especial' && item.opcion) ? (
               <EmpresasEditor
                 key={item.slot_id}
@@ -1310,7 +1418,7 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
               alejan lo destructivo del flujo principal. Solo celdas slot
               (especiales/custom, filas de menu_semanal_dias con id); los fijos se
               manejan como propiedad del catálogo. */}
-          {tipo === 'especial' && item.slot_id && (
+          {tipo === 'especial' && item.slot_id && !enUnificado && (
             <details className="rounded-lg border border-gray-100">
               <summary className="cursor-pointer p-4 text-sm font-semibold text-gray-700 marker:text-gray-400">
                 Más acciones
