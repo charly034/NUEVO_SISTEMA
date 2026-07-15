@@ -110,6 +110,27 @@ export const useSetEmpresasSlot = (menuId) => {
   });
 };
 
+// Override de guarnición a nivel CELDA (solo esta semana). null en el modo = volver
+// a lo de la vianda (limpiar el override). Invalida el resumen para refrescar la
+// procedencia ("de la vianda" -> "pisado esta semana").
+export const useSetGuarnicionSlot = (menuId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dia, opcion, guarnicion_modo_override, guarnicion_fija_override_id = null }) =>
+      menusService.setGuarnicionSlot(menuId, dia, opcion, { guarnicion_modo_override, guarnicion_fija_override_id }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] }),
+  });
+};
+
+export const useSetSalsaSlot = (menuId) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dia, opcion, salsa_modo_override, salsa_fija_override_id = null }) =>
+      menusService.setSalsaSlot(menuId, dia, opcion, { salsa_modo_override, salsa_fija_override_id }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['semana-opciones', menuId] }),
+  });
+};
+
 export const useHistorialPlato = (platoId) =>
   useQuery({
     queryKey: ['historial', platoId],

@@ -10,6 +10,7 @@ import {
 import {
   useMarcarSinServicio, useQuitarSinServicio, useMenuSemanal,
   useCambiarEstadoMenu, useDeleteMenu, useDuplicarMenu, useSetEmpresasSlot, useAgregarPlato, useQuitarPlato,
+  useSetGuarnicionSlot, useSetSalsaSlot,
 } from '../hooks/useMenus.js';
 import { usePedidos } from '../hooks/usePedidos.js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
@@ -829,223 +830,283 @@ function ProcedenciaCard({ item, embedded = false }) {
   );
 }
 
-// Excepciones de guarnición/salsa POR EMPRESA sobre esta celda (T8).
-//
-// Colapsada y vacía por defecto: sin excepciones, la celda aplica igual a todas las
-// empresas (opt-in real, no se crea ninguna fila). El backend deriva el ancla y la
-// guarda plato_id_origen del slot, así que acá solo se manda empresa + modos.
-function ExcepcionesEmpresaSection({ menuId, item, empresas = [] }) {
-  const slotId = item.slot_id;
-  const [abierto, setAbierto] = useState(false);
+const nombrePorId = (lista, id) => (id ? (lista.find((x) => x.id === Number(id))?.nombre ?? null) : null);
+
+// Bloque unificado Guarnición + Salsa + Excepciones con UN solo Guardar/Cancelar
+// (rediseño del mockup). Diferencia clave frente al editor viejo: acá "pisar solo
+// esta semana" setea el OVERRIDE DE CELDA (menu_semanal_dias, por semana), no la
+// vianda (que es la base para todas las semanas). El valor efectivo de cada dimensión
+// se muestra con su procedencia; las excepciones por empresa van inline, con la fila
+// "Las demás → base". Solo para especiales (celdas slot con opción).
+function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesIniciales, onClose }) {
+  const item = celda.item;
+  const { data: guarniciones = [] } = useGuarniciones();
+  const { data: salsas = [] } = useSalsas();
+  const setGuarnicionSlot = useSetGuarnicionSlot(menuId);
+  const setSalsaSlot = useSetSalsaSlot(menuId);
+  const guardarExc = useGuardarExcepcionEmpresa(menuId, item.slot_id);
+  const borrarExc = useBorrarExcepcionEmpresa(menuId, item.slot_id);
+
+  // Estado inicial del override de celda: si la procedencia guardada es 'celda' hay
+  // override; si no, no hay (queda '' = "de la vianda").
+  const gModoIni = item.guarnicion_procedencia === 'celda' ? item.guarnicion_modo : '';
+  const gIdIni = item.guarnicion_procedencia === 'celda' ? (item.guarnicion_efectiva_id ?? '') : '';
+  const sModoIni = item.salsa_procedencia === 'celda' ? item.salsa_modo : '';
+  const sIdIni = item.salsa_procedencia === 'celda' ? (item.salsa_efectiva_id ?? '') : '';
+
+  const [gModo, setGModo] = useState(gModoIni);
+  const [gId, setGId] = useState(gIdIni);
+  const [sModo, setSModo] = useState(sModoIni);
+  const [sId, setSId] = useState(sIdIni);
+  const [pisandoG, setPisandoG] = useState(false);
+  const [pisandoS, setPisandoS] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  // Excepciones como borrador local (se persisten al Guardar, no al instante).
+  const excIni = (excepcionesIniciales || []).map((e) => ({
+    empresa_id: e.empresa_id, empresa_nombre: e.empresa_nombre, stale: e.stale,
+    g_modo: e.guarnicion_modo_override ?? '', g_id: e.guarnicion_fija_override_id ?? '',
+    s_modo: e.salsa_modo_override ?? '', s_id: e.salsa_fija_override_id ?? '',
+  }));
+  const [exc, setExc] = useState(excIni);
   const [nuevaEmpresa, setNuevaEmpresa] = useState('');
 
-  const { data: excepciones = [], isLoading } = useExcepcionesEmpresa(abierto ? slotId : null);
-  const guardar = useGuardarExcepcionEmpresa(menuId, slotId);
-  const borrar = useBorrarExcepcionEmpresa(menuId, slotId);
+  // ── Texto efectivo (según el borrador) ──────────────────────────────────────
+  const baseGuarnicionTexto = item.guarnicion_id
+    ? (nombrePorId(guarniciones, item.guarnicion_id) ?? 'guarnición de la vianda')
+    : 'a elección del cliente';
+  const baseSalsaTexto = item.salsa_id
+    ? (nombrePorId(salsas, item.salsa_id) ?? 'salsa de la vianda')
+    : (item.salsa_libre ? 'a elección del cliente' : 'sin salsa');
 
-  const total = item.excepciones_empresas ?? 0;
-  const stale = item.excepciones_stale ?? 0;
-
-  // Solo las empresas que REALMENTE reciben esta celda ([] = todas).
-  const visibles = (item.visible_empresa_ids?.length
-    ? empresas.filter((e) => item.visible_empresa_ids.includes(e.id))
-    : empresas
-  ).filter((e) => e.activo);
-  const yaConExcepcion = new Set(excepciones.map((e) => e.empresa_id));
-  const disponibles = visibles.filter((e) => !yaConExcepcion.has(e.id));
-
-  const onAgregar = () => {
-    if (!nuevaEmpresa) return;
-    // Arranca pisando la guarnición a "sin guarnición": es el cambio más común y
-    // deja la fila válida (el modo 'fija' exigiría elegir cuál).
-    guardar.mutate(
-      { empresaId: Number(nuevaEmpresa), guarnicion_modo_override: 'sin_guarnicion' },
-      {
-        onSuccess: () => setNuevaEmpresa(''),
-        onError: (e) => toast.error(e?.message || 'No se pudo guardar la excepción'),
-      }
-    );
+  const guarnicionEfectiva = () => {
+    if (gModo === 'fija') return { txt: nombrePorId(guarniciones, gId) ?? 'Fija (elegí cuál)', chip: 'Pisado esta semana', pisado: true };
+    if (gModo === 'libre') return { txt: 'A elección del cliente', chip: 'Pisado esta semana', pisado: true };
+    if (gModo === 'sin_guarnicion') return { txt: 'Sin guarnición', chip: 'Pisado esta semana', pisado: true };
+    return { txt: baseGuarnicionTexto, chip: 'De la vianda', pisado: false };
+  };
+  const salsaEfectiva = () => {
+    if (sModo === 'fija') return { txt: nombrePorId(salsas, sId) ?? 'Fija (elegí cuál)', chip: 'Pisado esta semana', pisado: true };
+    if (sModo === 'libre') return { txt: 'A elección del cliente', chip: 'Pisado esta semana', pisado: true };
+    if (sModo === 'sin_salsa') return { txt: 'Sin salsa', chip: 'Pisado esta semana', pisado: true };
+    return { txt: baseSalsaTexto, chip: 'De la vianda', pisado: false };
   };
 
+  // ── Dirty + validez ─────────────────────────────────────────────────────────
+  const norm = (l) => JSON.stringify(l.map((e) => [e.empresa_id, e.g_modo, String(e.g_id), e.s_modo, String(e.s_id)]).sort());
+  const dirty = String(gModo) !== String(gModoIni) || String(gId) !== String(gIdIni)
+    || String(sModo) !== String(sModoIni) || String(sId) !== String(sIdIni)
+    || norm(exc) !== norm(excIni);
+  const gInvalido = gModo === 'fija' && !gId;
+  const sInvalido = sModo === 'fija' && !sId;
+  const excInvalida = exc.some((e) => (!e.g_modo && !e.s_modo) || (e.g_modo === 'fija' && !e.g_id) || (e.s_modo === 'fija' && !e.s_id));
+  const puedeGuardar = dirty && !gInvalido && !sInvalido && !excInvalida && !guardando;
+
+  const visibles = (item.visible_empresa_ids?.length
+    ? empresas.filter((e) => item.visible_empresa_ids.includes(e.id))
+    : empresas).filter((e) => e.activo);
+  const disponibles = visibles.filter((e) => !exc.some((x) => x.empresa_id === e.id));
+
+  const setExcCampo = (empresaId, campo, valor) => setExc((prev) => prev.map((e) => {
+    if (e.empresa_id !== empresaId) return e;
+    const n = { ...e, [campo]: valor };
+    if (campo === 'g_modo' && valor !== 'fija') n.g_id = '';
+    if (campo === 's_modo' && valor !== 'fija') n.s_id = '';
+    return n;
+  }));
+
+  const agregarExc = () => {
+    if (!nuevaEmpresa) return;
+    const emp = empresas.find((e) => e.id === Number(nuevaEmpresa));
+    setExc((prev) => [...prev, { empresa_id: emp.id, empresa_nombre: emp.nombre, g_modo: 'sin_guarnicion', g_id: '', s_modo: '', s_id: '', _nueva: true }]);
+    setNuevaEmpresa('');
+  };
+
+  // Cancelar descarta el borrador cerrando el drawer (se remonta limpio en el próximo
+  // abrir). Guardar también cierra al terminar: evita el "sin guardar" pegado por no
+  // re-inicializar el baseline, y da la semántica clásica de footer Guardar/Cancelar.
+  const cancelar = () => onClose?.();
+
+  const guardar = async () => {
+    setGuardando(true);
+    try {
+      const dia = celda.dia; const opcion = item.opcion;
+      if (String(gModo) !== String(gModoIni) || String(gId) !== String(gIdIni)) {
+        await setGuarnicionSlot.mutateAsync({ dia, opcion, guarnicion_modo_override: gModo || null, guarnicion_fija_override_id: gModo === 'fija' ? Number(gId) : null });
+      }
+      if (String(sModo) !== String(sModoIni) || String(sId) !== String(sIdIni)) {
+        await setSalsaSlot.mutateAsync({ dia, opcion, salsa_modo_override: sModo || null, salsa_fija_override_id: sModo === 'fija' ? Number(sId) : null });
+      }
+      // Excepciones: upsert las nuevas/cambiadas, borrar las removidas.
+      const iniPorEmpresa = new Map(excIni.map((e) => [e.empresa_id, e]));
+      for (const e of exc) {
+        const prev = iniPorEmpresa.get(e.empresa_id);
+        const cambio = !prev || prev.g_modo !== e.g_modo || String(prev.g_id) !== String(e.g_id) || prev.s_modo !== e.s_modo || String(prev.s_id) !== String(e.s_id);
+        if (cambio) {
+          await guardarExc.mutateAsync({
+            empresaId: e.empresa_id,
+            guarnicion_modo_override: e.g_modo || null, guarnicion_fija_override_id: e.g_modo === 'fija' ? Number(e.g_id) : null,
+            salsa_modo_override: e.s_modo || null, salsa_fija_override_id: e.s_modo === 'fija' ? Number(e.s_id) : null,
+          });
+        }
+      }
+      const empresasAhora = new Set(exc.map((e) => e.empresa_id));
+      for (const e of excIni) if (!empresasAhora.has(e.empresa_id)) await borrarExc.mutateAsync(e.empresa_id);
+
+      toast.success('Cambios guardados');
+      onClose?.();
+    } catch (err) {
+      toast.error(err?.message || 'No se pudieron guardar todos los cambios');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const gEf = guarnicionEfectiva();
+  const sEf = salsaEfectiva();
+  const chipCls = (pisado) => pisado ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+  const MODOS_G = [{ v: '', l: 'De la vianda' }, { v: 'fija', l: 'Fija' }, { v: 'libre', l: 'A elección' }, { v: 'sin_guarnicion', l: 'Sin guarnición' }];
+  const MODOS_S = [{ v: '', l: 'De la vianda' }, { v: 'fija', l: 'Fija' }, { v: 'libre', l: 'A elección' }, { v: 'sin_salsa', l: 'Sin salsa' }];
+
   return (
-    <div className="rounded-lg border border-gray-100">
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 p-4 text-left"
-      >
-        <div>
-          <p className="text-sm font-semibold text-gray-800">Excepciones por empresa</p>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {total === 0 && stale === 0
-              ? 'Esta celda sale igual para todas las empresas.'
-              : `${total} ${total === 1 ? 'empresa' : 'empresas'} con guarnición o salsa distinta${stale > 0 ? ` · ${stale} desactualizada${stale === 1 ? '' : 's'}` : ''}`}
-          </p>
+    <div className="rounded-lg border border-gray-100 p-4 space-y-4">
+      {/* GUARNICIÓN */}
+      <div>
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Guarnición</p>
         </div>
-        <span className="shrink-0 text-xs text-gray-400">{abierto ? 'Ocultar' : 'Configurar'}</span>
-      </button>
+        <div className="mt-1 flex items-center gap-2">
+          <p className="text-sm font-medium text-gray-900">{gEf.txt}</p>
+          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${chipCls(gEf.pisado)}`}>{gEf.chip}</span>
+        </div>
 
-      {abierto && (
-        <div className="space-y-3 border-t border-gray-100 p-4">
-          {/* Base de la celda a la vista (carga cognitiva, Lever 3): al armar una
-              excepción el operador necesita saber contra qué está cambiando, sin
-              tener que scrollear hasta la tarjeta de Guarnición y salsa. */}
-          {item.guarnicion_modo && (
-            <div className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
-              <span className="font-medium text-gray-500">Base (todas las empresas): </span>
-              {textoGuarnicion(item)} · {textoSalsa(item)}
+        {!pisandoG ? (
+          <button type="button" onClick={() => setPisandoG(true)} className="mt-1 text-xs font-medium text-brand-600 hover:underline">
+            Pisar solo esta semana ↗
+          </button>
+        ) : (
+          <div className="mt-2 space-y-2 rounded-md bg-gray-50 p-2">
+            <div className="flex flex-wrap gap-1">
+              {MODOS_G.map((m) => (
+                <button key={m.v} type="button" onClick={() => { setGModo(m.v); if (m.v !== 'fija') setGId(''); }}
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${gModo === m.v ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>
+                  {m.l}
+                </button>
+              ))}
             </div>
-          )}
-
-          {isLoading && <Spinner />}
-
-          {!isLoading && excepciones.length === 0 && (
-            <p className="text-xs text-gray-400">Todavía no hay excepciones. Agregá una para que una empresa reciba este plato con otra guarnición o salsa.</p>
-          )}
-
-          {excepciones.map((exc) => (
-            <ExcepcionEmpresaRow
-              key={exc.empresa_id}
-              exc={exc}
-              onGuardar={(datos) =>
-                guardar.mutate(
-                  { empresaId: exc.empresa_id, ...datos },
-                  { onError: (e) => toast.error(e?.message || 'No se pudo guardar la excepción') }
-                )
-              }
-              onBorrar={() =>
-                borrar.mutate(exc.empresa_id, {
-                  onError: (e) => toast.error(e?.message || 'No se pudo borrar la excepción'),
-                })
-              }
-              pendiente={guardar.isPending || borrar.isPending}
-            />
-          ))}
-
-          {disponibles.length > 0 && (
-            <div className="flex items-center gap-2 pt-1">
-              <select
-                value={nuevaEmpresa}
-                onChange={(e) => setNuevaEmpresa(e.target.value)}
-                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">Agregar excepción para...</option>
-                {disponibles.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            {gModo === 'fija' && (
+              <select value={gId} onChange={(e) => setGId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Elegí cuál...</option>
+                {dedupPorNombre(guarniciones, gId).map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
               </select>
-              <button
-                type="button"
-                onClick={onAgregar}
-                disabled={!nuevaEmpresa || guardar.isPending}
-                className="rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                Agregar
-              </button>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Excepciones por empresa (inline, bajo guarnición como el mockup) */}
+      <div className="border-t border-gray-100 pt-3">
+        <p className="text-xs font-medium text-gray-500 mb-1.5">Excepciones por empresa</p>
+        <div className="space-y-1.5">
+          {exc.map((e) => (
+            <ExcepcionDraftRow key={e.empresa_id} e={e} guarniciones={guarniciones} salsas={salsas}
+              onCampo={(campo, valor) => setExcCampo(e.empresa_id, campo, valor)}
+              onQuitar={() => setExc((prev) => prev.filter((x) => x.empresa_id !== e.empresa_id))} />
+          ))}
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>Las demás</span>
+            <span className="text-gray-600">{baseGuarnicionTexto} <span className="text-gray-400">(de la vianda)</span></span>
+          </div>
         </div>
-      )}
+        {disponibles.length > 0 && (
+          <div className="mt-2 flex items-center gap-2">
+            <select value={nuevaEmpresa} onChange={(e) => setNuevaEmpresa(e.target.value)} className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">+ agregar excepción por empresa</option>
+              {disponibles.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+            <button type="button" onClick={agregarExc} disabled={!nuevaEmpresa} className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-40">Agregar</button>
+          </div>
+        )}
+      </div>
+
+      {/* SALSA */}
+      <div className="border-t border-gray-100 pt-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Salsa</p>
+        <div className="mt-1 flex items-center gap-2">
+          <p className="text-sm font-medium text-gray-900">{sEf.txt}</p>
+          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${chipCls(sEf.pisado)}`}>{sEf.chip}</span>
+        </div>
+        {!pisandoS ? (
+          <button type="button" onClick={() => setPisandoS(true)} className="mt-1 text-xs font-medium text-brand-600 hover:underline">
+            Pisar solo esta semana ↗
+          </button>
+        ) : (
+          <div className="mt-2 space-y-2 rounded-md bg-gray-50 p-2">
+            <div className="flex flex-wrap gap-1">
+              {MODOS_S.map((m) => (
+                <button key={m.v} type="button" onClick={() => { setSModo(m.v); if (m.v !== 'fija') setSId(''); }}
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${sModo === m.v ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>
+                  {m.l}
+                </button>
+              ))}
+            </div>
+            {sModo === 'fija' && (
+              <select value={sId} onChange={(e) => setSId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="">Elegí cuál...</option>
+                {dedupPorNombre(salsas, sId).map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              </select>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Guardar / Cancelar */}
+      <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+        <button type="button" onClick={guardar} disabled={!puedeGuardar}
+          className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+          {guardando && <Spinner size="sm" />}
+          Guardar
+        </button>
+        <button type="button" onClick={cancelar} disabled={!dirty || guardando}
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+          Cancelar
+        </button>
+        {excInvalida && <span className="text-xs text-amber-600">Completá las excepciones</span>}
+      </div>
     </div>
   );
 }
 
-// Una fila de excepción: los modos de guarnición/salsa de UNA empresa. El modo
-// 'fija' exige elegir cuál (misma invariante que valida el backend), así que el
-// select de la fija solo aparece con ese modo.
-function ExcepcionEmpresaRow({ exc, onGuardar, onBorrar, pendiente }) {
-  const { data: guarniciones = [] } = useGuarniciones();
-  const { data: salsas = [] } = useSalsas();
-
-  const [gModo, setGModo] = useState(exc.guarnicion_modo_override ?? '');
-  const [gId, setGId] = useState(exc.guarnicion_fija_override_id ?? '');
-  const [sModo, setSModo] = useState(exc.salsa_modo_override ?? '');
-  const [sId, setSId] = useState(exc.salsa_fija_override_id ?? '');
-
-  const guarnOpts = dedupPorNombre(guarniciones, gId);
-  const salsaOpts = dedupPorNombre(salsas, sId);
-
-  const puedeGuardar = (gModo || sModo)
-    && !(gModo === 'fija' && !gId)
-    && !(sModo === 'fija' && !sId);
-
-  const guardar = () => onGuardar({
-    guarnicion_modo_override: gModo || null,
-    guarnicion_fija_override_id: gModo === 'fija' ? Number(gId) : null,
-    salsa_modo_override: sModo || null,
-    salsa_fija_override_id: sModo === 'fija' ? Number(sId) : null,
-  });
-
+// Fila compacta de excepción por empresa en el borrador (no persiste al instante).
+function ExcepcionDraftRow({ e, guarniciones, salsas, onCampo, onQuitar }) {
   return (
-    <div className={`rounded-lg border p-3 space-y-2 ${exc.stale ? 'border-amber-200 bg-amber-50' : 'border-gray-100'}`}>
+    <div className={`rounded-md border p-2 ${e.stale ? 'border-amber-200 bg-amber-50' : 'border-gray-100'}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-gray-800">{exc.empresa_nombre}</p>
-        <button
-          type="button"
-          onClick={onBorrar}
-          disabled={pendiente}
-          className="text-xs text-red-600 hover:underline disabled:opacity-50"
-        >
-          Quitar
-        </button>
+        <span className="text-sm font-medium text-gray-800">{e.empresa_nombre}</span>
+        <button type="button" onClick={onQuitar} className="text-xs text-red-600 hover:underline">Quitar</button>
       </div>
-
-      {exc.stale && (
-        <p className="text-xs text-amber-700">
-          Desactualizada: se cargó para otro plato y la rotación cambió esta celda. No se está aplicando. Reconfirmala o quitala.
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-2">
-        <select
-          value={gModo}
-          onChange={(e) => { setGModo(e.target.value); if (e.target.value !== 'fija') setGId(''); }}
-          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
-        >
+      {e.stale && <p className="text-[11px] text-amber-700 mt-0.5">Desactualizada: la rotación cambió el plato. No se aplica.</p>}
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+        <select value={e.g_modo} onChange={(ev) => onCampo('g_modo', ev.target.value)} className="rounded border border-gray-200 px-1.5 py-1 text-xs">
           <option value="">Guarnición: sin cambio</option>
           <option value="sin_guarnicion">Sin guarnición</option>
           <option value="libre">A elección</option>
           <option value="fija">Fija...</option>
         </select>
-        {gModo === 'fija' ? (
-          <select
-            value={gId}
-            onChange={(e) => setGId(e.target.value)}
-            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Elegí cuál...</option>
-            {guarnOpts.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-          </select>
-        ) : <div />}
-
-        <select
-          value={sModo}
-          onChange={(e) => { setSModo(e.target.value); if (e.target.value !== 'fija') setSId(''); }}
-          className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
-        >
+        {e.g_modo === 'fija'
+          ? <select value={e.g_id} onChange={(ev) => onCampo('g_id', ev.target.value)} className="rounded border border-gray-200 px-1.5 py-1 text-xs"><option value="">Cuál...</option>{dedupPorNombre(guarniciones, e.g_id).map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}</select>
+          : <div />}
+        <select value={e.s_modo} onChange={(ev) => onCampo('s_modo', ev.target.value)} className="rounded border border-gray-200 px-1.5 py-1 text-xs">
           <option value="">Salsa: sin cambio</option>
           <option value="sin_salsa">Sin salsa</option>
           <option value="libre">A elección</option>
           <option value="fija">Fija...</option>
         </select>
-        {sModo === 'fija' ? (
-          <select
-            value={sId}
-            onChange={(e) => setSId(e.target.value)}
-            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Elegí cuál...</option>
-            {salsaOpts.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-          </select>
-        ) : <div />}
+        {e.s_modo === 'fija'
+          ? <select value={e.s_id} onChange={(ev) => onCampo('s_id', ev.target.value)} className="rounded border border-gray-200 px-1.5 py-1 text-xs"><option value="">Cuál...</option>{dedupPorNombre(salsas, e.s_id).map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}</select>
+          : <div />}
       </div>
-
-      <button
-        type="button"
-        onClick={guardar}
-        disabled={!puedeGuardar || pendiente}
-        className="w-full rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-      >
-        Guardar
-      </button>
     </div>
   );
 }
@@ -1066,6 +1127,12 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
     ? (marcarSlotVianda.isPending || quitarSlotVianda.isPending)
     : (marcarFijoVianda.isPending || quitarFijoVianda.isPending));
   const porKiloPending = tipo === 'especial' ? setDisponiblePorKilo.isPending : setFijoDisponiblePorKilo.isPending;
+
+  // Especiales con vianda activa usan el bloque unificado (mockup): guarnición/salsa
+  // con override de celda + excepciones inline + un solo Guardar/Cancelar. Los fijos y
+  // las celdas sin opción siguen con el editor por-secciones.
+  const esUnificado = tipo === 'especial' && Boolean(item?.slot_id) && Boolean(item?.categoria_id);
+  const excQ = useExcepcionesEmpresa(esUnificado && item?.vianda_activa ? item.slot_id : null);
 
   // Activar vianda para un plato que todavia no tiene ninguna en el
   // catalogo tiraba 400 ("no tiene una vianda activa...") y mandaba al
@@ -1177,11 +1244,25 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
             </div>
           </div>
 
-          {/* Guarnición y salsa en UNA tarjeta (UX heuristics H8/H6): el valor
-              efectivo + de dónde sale (procedencia, solo lectura) arriba, y el editor
-              de la misma composición abajo. Antes eran dos bloques separados que
-              describían lo mismo. */}
-          {item.vianda_activa && (
+          {/* Especiales: bloque unificado del mockup (guarnición/salsa con override de
+              celda + excepciones inline + un solo Guardar/Cancelar). "Pisar solo esta
+              semana" setea el override de celda, no la vianda. */}
+          {item.vianda_activa && esUnificado && (
+            excQ.isLoading
+              ? <div className="flex justify-center py-6"><Spinner /></div>
+              : <CeldaComposicionUnificada
+                  key={`${item.slot_id}-${item.vianda_id}`}
+                  celda={celda}
+                  menuId={menuId}
+                  empresas={empresas || []}
+                  excepcionesIniciales={excQ.data || []}
+                  onClose={onClose}
+                />
+          )}
+
+          {/* Fijos / celdas sin opción: editor por-secciones (edita la vianda, sin
+              override de celda ni excepciones por empresa). */}
+          {item.vianda_activa && !esUnificado && (
             <div className="rounded-lg border border-gray-100">
               {item.guarnicion_modo && (
                 <>
@@ -1191,12 +1272,6 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
               )}
               <ComposicionViandaEditor key={`${tipo}-${item.slot_id ?? item.plato_id}-${item.vianda_id}`} item={item} embedded />
             </div>
-          )}
-
-          {/* Excepciones por empresa: solo celdas slot (tienen id de celda, del que
-              el backend deriva el ancla). Los fijos se configuran por catálogo. */}
-          {item.vianda_activa && item.slot_id && item.categoria_id && (
-            <ExcepcionesEmpresaSection key={item.slot_id} menuId={menuId} item={item} empresas={empresas} />
           )}
 
           {item.vianda_activa ? (
