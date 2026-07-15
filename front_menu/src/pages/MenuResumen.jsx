@@ -887,6 +887,16 @@ function ExcepcionesEmpresaSection({ menuId, item, empresas = [] }) {
 
       {abierto && (
         <div className="space-y-3 border-t border-gray-100 p-4">
+          {/* Base de la celda a la vista (carga cognitiva, Lever 3): al armar una
+              excepción el operador necesita saber contra qué está cambiando, sin
+              tener que scrollear hasta la tarjeta de Guarnición y salsa. */}
+          {item.guarnicion_modo && (
+            <div className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              <span className="font-medium text-gray-500">Base (todas las empresas): </span>
+              {textoGuarnicion(item)} · {textoSalsa(item)}
+            </div>
+          )}
+
           {isLoading && <Spinner />}
 
           {!isLoading && excepciones.length === 0 && (
