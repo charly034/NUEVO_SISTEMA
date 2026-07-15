@@ -476,6 +476,8 @@ function SelectorEmpresas({ empresas, initialIds, onGuardar, guardando, nota }) 
   };
 
   const puedeGuardar = todas || empresaIds.length > 0;
+  const actualIds = todas ? [] : empresaIds;
+  const dirty = JSON.stringify([...actualIds].sort((a, b) => a - b)) !== JSON.stringify([...inicial].sort((a, b) => a - b));
 
   return (
     <div className="rounded-lg border border-gray-100 p-4">
@@ -500,15 +502,18 @@ function SelectorEmpresas({ empresas, initialIds, onGuardar, guardando, nota }) 
       )}
       {nota && <p className="text-xs text-gray-400 mt-2">{nota}</p>}
 
-      <button
-        type="button"
-        onClick={() => onGuardar(todas ? [] : empresaIds)}
-        disabled={guardando || !puedeGuardar}
-        className="mt-3 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-      >
-        {guardando && <Spinner size="sm" />}
-        Guardar visibilidad
-      </button>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onGuardar(todas ? [] : empresaIds)}
+          disabled={guardando || !puedeGuardar || !dirty}
+          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+        >
+          {guardando && <Spinner size="sm" />}
+          Guardar visibilidad
+        </button>
+        {dirty && <span className="text-xs font-medium text-amber-600">Cambios sin guardar</span>}
+      </div>
     </div>
   );
 }
@@ -562,13 +567,33 @@ function EmpresasEditorFijo({ menuId, platoId, empresas, initialIds }) {
   );
 }
 
+// Colapsa opciones con el mismo nombre normalizado. El catálogo tiene duplicados
+// casi idénticos ("Puré de papas" / "Puré de Papas", "Ensalada Rusa" / "Ensalada
+// rusa"): mostrar los dos hace que el admin elija mal. Se deja una sola por nombre,
+// prefiriendo el id ya seleccionado (para no vaciar el select de un dato existente)
+// y, si no, el id más bajo (el canónico/original del sistema). NOTA: es un parche de
+// presentación; la limpieza real del catálogo (mergear ids y repuntar referencias)
+// es una tarea de datos aparte.
+function dedupPorNombre(items, mantenerId = null) {
+  const idActual = mantenerId != null && mantenerId !== '' ? Number(mantenerId) : null;
+  const porNombre = new Map();
+  for (const it of items) {
+    const clave = (it.nombre || '').trim().toLowerCase();
+    const previo = porNombre.get(clave);
+    if (!previo || it.id === idActual || (previo.id !== idActual && it.id < previo.id)) {
+      porNombre.set(clave, it);
+    }
+  }
+  return [...porNombre.values()].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+}
+
 // Editor de guarnicion/salsa de la vianda ya activa de este item -- se
 // remonta (via `key` en el llamador) cada vez que cambia el item o su
 // vianda_id, para arrancar siempre con el estado guardado real y no con el
 // de la vianda anterior. Solo actualiza (nunca crea): si el item tiene
 // vianda_activa=true, vianda_id siempre existe (lo garantiza el toggle de
 // arriba, que crea una vianda general antes de anclar si hacia falta).
-function ComposicionViandaEditor({ item }) {
+function ComposicionViandaEditor({ item, embedded = false }) {
   const actualizarVianda = useUpdateVianda();
   const { data: guarniciones = [] } = useGuarniciones();
   const { data: salsas = [] } = useSalsas();
@@ -577,6 +602,15 @@ function ComposicionViandaEditor({ item }) {
   const [guarnicionId, setGuarnicionId] = useState(item.guarnicion_id ?? '');
   const [salsaModo, setSalsaModo] = useState(salsaModoInicial);
   const [salsaId, setSalsaId] = useState(item.salsa_id ?? '');
+
+  const guarnOpts = dedupPorNombre(guarniciones, guarnicionId);
+  const salsaOpts = dedupPorNombre(salsas, salsaId);
+
+  // "Sin guardar" visible: cambios locales que todavía no se persistieron. Evita la
+  // pérdida silenciosa al cerrar el drawer sin apretar Guardar.
+  const dirty = String(guarnicionId) !== String(item.guarnicion_id ?? '')
+    || salsaModo !== salsaModoInicial
+    || (salsaModo === 'fija' && String(salsaId) !== String(item.salsa_id ?? ''));
 
   const guardar = async () => {
     try {
@@ -595,7 +629,7 @@ function ComposicionViandaEditor({ item }) {
   };
 
   return (
-    <div className="rounded-lg border border-gray-100 p-4 space-y-3">
+    <div className={embedded ? 'p-4 space-y-3' : 'rounded-lg border border-gray-100 p-4 space-y-3'}>
       <p className="text-sm font-semibold text-gray-800">Configurar vianda</p>
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">Guarnición</label>
@@ -605,7 +639,7 @@ function ComposicionViandaEditor({ item }) {
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
         >
           <option value="">Sin guarnición fija</option>
-          {guarniciones.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+          {guarnOpts.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
         </select>
       </div>
       <div>
@@ -631,26 +665,29 @@ function ComposicionViandaEditor({ item }) {
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="">Seleccioná una salsa...</option>
-            {salsas.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            {salsaOpts.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
           </select>
         )}
       </div>
-      <button
-        type="button"
-        onClick={guardar}
-        disabled={actualizarVianda.isPending || (salsaModo === 'fija' && !salsaId)}
-        className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-      >
-        {actualizarVianda.isPending && <Spinner size="sm" />}
-        Guardar composición
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={actualizarVianda.isPending || !dirty || (salsaModo === 'fija' && !salsaId)}
+          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+        >
+          {actualizarVianda.isPending && <Spinner size="sm" />}
+          Guardar composición
+        </button>
+        {dirty && <span className="text-xs font-medium text-amber-600">Cambios sin guardar</span>}
+      </div>
     </div>
   );
 }
 
 // Reasignar la categoría de una celda (o mandarla a "Sin categorizar") y
 // borrarla puntualmente. Solo aplica a celdas slot (filas de menu_semanal_dias).
-function ReasignarYBorrar({ menuId, item, onClose }) {
+function ReasignarYBorrar({ menuId, item, onClose, embedded = false }) {
   const { data: categorias = [] } = useCategorias();
   const reasignar = useReasignarMenuItem(menuId);
   const deleteItem = useDeleteMenuItem(menuId);
@@ -679,7 +716,7 @@ function ReasignarYBorrar({ menuId, item, onClose }) {
   };
 
   return (
-    <div className="rounded-lg border border-gray-100 p-4 space-y-3">
+    <div className={embedded ? 'space-y-3' : 'rounded-lg border border-gray-100 p-4 space-y-3'}>
       <div>
         <label className="block text-sm font-semibold text-gray-800 mb-1">Categoría</label>
         <select
@@ -754,7 +791,7 @@ function FilaProcedencia({ titulo, texto, procedencia }) {
   );
 }
 
-function ProcedenciaCard({ item }) {
+function ProcedenciaCard({ item, embedded = false }) {
   // Solo celdas slot (especiales/custom) traen la resolucion del backend; los fijos
   // se computan por otro camino y todavia no la exponen en este payload.
   if (!item?.guarnicion_modo) return null;
@@ -764,7 +801,7 @@ function ProcedenciaCard({ item }) {
   const stale = item.excepciones_stale ?? 0;
 
   return (
-    <div className="rounded-lg border border-gray-100 p-4 space-y-3">
+    <div className={embedded ? 'p-4 space-y-3' : 'rounded-lg border border-gray-100 p-4 space-y-3'}>
       <FilaProcedencia titulo="Guarnición" texto={textoGuarnicion(item)} procedencia={item.guarnicion_procedencia} />
       <FilaProcedencia titulo="Salsa" texto={textoSalsa(item)} procedencia={item.salsa_procedencia} />
 
@@ -913,6 +950,9 @@ function ExcepcionEmpresaRow({ exc, onGuardar, onBorrar, pendiente }) {
   const [sModo, setSModo] = useState(exc.salsa_modo_override ?? '');
   const [sId, setSId] = useState(exc.salsa_fija_override_id ?? '');
 
+  const guarnOpts = dedupPorNombre(guarniciones, gId);
+  const salsaOpts = dedupPorNombre(salsas, sId);
+
   const puedeGuardar = (gModo || sModo)
     && !(gModo === 'fija' && !gId)
     && !(sModo === 'fija' && !sId);
@@ -962,7 +1002,7 @@ function ExcepcionEmpresaRow({ exc, onGuardar, onBorrar, pendiente }) {
             className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="">Elegí cuál...</option>
-            {guarniciones.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+            {guarnOpts.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
           </select>
         ) : <div />}
 
@@ -983,7 +1023,7 @@ function ExcepcionEmpresaRow({ exc, onGuardar, onBorrar, pendiente }) {
             className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="">Elegí cuál...</option>
-            {salsas.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            {salsaOpts.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
           </select>
         ) : <div />}
       </div>
@@ -1023,15 +1063,21 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
   // se configura con el editor de abajo) y reintentamos el anclaje una
   // sola vez, mismo mecanismo que ya usa "agregar plato" (hallazgo de
   // sesion 2026-07-13).
+  // Los toggles guardan al instante; el toast de éxito cierra el bucle de feedback
+  // (H1) -- antes solo avisaban en error, así que el usuario no sabía si aplicó.
   const onToggleVianda = () => {
     const target = tipo === 'especial' ? item.slot_id : item.plato_id;
     if (item.vianda_activa) {
       const quitar = tipo === 'especial' ? quitarSlotVianda : quitarFijoVianda;
-      quitar.mutate(target, { onError: (e) => toast.error(e?.message || 'No se pudo actualizar la vianda') });
+      quitar.mutate(target, {
+        onSuccess: () => toast.success('Ya no se ofrece como vianda'),
+        onError: (e) => toast.error(e?.message || 'No se pudo actualizar la vianda'),
+      });
       return;
     }
     const marcar = tipo === 'especial' ? marcarSlotVianda : marcarFijoVianda;
     marcar.mutate(target, {
+      onSuccess: () => toast.success('Se ofrece como vianda'),
       onError: async (e) => {
         if (!e?.message?.includes('no tiene una vianda activa')) {
           toast.error(e?.message || 'No se pudo actualizar la vianda');
@@ -1039,7 +1085,10 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
         }
         try {
           await createVianda.mutateAsync({ plato_id: item.plato_id });
-          marcar.mutate(target, { onError: (e2) => toast.error(e2?.message || 'No se pudo actualizar la vianda') });
+          marcar.mutate(target, {
+            onSuccess: () => toast.success('Se ofrece como vianda'),
+            onError: (e2) => toast.error(e2?.message || 'No se pudo actualizar la vianda'),
+          });
         } catch (e2) {
           toast.error(e2?.message || 'No se pudo crear la vianda del plato');
         }
@@ -1049,15 +1098,16 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
 
   const onTogglePorKilo = () => {
     const disponible = !item.disponible_por_kilo;
+    const onSuccess = () => toast.success(disponible ? 'Disponible por kilo esta semana' : 'Excluido de la venta por kilo');
     if (tipo === 'especial') {
       setDisponiblePorKilo.mutate(
         { slotId: item.slot_id, disponible },
-        { onError: (e) => toast.error(e?.message || 'No se pudo actualizar la venta por kilo') }
+        { onSuccess, onError: (e) => toast.error(e?.message || 'No se pudo actualizar la venta por kilo') }
       );
     } else {
       setFijoDisponiblePorKilo.mutate(
         { platoId: item.plato_id, disponible },
-        { onError: (e) => toast.error(e?.message || 'No se pudo actualizar la venta por kilo') }
+        { onSuccess, onError: (e) => toast.error(e?.message || 'No se pudo actualizar la venta por kilo') }
       );
     }
   };
@@ -1117,10 +1167,20 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
             </div>
           </div>
 
-          {item.vianda_activa && <ProcedenciaCard item={item} />}
-
+          {/* Guarnición y salsa en UNA tarjeta (UX heuristics H8/H6): el valor
+              efectivo + de dónde sale (procedencia, solo lectura) arriba, y el editor
+              de la misma composición abajo. Antes eran dos bloques separados que
+              describían lo mismo. */}
           {item.vianda_activa && (
-            <ComposicionViandaEditor key={`${tipo}-${item.slot_id ?? item.plato_id}-${item.vianda_id}`} item={item} />
+            <div className="rounded-lg border border-gray-100">
+              {item.guarnicion_modo && (
+                <>
+                  <ProcedenciaCard item={item} embedded />
+                  <div className="border-t border-gray-100" />
+                </>
+              )}
+              <ComposicionViandaEditor key={`${tipo}-${item.slot_id ?? item.plato_id}-${item.vianda_id}`} item={item} embedded />
+            </div>
           )}
 
           {/* Excepciones por empresa: solo celdas slot (tienen id de celda, del que
@@ -1160,11 +1220,20 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
             )
           ) : null}
 
-          {/* Reasignar categoria + borrar celda puntual: solo celdas slot
-              (especiales/custom, que son filas de menu_semanal_dias con id).
-              Los fijos se manejan como propiedad del catalogo, no por celda. */}
+          {/* Acciones poco frecuentes (reasignar categoría, borrar celda) colapsadas
+              en "Más acciones" (UX heuristics H8): bajan la carga visual del drawer y
+              alejan lo destructivo del flujo principal. Solo celdas slot
+              (especiales/custom, filas de menu_semanal_dias con id); los fijos se
+              manejan como propiedad del catálogo. */}
           {tipo === 'especial' && item.slot_id && (
-            <ReasignarYBorrar menuId={menuId} item={item} onClose={onClose} />
+            <details className="rounded-lg border border-gray-100">
+              <summary className="cursor-pointer p-4 text-sm font-semibold text-gray-700 marker:text-gray-400">
+                Más acciones
+              </summary>
+              <div className="border-t border-gray-100 p-4">
+                <ReasignarYBorrar menuId={menuId} item={item} onClose={onClose} embedded />
+              </div>
+            </details>
           )}
         </div>
       )}
