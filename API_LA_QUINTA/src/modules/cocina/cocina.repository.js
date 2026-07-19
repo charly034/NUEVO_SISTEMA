@@ -99,7 +99,7 @@ export const findSlotsSemana = (menuSemanalId) => findSlots(menuSemanalId);
 // dia: 'lunes' | ... | null (null = todos los días)
 
 export const findConteosPedidos = async (semanaInicio, dia = null) => {
-  const conds = ['p.semana_inicio = $1', "p.estado NOT IN ('cancelado')"];
+  const conds = ['se.fecha_inicio = $1', "p.estado NOT IN ('cancelado')"];
   const vals = [semanaInicio];
 
   if (dia) {
@@ -117,6 +117,7 @@ export const findConteosPedidos = async (semanaInicio, dia = null) => {
        COUNT(*)::int  AS total
      FROM pedido_items pi
      JOIN pedidos  p  ON p.id  = pi.pedido_id
+     JOIN semanas  se ON se.id = p.semana_id
      JOIN empresas e  ON e.id  = p.empresa_id
      JOIN platos   pl ON pl.id = pi.plato_id
      WHERE ${conds.join(' AND ')}
@@ -149,13 +150,14 @@ export const findDetalleEtiquetas = async (semanaInicio, dia) => {
        pv.gramaje_min    AS plan_gramaje_min
      FROM pedido_items pi
      JOIN pedidos      p    ON p.id    = pi.pedido_id
+     JOIN semanas      se   ON se.id   = p.semana_id
      JOIN empresas     e    ON e.id    = p.empresa_id
      JOIN empleados    empl ON empl.id = p.empleado_id
      JOIN platos       pl   ON pl.id   = pi.plato_id
      LEFT JOIN guarniciones  g  ON g.id  = pi.guarnicion_id
      LEFT JOIN salsas        s  ON s.id  = pi.salsa_id
      LEFT JOIN planes_comerciales pv ON pv.id = e.plan_id
-     WHERE p.semana_inicio = $1
+     WHERE se.fecha_inicio = $1
        AND pi.dia          = $2
        AND p.estado NOT IN ('cancelado')
        AND pi.sin_pedido   = false
@@ -178,7 +180,8 @@ export const findKPIsHoy = async (semanaInicio, dia) => {
        COUNT(DISTINCT p.empresa_id) FILTER (WHERE pi.estado NOT IN ('cancelado'))::int  AS empresas_count
      FROM pedido_items pi
      JOIN pedidos p ON p.id = pi.pedido_id
-     WHERE p.semana_inicio = $1
+     JOIN semanas se ON se.id = p.semana_id
+     WHERE se.fecha_inicio = $1
        AND pi.dia = $2
        AND pi.sin_pedido = false
        AND pi.plato_id IS NOT NULL
@@ -194,7 +197,8 @@ export const findTotalesPorDia = async (semanaInicio) => {
     `SELECT pi.dia, COUNT(*)::int AS total
      FROM pedido_items pi
      JOIN pedidos p ON p.id = pi.pedido_id
-     WHERE p.semana_inicio = $1
+     JOIN semanas se ON se.id = p.semana_id
+     WHERE se.fecha_inicio = $1
        AND pi.sin_pedido = false
        AND pi.plato_id IS NOT NULL
        AND p.estado NOT IN ('cancelado')
