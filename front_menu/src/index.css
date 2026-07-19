@@ -34,21 +34,70 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-gray-50 text-gray-900 antialiased font-sans;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
   }
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
     @apply inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors;
   }
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold;
   }
+  /* Números tabulares D2: alineación monoespaciada para plata y conteos. */
+  .num {
+    @apply font-mono tabular-nums;
+  }
+}
+
+/* ── Colores de celdas del resumen semanal (personalizables) ──────────────
+   Las variables --c-* se setean en el contenedor de la página desde la
+   config del backend; estas clases las consumen. Cambiar el color en el
+   selector actualiza las variables y toda la grilla se repinta. */
+.celda-estado {
+  border-left-width: 4px;
+  border-left-style: solid;
+  transition: filter 0.15s ease;
+}
+.celda-estado:hover { filter: brightness(0.96); }
+.celda-vianda  { background: var(--c-vianda-bg);  border-left-color: var(--c-vianda); }
+.celda-porkilo { background: var(--c-porkilo-bg); border-left-color: var(--c-porkilo); }
+.celda-ambos   { background: var(--c-ambos-bg);   border-left-color: var(--c-ambos); }
+.celda-ninguno { background: var(--c-ninguno-bg); border-left-color: var(--c-ninguno); }
+
+.chip-estado  { color: #1f2937; } /* gray-800: legible sobre cualquier tinte */
+.chip-vianda  { background: var(--c-vianda-bg);  border-color: var(--c-vianda); }
+.chip-porkilo { background: var(--c-porkilo-bg); border-color: var(--c-porkilo); }
+.chip-ambos   { background: var(--c-ambos-bg);   border-color: var(--c-ambos); }
+.chip-ninguno { background: var(--c-ninguno-bg); border-color: var(--c-ninguno); }
+
+/* ── Filtro por estado: al setear data-filtro en el contenedor, se atenúa
+   todo lo que NO coincide, para que resalte solo el estado elegido. ── */
+[data-filtro] .celda-estado,
+[data-filtro] .chip-estado { transition: opacity 0.15s ease, filter 0.15s ease; }
+
+/* ── Etiqueta de categoría: color por categoría (--cat inline) renderizado
+   según el estilo global (data-cat-estilo en el contenedor). ── */
+.etq { border-left: 4px solid transparent; }
+[data-cat-estilo="sobrio"]   .etq { background: color-mix(in srgb, var(--cat) 14%, white); color: color-mix(in srgb, var(--cat) 72%, black); }
+[data-cat-estilo="solido"]   .etq { background: var(--cat); color: #fff; }
+[data-cat-estilo="contorno"] .etq { background: #fff; color: #374151; border-left-color: var(--cat); }
+
+[data-filtro="vianda"]  .celda-estado:not(.celda-vianda),
+[data-filtro="vianda"]  .chip-estado:not(.chip-vianda),
+[data-filtro="porkilo"] .celda-estado:not(.celda-porkilo),
+[data-filtro="porkilo"] .chip-estado:not(.chip-porkilo),
+[data-filtro="ambos"]   .celda-estado:not(.celda-ambos),
+[data-filtro="ambos"]   .chip-estado:not(.chip-ambos),
+[data-filtro="ninguno"] .celda-estado:not(.celda-ninguno),
+[data-filtro="ninguno"] .chip-estado:not(.chip-ninguno) {
+  opacity: 0.18;
+  filter: grayscale(0.85);
 }

@@ -133,9 +133,12 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
 
   return (
     <>
-      <div className="border-b border-gray-100 px-5 py-5">
-        <span className="text-lg font-bold text-brand-700">La Quinta</span>
-        <p className="mt-0.5 text-xs text-gray-500">Sistema de menús</p>
+      <div className="flex items-center gap-2.5 border-b border-gray-100 px-4 py-4">
+        <span className="flex h-8 w-8 items-center justify-center rounded bg-brand-600 text-sm font-bold text-white">Q</span>
+        <div>
+          <span className="block text-[15px] font-bold leading-tight text-brand-700">La Quinta</span>
+          <p className="text-[11px] text-gray-400">Sistema de menús</p>
+        </div>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
         {NAV.filter(item => !item.superadminOnly || admin.rol === 'superadmin').map((item) => {
@@ -151,7 +154,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
               <div key="clientes" className="space-y-0.5">
                 <div
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
-                    clientesActivo ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    clientesActivo ? 'border-l-2 border-brand-600 bg-brand-50 text-brand-700' : 'border-l-2 border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
                   <NavLink to="/clientes" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -204,7 +207,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
               <div key="catalogo" className="space-y-0.5">
                 <div
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
-                    catalogoActivo ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    catalogoActivo ? 'border-l-2 border-brand-600 bg-brand-50 text-brand-700' : 'border-l-2 border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
                   <NavLink to="/platos" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -253,7 +256,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
               <div key="menu-semanal" className="space-y-0.5">
                 <div
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
-                    menuSemanalActivo ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    menuSemanalActivo ? 'border-l-2 border-brand-600 bg-brand-50 text-brand-700' : 'border-l-2 border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
                   <NavLink to="/semanas" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -305,7 +308,7 @@ function SidebarContent({ admin, onLogout, onNavigate }) {
               onClick={onNavigate}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  isActive ? 'border-l-2 border-brand-600 bg-brand-50 text-brand-700' : 'border-l-2 border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`
               }
             >
@@ -401,7 +404,7 @@ export default function Sidebar({ admin, onLogout, mobileOpen = false, onCloseMo
         </div>
       )}
 
-      <aside className="hidden w-56 flex-shrink-0 flex-col border-r border-gray-200 bg-white print:hidden lg:flex">
+      <aside className="hidden w-52 flex-shrink-0 flex-col border-r border-gray-200 bg-white print:hidden lg:flex">
         <SidebarContent admin={admin} onLogout={onLogout} />
       </aside>
     </>

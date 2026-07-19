@@ -27,7 +27,7 @@ export default function AdminLogin({ onLogin }) {
 
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">🌿</div>
-          <h1 className="text-2xl font-bold text-green-700">La Quinta</h1>
+          <h1 className="text-2xl font-bold text-brand-700">La Quinta</h1>
           <p className="text-sm text-gray-500 mt-1">Panel administrativo</p>
         </div>
 
@@ -46,7 +46,7 @@ export default function AdminLogin({ onLogin }) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="admin@laquinta.com"
-              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 transition-colors"
+              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
             />
           </div>
 
@@ -63,7 +63,7 @@ export default function AdminLogin({ onLogin }) {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 pr-11 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100 transition-colors"
+                className="w-full px-3.5 py-2.5 pr-11 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-colors"
               />
               <button
                 type="button"
@@ -94,7 +94,7 @@ export default function AdminLogin({ onLogin }) {
               type="checkbox"
               checked={remember}
               onChange={e => setRemember(e.target.checked)}
-              className="w-4 h-4 rounded accent-green-600 cursor-pointer"
+              className="w-4 h-4 rounded accent-brand-600 cursor-pointer"
             />
             <span className="text-sm text-gray-600">Recordarme por 7 días</span>
           </label>
@@ -110,7 +110,7 @@ export default function AdminLogin({ onLogin }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 mt-2"
+            className="w-full bg-brand-700 hover:bg-brand-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 mt-2"
           >
             {loading ? (
               <>

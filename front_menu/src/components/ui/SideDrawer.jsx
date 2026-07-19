@@ -24,7 +24,7 @@ export default function SideDrawer({ open, onClose, title, children, width = 'md
       />
       {/* Panel */}
       <div
-        className={`relative z-10 w-full ${WIDTHS[width]} bg-white shadow-2xl flex flex-col h-full transition-transform duration-200 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`relative z-10 w-full ${WIDTHS[width]} bg-white flex flex-col h-full transition-transform duration-200 ${open ? 'translate-x-0 shadow-2xl' : 'translate-x-full shadow-none'}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="font-semibold text-gray-900 text-base">{title}</h2>

@@ -1,5 +1,5 @@
 schema: la_quinta_debt_v2
-updated_at: "2026-07-11"
+updated_at: "2026-07-17"
 
 technical_debt:
   - id: "debt-notificaciones-filtro-plan-legacy"
@@ -15,13 +15,29 @@ technical_debt:
     recommended_cut: "Completado. Re-guardar desde el panel cualquier regla legacy con filtros.plan para migrarla a plan_id."
 
   - id: "debt-admin-auditoria-cobertura-parcial"
-    status: open
+    status: resolved
     area: "admin_auditoria"
     evidence:
-      - "admin_auditoria registra acciones admin nivel 2 para menus, empleados, importacion CSV y cambio de estado de pedidos."
-      - "No registra aun todos los CRUD de empresas, platos, guarniciones, administradores y reglas de notificacion."
-    risk: "La pantalla Auditoria no cubre todavia el 100% de acciones sensibles del panel admin."
-    recommended_cut: "Extender registrarAdminAction a empresas, platos, guarniciones, usuarios_admin y notificaciones en una tanda especifica."
+      - "Antes: admin_auditoria cubria menus, empleados, importacion CSV, cambio de estado de pedidos y finanzas/notificaciones parcial."
+      - "2026-07-17: se extendio registrarAdminAction a los 5 modulos que faltaban, siguiendo el patron existente (auditar en el service donde hay service -> platos; en el controller donde no hay service -> empresas/guarniciones/salsas/usuarios-admin, igual que empleados)."
+      - "empresas (entidad_tipo=empresa): crear, actualizar (update + reabrir/cerrar plazo + regenerar-codigo), eliminar (soft delete). platos (plato): crear/actualizar/eliminar. guarniciones (guarnicion) y salsas (salsa): crear/actualizar/eliminar. usuarios del panel admin (usuario_admin) en admin-auth.controller.js: crear/actualizar/eliminar."
+      - "GUARDRAIL de seguridad en usuarios_admin: helper soloCamposSeguros() serializa solo id/nombre/apellido/email/rol/activo en antes/despues -- NUNCA password_hash; update guarda metadata.cambio_password (booleano) en vez del secreto. Verificado en el diff."
+      - "Test nuevo test/admin-auditoria-cobertura.http-db.test.js: crear+eliminar guarnicion deja 2 eventos; crear empresa deja 1 evento, atribuidos al admin."
+      - "Validado: npm run lint exit 0; npm test 154/154 (secuencial, ver debt-api-test-flakiness-paralelo)."
+    risk: "Bajo. Residual menor: las reglas de notificacion (POST/PATCH/DELETE /notificaciones/admin/reglas) no se verificaron explicitamente en esta tanda; el resto del CRUD sensible del panel ya audita."
+    recommended_cut: "Completado para empresas/platos/guarniciones/salsas/usuarios_admin. Verificar/agregar auditoria de reglas de notificacion si se necesita cobertura 100%."
+
+  - id: "debt-api-test-flakiness-paralelo"
+    status: resolved
+    area: "API_LA_QUINTA.test"
+    evidence:
+      - "2026-07-17: al reconstruir la DB de test y sumar un test file nuevo (admin-auditoria-cobertura) se hizo evidente que varios tests de consistencia sobre estado GLOBAL fallan de forma no-determinista bajo ejecucion paralela (node --test corre los test FILES en paralelo)."
+      - "Races observados: categorias-fase-f iteraba todos los menus no-sembrados y daba 404 cuando otro test borraba uno a mitad de iteracion; vista-semanal asertaba activas===total sobre el conteo GLOBAL de empresas activas (no atomico frente a inserts concurrentes de otros files); categorias-fase-c (createMenuSemanal siembra fijos) tambien aparecia esporadicamente."
+      - "Confirmado que NO son bugs de codigo: la suite da 154/154 verde de forma determinista en modo secuencial (node --test --test-concurrency=1). El baseline previo de 152/152 pasaba por suerte de timing."
+      - "Fix: (a) package.json 'test' pasa a 'node --test --test-concurrency=1' (determinista, ~21s, suite chica); (b) endurecimientos puntuales: vista-semanal crea su propia empresa activa y ya no exige la igualdad global racy; categorias-fase-f saltea menus borrados concurrentemente (404) en vez de romper."
+      - "Verificado: 3 corridas seguidas de npm test dieron 154/154."
+    risk: "Bajo. Se pierde el paralelismo del runner (la suite tarda ~21s en vez de ~12s), a cambio de determinismo total."
+    recommended_cut: "Completado. Si en el futuro se quiere volver a paralelo, habria que aislar los tests de consistencia global (scoping a datos propios/sembrados con prefijo consistente) en vez de asertar sobre todas las filas."
 
   - id: "platos-fotos-reales-pendientes"
     status: resolved
@@ -95,13 +111,13 @@ technical_debt:
     recommended_cut: "Revisar CSS solo si el tiempo de build se vuelve problema operativo."
 
   - id: "debt-docs-mojibake"
-    status: open
+    status: resolved
     area: "documentacion"
     evidence:
-      - "Varias lecturas de README/docs muestran caracteres mojibake para acentos."
-      - "docs/ai/ux-admin-prompt.md fue normalizado a texto ASCII legible el 2026-07-06, pero no implica que el resto de la documentacion haya sido normalizada."
-    risk: "Documentacion dificil de leer o copiar."
-    recommended_cut: "Normalizar encoding a UTF-8 en una tarea separada sin tocar codigo funcional."
+      - "2026-07-17: scan a nivel de bytes de todo docs/ (cualquier extension) + README.md: cero U+FFFD (caracter de reemplazo), cero secuencias de doble-encoding (Ã/Â + Latin-1 alto) y cero BOM en archivos de texto. El unico positivo fue un PNG binario (falso positivo)."
+      - "El mojibake reportado antes parece haber sido un artefacto de render de herramienta en sesiones previas, no corrupcion real en los bytes; los .md/.txt/.yaml estan en UTF-8 limpio."
+    risk: "Sin riesgo residual."
+    recommended_cut: "Completado. Si reaparece mojibake al leer un doc, verificar la codificacion de la herramienta lectora antes de reescribir el archivo."
 
   - id: "debt-admin-ux-audit-pending"
     status: partially_resolved
@@ -267,24 +283,70 @@ technical_debt:
     recommended_cut: "Reevaluar solo si aparece un caso real de negocio que lo necesite; no construir la excepcion de forma especulativa."
 
   - id: "debt-menu-semanal-sin-bloqueo-por-estado-publicado"
-    status: open
-    area: "API_LA_QUINTA.menus_semanales"
+    status: resolved
+    area: "API_LA_QUINTA.menus_semanales / front_menu"
     evidence:
-      - "2026-07-11: /plan-eng-review confirmo que el trigger trg_bloquear_desactivar_vianda (migracion 1719000067000) NO esta gateado por menus_semanales.estado -- su WHERE solo chequea ms.fecha_fin >= CURRENT_DATE, y solo se dispara al desactivar una vianda del catalogo, no al editar filas de menu_semanal_dias."
-      - "Verificado en menus-semanales.service.js (agregarPlatoDia, quitarPlatoDia, setEmpresasSlot): hoy no existe ningun bloqueo por estado al editar la grilla/dias de una semana publicado o cerrado."
-      - "DisenoMenu.jsx permite editar una semana ya publicada (a la que empleados pueden haber hecho pedidos) sin ninguna confirmacion ni proteccion."
-    risk: "Medio: editar una semana publicada sin aviso puede desincronizar lo que un empleado ya pidio con lo que finalmente se cocina/factura, sin que quede registro de que cambio ni cuando."
-    recommended_cut: "Evaluar agregar una confirmacion explicita (o bloqueo) al editar menu_semanal_dias de una semana con estado='publicado', como feature de seguridad separada -- no mezclar con la vista semanal coordinada."
+      - "2026-07-11: /plan-eng-review confirmo que editar la grilla (agregarPlatoDia, quitarPlatoDia, setEmpresasSlot) de una semana publicada no tenia ni aviso ni registro del estado."
+      - "Decision del usuario 2026-07-17: 'Confirmar en UI + auditar' (ni bloqueo duro ni solo-auditar)."
+      - "AUDITAR (backend): agregarPlatoDia/quitarPlatoDia/setEmpresasSlot ya registraban admin_auditoria; se enriquecieron con metadata.estado_menu y el resumen marca ' (semana PUBLICADA)' cuando estado='publicado'. Asi cada edicion de una semana publicada queda trazable con precision en admin_auditoria."
+      - "CONFIRMAR (frontend): front_menu/src/pages/MenuResumen.jsx (el editor actual, ex-DisenoMenu). Se agrego SemanaPublicadaContext (provisto en el root con value=menuQ.data.estado==='publicado') y un helper confirmarEdicionPublicada() que pide confirmacion (confirmarAccion, SweetAlert) antes de mutar. Gateados: el guardado unificado del drawer de celda (CeldaComposicionUnificada.guardar) y el alta de plato (BuscarOCrearPlato.asignar)."
+      - "Validado: API lint 0 + npm test 154/154; front_menu lint 0 errores + npm run build OK."
+    risk: "Bajo. Residual menor: el confirm cubre los dos chokepoints principales (editar composicion de celda + agregar plato); toggles de vianda, quitar y reasignar/borrar celda podrian sumar el mismo one-liner useContext+confirmarEdicionPublicada si se quiere cobertura total. Pendiente: smoke manual en navegador del confirm sobre una semana publicada (validado por build, no por UI en vivo)."
+    recommended_cut: "Completado para el flujo principal. Verificar en UI el confirm; extender el guard a los handlers secundarios si se busca 100% de cobertura."
 
   - id: "debt-pedidos-test-fecha-fin-de-semana"
-    status: open
+    status: accepted
     area: "API_LA_QUINTA.test"
     evidence:
       - "2026-07-11: npm test corrido dos veces en la misma sesion (antes y despues de la migracion 1719000068000) muestra el mismo set de 8 fallos, siempre en test/pedidos.http-db.test.js (tests 15,16,18,27,29,32,38,39), nunca en menus-semanales."
       - "test/pedidos.http-db.test.js:64-79 (lunesSemanaActualTest/lunesSemanaProximaTest) calculan la semana actual con new Date() real, no con una fecha fija inyectada."
       - "El reloj real crevio de viernes a sabado durante esta sesion (confirmado por system-reminder de cambio de fecha), lo que corrio la semana de referencia de los fixtures y produjo errores como 'Todavia no hay menu publicado para elegir plato especial el martes/lunes/jueves'."
-    risk: "Bajo funcionalmente (no es un bug de negocio), pero alto en confianza de CI: estos tests fallan o pasan segun que dia de la semana se ejecuten, especialmente cerca del fin de semana."
-    recommended_cut: "Inyectar una fecha de referencia fija (env var o parametro de test) en vez de new Date() real en los fixtures de pedidos.http-db.test.js, para que la suite sea determinista sin importar el dia real de ejecucion."
+      - "2026-07-17 (verificado): parcialmente MITIGADA. El helper test_helpers/pedidos-http.helper.js ya usa lunesSemanaProximaHelper() como semana default del fixture (parche 2026-07-13), asi que el grueso de la suite es robusto. El residuo son ~3 tests de SEMANA EN CURSO (usos de lunesSemanaActualTest/lunesSemanaAnteriorTest en pedidos.http-db.test.js: DELETE /mi-pedido conserva dias vencidos, GET /pedidos/semanas marca cerrada) que por diseno necesitan un split vencido/editable que depende de que dia real sea hoy."
+      - "2026-07-17: baseline reproducido en DB de test limpia dio 152/152 en verde un viernes; los ~3 tests de semana en curso pueden volver a fallar sabado/domingo."
+    risk: "Bajo funcionalmente (no es un bug de negocio), es confianza de CI cerca del fin de semana. El fix robusto (inyectar un 'hoy' controlable) tendria que cubrir tanto new Date() en pedidos.service.js como CURRENT_DATE/NOW() en pedidos.repository.js -- no hay chokepoint unico -- dentro del modulo pedidos, que es ZONA DE ALTO RIESGO."
+    recommended_cut: "DECISION 2026-07-17: DIFERIDO por decision del usuario. Baja ganancia (solo CI) vs alto riesgo de tocar el seam de fecha en pedidos. Se documenta como flaky-conocido de fin de semana. Si en el futuro se prioriza CI determinista, implementar un seam de fecha de referencia (env var, ej. APP_FECHA_REFERENCIA) honrado por el JS y por las queries SQL de plazos, con tests, como cambio dedicado y aislado."
+
+  - id: "debt-planes-normalizarplan-gramaje-max"
+    status: resolved
+    area: "API_LA_QUINTA.planes"
+    evidence:
+      - "2026-07-17: verificado que planes.controller.js::normalizarPlan trata gramaje_max ausente (undefined/''/null) como null en vez de Number(undefined); crear un plan sin gramaje_max lo persiste como null."
+      - "Cubierto por test/planes.http-db.test.js: 'POST /api/v1/planes sin gramaje_max lo persiste como null' (7/7 en verde)."
+      - "Reemplaza la nota 'hallazgo colateral no corregido' de la Fase 2 en docs/ai/90-redesign-dominio-borrador.md."
+    risk: "Sin riesgo residual."
+    recommended_cut: "Completado."
+
+  - id: "debt-seed-menus-sin-categorizar-ni-materializar"
+    status: resolved
+    area: "API_LA_QUINTA seeds"
+    evidence:
+      - "2026-07-17: descubierta al reconstruir la DB de test desde cero (migrate + seed limpio). import-menus-csv.js insertaba filas de menu_semanal_dias sin categoria_id y npm run seed no materializaba los fijos, dejando la DB inconsistente con el modelo de categorias (teardown 2026-07-13). Fallaban categorias-fase-a/b/f contra un reseed limpio."
+      - "En la DB del usuario funcionaba por orden historico (el backfill de la migracion Fase A 1719000075000 alcanzo las filas ya sembradas); un migrate+seed limpio no las alcanza."
+      - "Fix: import-menus-csv.js ahora inserta categoria_id=(especiales) en las opciones A/C; package.json encadena 'seed:menus' con scripts/materializar-fijos.js (idempotente)."
+      - "Verificado: reseed limpio deja 214 especiales + 322 fijos-de-siempre, cero filas sin categoria, sin pasos manuales; suite API 152/152."
+    risk: "Bajo. El pipeline alternativo seed:catalogo-menus sigue fuera de este arreglo (ver gap conocido en 90-redesign Fase 3)."
+    recommended_cut: "Completado para el pipeline canonico (npm run seed)."
+
+  - id: "debt-test-paridad-umbral-hardcodeado"
+    status: resolved
+    area: "API_LA_QUINTA.test"
+    evidence:
+      - "2026-07-17: test/categorias-fase-b-paridad.db.test.js asumia >=20 fijos en el primer menu, pero el CSV historico ancla ~14 fijos/semana, haciendo fallar el sanity en un reseed limpio aunque la paridad (nuevo==viejo) pasara."
+      - "Fix: el umbral se deriva del path viejo (cargarPlatosFijos del mismo menu) en vez de un numero fijo: assert nuevoPrimero.length === viejoPrimero.length y viejoPrimero.length > 0."
+    risk: "Sin riesgo residual."
+    recommended_cut: "Completado."
+
+  - id: "debt-guarniciones-filas-salsa-residuales"
+    status: tooling_ready_pending_run
+    area: "datos (DB del usuario)"
+    evidence:
+      - "Hallazgo de la Fase 5 del replanteo de dominio (90-redesign): la tabla guarniciones conserva ~6 filas historicas 'Salsa blanca/bolognesa/caruso/con albondigas/de hongos/fileto', residuo de antes de separar Salsa como entidad propia (tabla salsas). Aparecen mezcladas en el selector de Guarnicion de front_menu/front_clientes."
+      - "2026-07-17: NO reproducibles en una DB sembrada limpia (seed:catalogo no las crea); existen solo en la DB real del usuario."
+      - "Decision del usuario 2026-07-17: DESACTIVAR (activo=false), reversible, preserva historial."
+      - "Entregable: scripts/limpiar-salsas-en-guarniciones.js (dry-run/apply, patron datos-prueba:limpiar). Comandos: npm run salsas:limpiar-guarniciones (dry-run) y salsas:limpiar-guarniciones:apply (requiere DESACTIVAR_SALSAS_GUARNICIONES_CONFIRM=SI). El dry-run reporta las filas y todas las FKs que las referencian (platos.guarnicion_fija_id, pedido_items.guarnicion_id, viandas.guarnicion_id, overrides de menu, etc.)."
+      - "Validado end-to-end contra la DB de test con filas sinteticas: dry-run reporta, guarda de confirm aborta sin la env var, apply desactiva solo las activas, idempotente."
+    risk: "Bajo. Desactivar es reversible y no rompe referencias (activo=false es un flag). Si un plato tiene guarnicion_fija_id apuntando a una de estas, quedara apuntando a una guarnicion inactiva -- el dry-run lo reporta para revisarlo antes."
+    recommended_cut: "PENDIENTE OPERATIVO: el usuario debe correr 'npm run salsas:limpiar-guarniciones' (dry-run) contra su DB real, revisar el reporte y luego aplicar con la env var de confirmacion. Alternativa futura no elegida: migrar estas filas a la tabla salsas en vez de solo desactivar."
 
 deferred_cleanup:
   - "Alinear endpoints legacy del cliente antes de agregar UI nueva."

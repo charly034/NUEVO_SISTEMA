@@ -167,7 +167,7 @@ Rename `planes_vianda` → `planes_comerciales` completo y verificado (75/75 tes
 - Migración `1719000062000_planes-comerciales-rename.js`: rename de tabla, secuencia, PK, UNIQUE(codigo) y CHECK(gramaje).
 - Código actualizado: `planes.repository.js` (6 queries), `empresas.repository.js`, `cocina.repository.js`, `auth.service.js` (JOINs a la tabla renombrada). Las migraciones históricas (`1719000043000`, `1719000056000`) no se tocaron — son inmutables.
 - Test de integración nuevo `test/planes.http-db.test.js` (CRUD completo + soft delete).
-- Hallazgo colateral (no corregido, fuera de alcance de esta fase): `planes.controller.js::normalizarPlan` falla con 400 al crear un plan sin `gramaje_max` (calcula `Number(undefined)` en vez de tratarlo como ausente). Ver nota en `docs/ai/20-modules.yaml`.
+- Hallazgo colateral (RESUELTO 2026-07-17): `planes.controller.js::normalizarPlan` ya trata `gramaje_max` ausente (`undefined`/`''`/`null`) como `null` en vez de hacer `Number(undefined)`; crear un plan sin `gramaje_max` lo persiste como `null`. Cubierto por `test/planes.http-db.test.js` ("POST /api/v1/planes sin gramaje_max lo persiste como null").
 
 ## Implementación — Fase 3 (✅ hecha, 2026-07-10)
 
@@ -202,3 +202,94 @@ Frontend (admin + cliente), correctitud funcional verificada manualmente en nave
 - Validación: `front_menu` (`npm run lint` 0 errores/2 warnings preexistentes en `Semanas.jsx`, `npm run build` OK), `front_clientes` (`npm run lint`, `npm run build`, `npm test` 14/14, `npm run test:e2e` 1/1, todos en verde).
 
 **Las 5 fases del replanteo de dominio están completas.** Próximo paso (explícitamente señalado por el usuario para después, no iniciado): una revisión dedicada de UX/UI sobre todo el sistema.
+
+---
+
+# Replanteo v2 — Menú base vs Menú compuesto (idea nueva 2026-07-18, EN DISCUSIÓN)
+
+> **Estado: DRAFT, en discusión. No implementado.** Evolución mayor propuesta por el usuario que **supersede partes del modelo de Vianda (Etapas 1-5, ya implementadas)**: reifica la combinación como entidad de catálogo **con nombre**, la **generaliza a N platos base**, y mueve la resolución de guarnición/salsa del momento del pedido al catálogo. Cambia cómo se guardan platos/menús y toca pedidos/cocina/UI.
+
+## Origen / motivación
+Coincide 1:1 con la estructura del **Google Form real de pedido semanal** (FORMULARIO EDISON, analizado 2026-07-18): cada opción del dropdown "Principal" ES un "menú compuesto" ("Arroz con pollo" = 1 base sin guarnición; "Milanesa de pollo + guarnición" = 1 base + guarnición a elección; "Suprema caprese con puré de papas" = 1 base + guarnición fija; "budín bicolor con bomba de papa" = 2 bases). Formaliza cómo ya se opera.
+
+## Conceptos
+- **Menú base** (átomo): el plato individual (fideos, milanesa, budín bicolor, bomba de papa). Es el `platos` actual, pero **pierde `guarnicion_modo`/`salsa_modo`/`*_fija_id`** (migran al compuesto).
+- **Guarnición / Salsa**: catálogos aparte (sin cambio respecto a hoy).
+- **Menú compuesto** (entidad NUEVA, catálogo reusable con nombre auto): una **bolsa de componentes**, cada uno con **rol** (`principal` / `guarnición` / `salsa`) y **modo** (`fijo` = ref específica / `a elección` = el cliente/empresa elige). (Modelo genérico de componentes con rol, NO slots rígidos — decisión del usuario 2da ronda.)
+  - **1..N componentes `principal`** (siempre fijos, cada uno ref a un plato base) — habilita el combo multi-plato ("budín bicolor + bomba de papa"), hoy imposible.
+  - **0..1 componente `guarnición`** — fijo (una guarnición) o a elección (cualquiera de las activas; se hacen las 14 igual, no hace falta acotar el set).
+  - **0..1 componente `salsa`** — fijo o a elección. **Salsa es componente de PRIMERA CLASE** (supersede el parche "salsa en el nombre" del modelo viejo/seed).
+
+## Decisiones cerradas (2026-07-18)
+- ✅ **Fijas y a-elección conviven** (como el form: "Suprema con puré" fija vs "Milanesa + guarnición" a elección). Evita la explosión combinatoria: una guarnición que varía es UN compuesto "a elección", no uno por guarnición.
+- ✅ **En el armado semanal SIEMPRE se elige un compuesto.** Un plato "pelado" = compuesto de 1 base sin guarnición ni salsa. Un solo concepto en la grilla semanal (no hay "plato suelto" vs "compuesto").
+- ✅ **Override de composición POR EMPRESA** (no es visibilidad): el mismo compuesto "Milanesa con puré" (guarnición fija=puré por default) puede resolverse como **guarnición a elección** para las empresas que lo piden. Es un override de MODO (y del valor fijo) por (compuesto, empresa), **standing**: aplica cada vez que ese compuesto se ofrece a esa empresa, no por semana.
+
+## Modelo de tablas (🟡 propuesta, a validar en implementación)
+- `platos` (menú base): `nombre` + metadata (kcal, alérgenos, foto, descripción). Se le **quitan** `guarnicion_modo/salsa_modo/guarnicion_fija_id/salsa_fija_id` (migran al compuesto).
+- `menu_compuesto`: `id, nombre_override (nullable), foto_override (nullable), activo`. Los modos/refs de guarnición/salsa ya NO son columnas: son componentes (ver abajo). **El nombre NO se tipea en el caso común: se AUTO-COMPONE** de los componentes resueltos (principal(es) + guarnición/salsa fija, con marca "a elección" cuando aplica), reutilizando la lógica de `construirTextoItem` (pedidos.service.js). `nombre_override` = el actual `nombre_vianda`, solo para nombres comerciales propios ("Combo Criollo") o redacción custom ("Fideos a la bolognesa"). Como el nombre se compone del resultado RESUELTO, respeta automáticamente el override por empresa sin duplicar registros.
+- `menu_compuesto_componente`: `(menu_compuesto_id, rol ∈ principal|guarnicion|salsa, modo ∈ fijo|libre, ref_id nullable [plato_id/guarnicion_id/salsa_id según rol; NULL si modo=libre], orden)`. Reemplaza a `menu_compuesto_plato` + las columnas de modo del compuesto. Principales: `rol=principal, modo=fijo`, 1..N refs a plato. Guarnición/salsa: 0..1 componente cada uno, `fijo` (con ref) o `libre` (sin ref).
+- `menu_compuesto_empresa_override`: `(menu_compuesto_id, empresa_id, guarnicion_modo?, guarnicion_fija_id?, salsa_modo?, salsa_fija_id?)` — override de composición por empresa (decisión 3, standing).
+- `menu_semanal_dias`: pasa a referenciar **`menu_compuesto_id`** (en vez de `plato_id` + `vianda_id` + overrides de slot). Conserva `dia, opcion, categoria_id`.
+- `pedido_items`: referencia `menu_compuesto_id` + la guarnición/salsa **resuelta elegida** (cuando el modo es a elección) + snapshot para cocina/histórico.
+
+## Qué supersede del modelo actual (⚠️ blast radius grande)
+- La tabla `viandas` (Plato+Guarnición?+Salsa? por empresa, Fase 1/5) queda **subsumida** por `menu_compuesto` (su versión con nombre + multi-base). Migración: cada vianda/plato-con-modo actual → un compuesto de 1 base.
+- Los modos guarnición/salsa **dejan `platos`** y viven en `menu_compuesto`.
+- `menu_semanal_dia_empresa_override` (override por celda/semana, mig. 1719000080000) se **reemplaza** por `menu_compuesto_empresa_override` (override por compuesto, standing) — o conviven si se quiere además override puntual por semana.
+- Toca: `menus-semanales`, `pedidos` (item pasa a compuesto+resueltos), `cocina` (etiquetas/conteos), front admin (armado en `MenuResumen.jsx`) y front cliente (elección en `WeeklyOrderView.jsx`).
+
+## Principio anti-explosión de registros (✅ 2026-07-18, preocupación central del usuario)
+El catálogo de compuestos NO debe multiplicarse como platos × guarniciones. Dos palancas lo evitan:
+- ✅ **"A elección" colapsa las combinaciones**: NO se crea un compuesto por guarnición. Se crea UNO "Milanesa (guarnición a elección)" que cubre todas; la guarnición la resuelve el cliente/empresa. Compuestos **fijos** solo para combos curados obligatorios ("Suprema con puré", "budín bicolor + bomba de papa").
+- ✅ **El override por empresa evita duplicar por empresa** (no se crea un compuesto por empresa; se pone un override sobre el mismo compuesto).
+- **Regla mental**: nº de compuestos ≈ nº de platos base + un puñado de combos curados (NO platos × guarniciones). Ej: ~30 bases → ~40 compuestos, no ~420. El compuesto es una capa FINA para el caso común y solo "engorda" en los combos fijos y multi-plato.
+
+## Definiciones cerradas de las preguntas (2026-07-18)
+- ✅ **Metadata**: la cruda (kcal, alérgenos) vive en el **plato base**; el compuesto la **deriva/agrega** de sus base(s) + guarnición/salsa fijas (no la copia, evita duplicación). El compuesto tiene campos propios de **presentación** (nombre visible, foto) que pueden pisar los del base. Columnas en la misma entidad (`platos` / `menu_compuesto`), sin tabla de metadata aparte.
+- ✅ **fijo-de-siempre vs especial es propiedad de la CELDA SEMANAL** (`categoria_id` en `menu_semanal_dias`), NO del compuesto. Confirmado con caso real: "Tarta de acelga" (compuesto sin guarnición) va como fijo casi siempre, y "Tarta de acelga + ensalada" (otro compuesto, guarnición fija) se pone como especial una semana puntual. Dos compuestos comparten el mismo base — uso correcto, no explosión.
+- ✅ **Diseño óptimo sin compat legacy**: como no está en producción, se puede tirar `viandas` y los overrides viejos directamente y hacer la migración de datos limpia.
+- ✅ **Override standing** (decidido 2026-07-18): el override de composición por empresa vive en el **compuesto** y es standing (`menu_compuesto_empresa_override`) — aplica siempre que ese compuesto se ofrece a esa empresa. NO se construye el override puntual-por-semana por ahora (se puede sumar después como capa que pisa al standing si aparece una necesidad real). **El modelo queda 100% cerrado.**
+
+## Migración de datos (🟡, óptima sin legacy)
+- Platos con `guarnicion_modo`/`salsa_modo` actuales → un compuesto de 1 base cada uno (el modo migra al compuesto).
+- `viandas` ancladas → compuestos.
+- `menu_semanal_dias` actuales → apuntar al compuesto correspondiente.
+- Se pueden dropear `viandas` y `menu_semanal_dia_empresa_override` (reemplazado por override por empresa en el compuesto).
+
+## Plan de migración por fases (🟡 propuesta, modelo cerrado 2026-07-18)
+Al no estar en producción se puede migrar directo, pero se conserva un test de **paridad shadow-read** como gate de correctitud (igual que el teardown de categorías, que resultó seguro). Orden:
+
+- **Fase 0 — Schema aditivo (migración nueva).** Crear `menu_compuesto`, `menu_compuesto_plato`, `menu_compuesto_empresa_override`. Agregar `menu_compuesto_id` NULLABLE a `menu_semanal_dias` y `pedido_items`. No tocar nada viejo todavía. Cero cambio de comportamiento.
+- **Fase 1 — Backfill del catálogo de compuestos.** Script: por cada `plato` actual con sus `guarnicion_modo/salsa_modo` → crear un compuesto de **1 base** con esos modos (nombre = nombre del plato). Los combos fijos y multi-base curados se cargan explícitos. **Este backfill se fusiona con el seed consolidado nuevo** (`seed:consolidado`) — el seed pasa a sembrar compuestos, no platos con modos.
+- **Fase 2 — Backfill de menús + paridad.** Apuntar `menu_semanal_dias.menu_compuesto_id` al compuesto equivalente. Test de paridad: leer el menú por el path viejo (plato+modo+vianda) == leerlo por el compuesto, sobre TODOS los menús reales (patrón `categorias-fase-b-paridad`).
+- **Fase 3 — Flip backend.** `menus-semanales`, `pedidos` y `cocina` leen del compuesto. `pedido_items` pasa a `menu_compuesto_id` + guarnición/salsa **resueltas** (cuando el modo es a elección) + snapshot.
+- **Fase 4 — UI admin (`MenuResumen.jsx`).** CRUD del catálogo de compuestos; armado semanal eligiendo compuestos (1 concepto en la grilla); override por empresa (standing) en el compuesto. Reemplaza el drawer de celda actual (plato+guarnición/salsa+excepciones).
+- **Fase 5 — UI cliente (`WeeklyOrderView.jsx`).** El cliente ve compuestos por día; si el compuesto (o su override de empresa) es "a elección", elige guarnición/salsa dentro.
+- **Fase 6 — Limpieza (sin legacy).** Drop `viandas`, `menu_semanal_dia_empresa_override`; drop columnas `guarnicion_modo/salsa_modo/guarnicion_fija_id/salsa_fija_id` de `platos`; drop `plato_id/vianda_id` de `menu_semanal_dias`/`pedido_items` una vez migrado y verde.
+
+**Áreas de alto riesgo del plan**: `pedidos` (el item cambia de forma), `cocina` (etiquetas/conteos leen del compuesto), y las dos UIs de armado/elección. Gate por fase: `npm test` (secuencial) verde + paridad en verde antes de cada flip.
+
+## Refinamientos 2da ronda (✅ 2026-07-18) — modelo definitivo
+Tras una crítica al modelo, el usuario resolvió:
+- ✅ **Rewrite completo confirmado**, motivado por un dolor real y recurrente: hoy poner un plato en el menú exige que tenga una **vianda asociada** ("no hay vianda asociada" → doble trabajo). Con el compuesto se compone directo, sin pre-asociar nada.
+- ✅ **Modelo genérico de componentes con rol** (no slots rígidos base[N]+guarnición[1]+salsa[1]). Tabla `menu_compuesto_componente` (rol + modo + ref).
+- ✅ **Salsa = componente de primera clase.** ⚠️ Esto **supersede** el seed `seed:consolidado` que se armó el 2026-07-18 (que dejaba la salsa dentro del nombre del plato y la tabla `salsas` vacía): la migración debe **poblar `salsas` de verdad** y **separar las salsas de los nombres** de plato. La descomposición de `src/database/seeds/data/decomposicion.json` (que ya separa "Salsa fileto" etc.) es la fuente para esto.
+- ✅ **fijo/especial se mantiene en la CELDA semanal** (revierte la contra-propuesta de la crítica): permite sacar un fijo una semana puntual sin tocar el catálogo. Se agrega un **auto-fill de conveniencia** (precargar los fijos habituales al crear cada semana) para no re-cargarlos a mano, pero la celda es la autoridad y es editable por semana.
+- ✅ **"A elección" = todas las guarniciones activas** (no hace falta whitelist por semana: la cocina prepara las 14 igual). Mantiene el modelo simple.
+- ✅ **Auto-crear el compuesto default al crear un plato base** ("Milanesa" → auto "Milanesa (guarnición a elección)"): elimina la fricción de la relación 1:1 base↔compuesto en el caso común; el base queda disponible para reutilizarse en combos/especiales.
+- ✅ **Metadata**: cruda en el base, derivada al compuesto (sin duplicar); presentación (nombre/foto) override opcional en el compuesto.
+- **Override por empresa**: standing en el compuesto (`menu_compuesto_empresa_override`), pisa el modo/ref de los componentes guarnición/salsa para esa empresa.
+
+## Diseño operativo (cómo opera end-to-end, 2026-07-18)
+- **Admin · Catálogo**: crea un plato base (nombre+metadata) → se **auto-crea su compuesto default** "X (guarnición a elección)", listo para usar sin pre-asociar viandas. Crea compuestos curados (fijo, combo multi-plato, con salsa fija) con un editor de componentes (principal/guarnición/salsa, cada uno fijo o a elección); nombre auto + override. Cataloga guarniciones y salsas (reales).
+- **Admin · Armado semanal** (corazón): abre la semana → grilla precargada con los fijos habituales (auto-fill), editable. Por día agrega compuestos buscándolos por nombre (un solo concepto); marca cada celda fijo/especial; puede sacar un fijo puntual sin tocar el catálogo; setea override por empresa en el compuesto (standing).
+- **Cliente · Pedido**: ve los compuestos del día para su empresa (con overrides aplicados, nombre auto, foto, metadata derivada); elige uno por día; si tiene guarnición/salsa a elección, elige adentro; confirma. `pedido_item` guarda compuesto + resueltos.
+- **Cocina**: conteos agregados por compuesto y por componente + etiquetas.
+
+## Roadmap de implementación con skills (2026-07-18)
+**Diseño (pre-código):** 1) `/spec` (spec ejecutable: tablas/migraciones/contratos/tests/6 fases) → 2) `/plan-eng-review` (arquitectura + riesgo de migración) → 3) `/design-consultation` (UI armado semanal + editor compuesto + picker cliente) → 4) `/plan-design-review` → (atajo) `/autoplan` corre CEO+design+eng+DX de una. Más el mockup.
+**Build (las 6 fases):** cada fase: implementar → `/review` (diff) → `/verify` (end-to-end) → `npm test` secuencial. `/design-review` sobre las UIs. `/ship` al cerrar.
+
+## Próximo paso sugerido
+Traducir a un **plan de migración por fases** (tablas nuevas → backfill de compuestos desde platos/viandas actuales → flip de `menu_semanal_dias` y `pedidos` → UI admin/cliente → limpieza de columnas viejas), con paridad shadow-read como en el teardown de categorías. No tocar código hasta cerrar el modelo y las preguntas abiertas.

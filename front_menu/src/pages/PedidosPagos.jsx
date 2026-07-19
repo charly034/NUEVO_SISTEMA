@@ -341,14 +341,14 @@ function PagoModal({ pedido, onClose, onRegistrar, loading }) {
             <textarea value={form.observacion} onChange={e => setForm(f => ({ ...f, observacion: e.target.value }))} className="h-20 w-full rounded-lg border border-gray-200 px-3 py-2" />
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-2">
-            <input type="checkbox" checked={form.aplicar} onChange={e => setForm(f => ({ ...f, aplicar: e.target.checked }))} className="h-4 w-4 accent-green-700" />
+            <input type="checkbox" checked={form.aplicar} onChange={e => setForm(f => ({ ...f, aplicar: e.target.checked }))} className="h-4 w-4 accent-brand-700" />
             Aplicar este pago al pedido seleccionado
           </label>
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">Cancelar</button>
-          <button type="submit" disabled={loading} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          <button type="submit" disabled={loading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {loading ? 'Guardando...' : 'Registrar'}
           </button>
         </div>
@@ -390,7 +390,7 @@ function AsociarPagoModal({ pedido, onClose, onAplicar, loading }) {
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">Cancelar</button>
-          <button type="submit" disabled={loading} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          <button type="submit" disabled={loading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {loading ? 'Aplicando...' : 'Aplicar'}
           </button>
         </div>
@@ -436,7 +436,7 @@ function DetalleModal({
           <button type="button" onClick={() => onCuenta('empresa', pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Cuenta empresa</button>
           <button type="button" onClick={() => onCuenta('empleado', pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Cuenta persona</button>
           <Link to="/pedidos" className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Ir a pedidos</Link>
-          <button type="button" onClick={() => onRegistrarPago(pedido)} className="rounded-lg border border-green-700 px-3 py-2 text-sm font-medium text-green-700">Registrar pago</button>
+          <button type="button" onClick={() => onRegistrarPago(pedido)} className="rounded-lg border border-brand-700 px-3 py-2 text-sm font-medium text-brand-700">Registrar pago</button>
           <button type="button" onClick={() => onAsociarPago(pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Asociar pago</button>
           <button type="button" onClick={() => onImprimir(pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Imprimir</button>
           <button type="button" onClick={() => onCopiarWhatsApp(pedido)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Copiar WhatsApp</button>
@@ -631,7 +631,7 @@ export default function PedidosPagos() {
           <button type="button" onClick={exportarExcel} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{icono('download')} Excel</button>
           <button type="button" onClick={exportarCsv} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{icono('download')} CSV</button>
           <button type="button" onClick={() => imprimirResumen(pedidosFiltrados, metrics)} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{icono('file')} PDF</button>
-          <button type="button" onClick={copiarWhatsApp} className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-100">{icono('message')} WhatsApp</button>
+          <button type="button" onClick={copiarWhatsApp} className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800 hover:bg-brand-100">{icono('message')} WhatsApp</button>
         </div>
       </div>
 
@@ -768,10 +768,10 @@ export default function PedidosPagos() {
                         <tr key={row.id} onClick={() => setDetalle(row)} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50">
                           <td className="whitespace-nowrap px-3 py-2">{formatDate(row.semana_inicio)}</td>
                           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" onClick={() => abrirCuenta('empresa', row)} className="font-medium text-gray-900 hover:text-green-700">{row.empresa_nombre || '-'}</button>
+                            <button type="button" onClick={() => abrirCuenta('empresa', row)} className="font-medium text-gray-900 hover:text-brand-700">{row.empresa_nombre || '-'}</button>
                           </td>
                           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" onClick={() => abrirCuenta('empleado', row)} className="font-medium text-gray-900 hover:text-green-700">{row.persona}</button>
+                            <button type="button" onClick={() => abrirCuenta('empleado', row)} className="font-medium text-gray-900 hover:text-brand-700">{row.persona}</button>
                             {row.empleado_email && <p className="text-xs text-gray-500">{row.empleado_email}</p>}
                           </td>
                           <td className="px-3 py-2 text-right font-semibold">{formatMoney(row.vendido)}</td>

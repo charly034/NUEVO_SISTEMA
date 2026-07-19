@@ -58,7 +58,7 @@ export default function BottomNav({ admin }) {
         />
       )}
 
-      <div className={`fixed bottom-16 left-0 right-0 z-50 rounded-t-2xl border-t border-gray-200 bg-white shadow-2xl transition-transform duration-200 md:hidden ${masOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`fixed bottom-16 left-0 right-0 z-50 rounded-t-2xl border-t border-gray-200 bg-white transition-transform duration-200 md:hidden ${masOpen ? 'translate-y-0 shadow-2xl' : 'translate-y-full shadow-none'}`}>
         <div className="mx-auto mb-2 mt-3 h-1 w-10 rounded-full bg-gray-200" />
         <div className="grid grid-cols-3 gap-1 p-3 pb-5">
           {navMore.map(({ to, label }) => (

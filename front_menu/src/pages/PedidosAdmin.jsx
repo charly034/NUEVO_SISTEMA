@@ -14,24 +14,24 @@ import { lunesActualISO as getLunes, addDiasISO as addDias } from '../lib/fechas
 const ESTADOS_PEDIDO = [
   { key: 'pendiente',  label: 'Pendiente',  icon: '🕐', cls: 'bg-amber-50 text-amber-700 border-amber-200'  },
   { key: 'en_proceso', label: 'En proceso', icon: '🔥', cls: 'bg-blue-50 text-blue-700 border-blue-200'    },
-  { key: 'completo',   label: 'Completo',    icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
+  { key: 'completo',   label: 'Completo',    icon: '✅', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   { key: 'cancelado',  label: 'Cancelado',   icon: '❌', cls: 'bg-red-50 text-red-600 border-red-200'      },
 ];
 const ESTADOS_ITEM = [
   { key: 'pendiente',  label: 'Pendiente',  icon: '🕐', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   { key: 'preparado',  label: 'Preparada',  icon: '🍽️', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { key: 'entregado',  label: 'Entregada',  icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
+  { key: 'entregado',  label: 'Entregada',  icon: '✅', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   { key: 'cancelado',  label: 'Cancelada',  icon: '❌', cls: 'bg-red-50 text-red-600 border-red-200' },
 ];
 // Estados ya no escritos; solo para mostrar filas históricas en la DB
 const ESTADOS_LEGACY = [
-  { key: 'listo',      label: 'Listo',      icon: '✅', cls: 'bg-green-50 text-green-700 border-green-200' },
+  { key: 'listo',      label: 'Listo',      icon: '✅', cls: 'bg-brand-50 text-brand-700 border-brand-200' },
   { key: 'entregado',  label: 'Entregado',  icon: '📦', cls: 'bg-gray-50 text-gray-500 border-gray-200' },
 ];
 const ESTADO_MAP = Object.fromEntries([...ESTADOS_PEDIDO, ...ESTADOS_ITEM, ...ESTADOS_LEGACY].map(e => [e.key, e]));
 
 const AVATAR_COLORS = [
-  'bg-green-600','bg-blue-600','bg-purple-600','bg-orange-500',
+  'bg-brand-600','bg-blue-600','bg-purple-600','bg-orange-500',
   'bg-pink-600','bg-teal-600','bg-indigo-600','bg-rose-600',
 ];
 
@@ -101,7 +101,7 @@ function EmptyPedidos({ filtrosActivos, onLimpiarFiltros }) {
         <button
           type="button"
           onClick={onLimpiarFiltros}
-          className="mt-3 rounded-lg border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50"
+          className="mt-3 rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50"
         >
           Limpiar filtros
         </button>
@@ -316,7 +316,7 @@ function BotonExportar({ pedidos, semana, empresas, compact = false, initialEmpr
               <select
                 value={soloEmpresa}
                 onChange={e => setSoloEmpresa(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-green-500"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-brand-500"
               >
                 <option value="">Todas las empresas</option>
                 {empresas.map(e => <option key={e} value={e}>{e}</option>)}
@@ -328,7 +328,7 @@ function BotonExportar({ pedidos, semana, empresas, compact = false, initialEmpr
               <select
                 value={soloDia}
                 onChange={e => setSoloDia(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-green-500"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-brand-500"
               >
                 <option value="">Todos los días</option>
                 {diasConPedidos.map(d => <option key={d} value={d}>{DIAS_FULL[d]}</option>)}
@@ -337,7 +337,7 @@ function BotonExportar({ pedidos, semana, empresas, compact = false, initialEmpr
 
             <button
               onClick={handleExportar}
-              className="w-full bg-green-700 text-white rounded-lg py-1.5 text-sm font-semibold hover:bg-green-800 transition-colors"
+              className="w-full bg-brand-700 text-white rounded-lg py-1.5 text-sm font-semibold hover:bg-brand-800 transition-colors"
             >
               📥 Descargar Excel
             </button>
@@ -595,24 +595,24 @@ function EstadoItemBadge({ item, onCambiar, loading }) {
 function BulkActionBar({ count, onClear, onCambiarEstado, loading }) {
   const [estadoSel, setEstadoSel] = useState('en_proceso');
   return (
-    <div className="flex items-center gap-3 bg-green-700 text-white px-4 py-2.5 rounded-xl mb-4 print:hidden">
+    <div className="flex items-center gap-3 bg-brand-700 text-white px-4 py-2.5 rounded-xl mb-4 print:hidden">
       <span className="text-sm font-semibold">{count} seleccionado{count !== 1 ? 's' : ''}</span>
       <div className="flex items-center gap-2 ml-auto">
         <select
           value={estadoSel}
           onChange={e => setEstadoSel(e.target.value)}
-          className="text-sm bg-white text-gray-800 rounded-lg px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-green-500"
+          className="text-sm bg-white text-gray-800 rounded-lg px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
           {ESTADOS_PEDIDO.map(e => <option key={e.key} value={e.key}>{e.icon} {e.label}</option>)}
         </select>
         <button
           onClick={() => onCambiarEstado(estadoSel)}
           disabled={loading}
-          className="bg-white text-green-700 font-semibold text-sm px-3 py-1 rounded-lg hover:bg-green-50 disabled:opacity-60"
+          className="bg-white text-brand-700 font-semibold text-sm px-3 py-1 rounded-lg hover:bg-brand-50 disabled:opacity-60"
         >
           {loading ? 'Aplicando...' : 'Aplicar'}
         </button>
-        <button onClick={onClear} className="text-green-200 hover:text-white text-sm ml-1">✕ Limpiar</button>
+        <button onClick={onClear} className="text-brand-200 hover:text-white text-sm ml-1">✕ Limpiar</button>
       </div>
     </div>
   );
@@ -669,7 +669,7 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, onCambiarEstadoItem, 
   const tieneEventos = (pedido.eventos ?? []).length > 0;
 
   return (
-    <div className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-colors ${isSelected ? 'border-green-400' : 'border-gray-100'}`}>
+    <div className={`bg-white rounded-xl border overflow-hidden shadow-sm transition-colors ${isSelected ? 'border-brand-400' : 'border-gray-100'}`}>
       {/* Fila principal — siempre visible */}
       <div className="flex items-center px-4 py-3">
         <div className="mr-3 print:hidden" onClick={e => e.stopPropagation()}>
@@ -677,7 +677,7 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, onCambiarEstadoItem, 
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleSelect(pedido.id)}
-            className="w-4 h-4 accent-green-700 cursor-pointer"
+            className="w-4 h-4 accent-brand-700 cursor-pointer"
           />
         </div>
 
@@ -716,7 +716,7 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, onCambiarEstadoItem, 
             const item = itemsPorDia[dia];
             return (
               <div key={dia} className="flex items-center gap-3 px-4 py-2">
-                <span className="text-[11px] font-bold text-green-700 w-8 shrink-0">{DIAS_LABEL[dia]}</span>
+                <span className="text-[11px] font-bold text-brand-700 w-8 shrink-0">{DIAS_LABEL[dia]}</span>
                 <p className="text-xs text-gray-800 flex-1 truncate">{item.plato_nombre}</p>
                 <div className="flex gap-2 shrink-0">
                   {item.opcion && <span className="text-[11px] text-gray-500">Op.{item.opcion}</span>}
@@ -740,7 +740,7 @@ function PedidoCard({ pedido, diasSemana, onCambiarEstado, onCambiarEstadoItem, 
           <div className="space-y-2">
             {pedido.eventos.slice().reverse().map((evento) => (
               <div key={evento.id} className="flex gap-2 text-xs">
-                <span className="mt-1 w-2 h-2 rounded-full bg-green-600 shrink-0" />
+                <span className="mt-1 w-2 h-2 rounded-full bg-brand-600 shrink-0" />
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-700">{descripcionEvento(evento)}</p>
                   <p className="text-slate-500">{[evento.actor_nombre, fmtEvento(evento.created_at)].filter(Boolean).join(' · ')}</p>
@@ -849,14 +849,14 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
             <button
               key={d}
               onClick={() => { setDiaActivo(d); setFiltroPlatoTxt(''); }}
-              className={`flex flex-col items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${activo ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-200 hover:border-green-300'}`}
+              className={`flex flex-col items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${activo ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'}`}
             >
               <span className="font-bold flex items-center gap-1">
                 {DIAS_FULL[d]}
-                {d === diaHoy && <span className={`text-[9px] font-bold px-1 py-px rounded ${activo ? 'bg-white text-green-700' : 'bg-green-600 text-white'}`}>Hoy</span>}
+                {d === diaHoy && <span className={`text-[9px] font-bold px-1 py-px rounded ${activo ? 'bg-white text-brand-700' : 'bg-brand-600 text-white'}`}>Hoy</span>}
               </span>
-              <span className={`text-[10px] ${activo ? 'text-green-200' : 'text-gray-500'}`}>{fmt(fechaDia(d))}</span>
-              <span className={`mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activo ? 'bg-white text-green-700' : 'bg-green-100 text-green-700'}`}>{count}</span>
+              <span className={`text-[10px] ${activo ? 'text-brand-200' : 'text-gray-500'}`}>{fmt(fechaDia(d))}</span>
+              <span className={`mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activo ? 'bg-white text-brand-700' : 'bg-brand-100 text-brand-700'}`}>{count}</span>
               {porPreparar > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activo ? 'bg-amber-300 text-amber-900' : 'bg-amber-100 text-amber-700'}`}>{porPreparar} por hacer</span>
               )}
@@ -876,7 +876,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
           <div className="flex items-center gap-3 mb-3 text-[11px] text-gray-500">
             {estados.has('pendiente')  && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Por preparar</span>}
             {estados.has('preparado') && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Preparada</span>}
-            {estados.has('entregado') && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600 inline-block" />Entregada</span>}
+            {estados.has('entregado') && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-brand-600 inline-block" />Entregada</span>}
           </div>
         );
       })()}
@@ -904,7 +904,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
                   placeholder="Buscar plato..."
                   value={filtroPlatoTxt}
                   onChange={e => setFiltroPlatoTxt(e.target.value)}
-                  className="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-green-400"
+                  className="w-full pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-400"
                 />
               </div>
             )}
@@ -976,9 +976,9 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
               <p className="text-xl font-bold text-blue-700">{preparadas}</p>
               <p className="text-[11px] text-blue-600 mt-0.5">Preparadas</p>
             </div>
-            <div className="bg-green-50 p-3 text-center">
-              <p className="text-xl font-bold text-green-700">{entregadas}</p>
-              <p className="text-[11px] text-green-600 mt-0.5">Entregadas</p>
+            <div className="bg-brand-50 p-3 text-center">
+              <p className="text-xl font-bold text-brand-700">{entregadas}</p>
+              <p className="text-[11px] text-brand-600 mt-0.5">Entregadas</p>
             </div>
           </div>
         );
@@ -998,13 +998,13 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
             const cargandoGrupo = bulkGrupo === grupoKey;
             const estaExpandido = expandGrupo === grupoKey;
             return (
-              <div key={i} className={`bg-white rounded-xl border shadow-sm ${todoEntregado ? 'border-green-200' : 'border-gray-100'}`}>
+              <div key={i} className={`bg-white rounded-xl border shadow-sm ${todoEntregado ? 'border-brand-200' : 'border-gray-100'}`}>
                 <div className="flex items-center gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-gray-900 text-sm">{grupo.plato_nombre}</p>
                       {todoEntregado
-                        ? <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ Entregadas</span>
+                        ? <span className="text-[11px] font-bold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">✓ Entregadas</span>
                         : grupo.preparadas > 0 && grupo.pendienteIds.length === 0
                           ? <span className="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🍽️ {grupo.preparadas} listo{grupo.preparadas !== 1 ? 's' : ''}</span>
                           : <span className="text-[11px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{grupo.pendienteIds.length} por preparar</span>
@@ -1017,13 +1017,13 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
                       {grupo.opcion && <span className="text-xs text-gray-500">Opción {grupo.opcion}</span>}
                       {grupo.guarnicion_nombre && <span className="text-xs text-emerald-600">+ {grupo.guarnicion_nombre}</span>}
                     </div>
-                    <p className="mt-1 text-xs font-medium text-green-700">
+                    <p className="mt-1 text-xs font-medium text-brand-700">
                       {grupo.cantidad} vianda{grupo.cantidad !== 1 ? 's' : ''} · {resumenTamanos(grupo.tamanos)}
                     </p>
                     <p className="mt-0.5 text-[11px] text-gray-500">{resumenExtras(grupo)}</p>
                   </div>
                   <div className="flex flex-col items-center gap-2 shrink-0">
-                    <div className={`text-xl font-bold w-11 h-11 rounded-xl flex items-center justify-center ${todoEntregado ? 'bg-green-100 text-green-700' : 'bg-green-700 text-white'}`}>
+                    <div className={`text-xl font-bold w-11 h-11 rounded-xl flex items-center justify-center ${todoEntregado ? 'bg-brand-100 text-brand-700' : 'bg-brand-700 text-white'}`}>
                       {grupo.cantidad}
                     </div>
                     {grupo.pendienteIds.length > 0 && (
@@ -1065,7 +1065,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
                     {grupo.personas.map((p, pi) => {
                       const siguienteEstado = p.estado === 'pendiente' ? 'preparado' : p.estado === 'preparado' ? 'entregado' : null;
                       const accionLabel = p.estado === 'pendiente' ? '🍽️ Preparar' : p.estado === 'preparado' ? '✓ Entregar' : null;
-                      const estadoCls = p.estado === 'entregado' ? 'text-green-600' : p.estado === 'preparado' ? 'text-blue-600' : 'text-amber-600';
+                      const estadoCls = p.estado === 'entregado' ? 'text-brand-600' : p.estado === 'preparado' ? 'text-blue-600' : 'text-amber-600';
                       const cargandoItem = loadingItemId === p.itemId;
                       return (
                         <div key={pi} className="flex items-center justify-between gap-2 py-1">
@@ -1113,7 +1113,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100 min-h-[48px]">
                 <p className="font-semibold text-gray-800 text-sm">{empresa}</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{personas.length}</span>
+                  <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{personas.length}</span>
                   {pendienteIds.length > 0 && (
                     <button
                       onClick={() => onEntregarVarios(pendienteIds, 'preparado')}
@@ -1144,7 +1144,7 @@ function VistaDia({ pedidos, semana, diaActivo, setDiaActivo, filtrosActivos, on
                           <span className="font-medium text-gray-700">{item.plato_nombre}</span>
                           {item.opcion && <span className="text-gray-500"> · Op. {item.opcion}</span>}
                           {item.guarnicion_nombre && <span className="text-emerald-600"> + {item.guarnicion_nombre}</span>}
-                          <span className="text-green-700"> · {item.plan_nombre}</span>
+                          <span className="text-brand-700"> · {item.plan_nombre}</span>
                           <span className="ml-2 inline-flex">
                             <EstadoItemBadge
                               item={item}
@@ -1178,7 +1178,7 @@ function GrupoEmpresa({ empresa, grupo, diasSemana, onCambiarEstado, onCambiarEs
       >
         <p className="font-semibold text-gray-800 text-sm">{empresa}</p>
         <div className="flex items-center gap-2.5">
-          <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{grupo.length}</span>
+          <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{grupo.length}</span>
           <span className="text-gray-500 text-sm">{abierto ? '▲' : '▼'}</span>
         </div>
       </button>
@@ -1375,12 +1375,12 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
     <div className="px-4 pt-0 pb-4 md:p-6 max-w-7xl mx-auto">
 
       {/* ── Header mobile (sticky) ── */}
-      <div className="md:hidden sticky top-0 z-20 bg-green-700 text-white px-4 py-3 -mx-4 -mt-0 mb-4 print:hidden flex flex-wrap items-center gap-2">
+      <div className="md:hidden sticky top-0 z-20 bg-brand-700 text-white px-4 py-3 -mx-4 -mt-0 mb-4 print:hidden flex flex-wrap items-center gap-2">
         <h1 className="text-base font-bold flex-1">{titulo}</h1>
         <button onClick={() => cambiarSemana(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 text-white text-lg leading-none">‹</button>
         <div className="text-center">
           <p className="text-xs font-semibold leading-tight">{fmt(semana)} — {fmt(domingoSemana)}</p>
-          <p className="text-[10px] text-green-200">{fmtFull(semana).split('/')[2]}</p>
+          <p className="text-[10px] text-brand-200">{fmtFull(semana).split('/')[2]}</p>
         </div>
         <button onClick={() => cambiarSemana(1)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/20 text-white text-lg leading-none">›</button>
         {esSeguimiento && (
@@ -1392,7 +1392,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
           <button
             type="button"
             onClick={volverSemanaActual}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${esEstaSemana ? 'bg-white/15 text-green-100' : 'bg-white text-green-800'}`}
+            className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${esEstaSemana ? 'bg-white/15 text-brand-100' : 'bg-white text-brand-800'}`}
           >
             Semana actual
           </button>
@@ -1412,7 +1412,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
           <button
             type="button"
             onClick={volverSemanaActual}
-            className={`ml-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${esEstaSemana ? 'border-green-100 bg-green-50 text-green-700' : 'border-green-200 text-green-700 hover:bg-green-50'}`}
+            className={`ml-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${esEstaSemana ? 'border-brand-100 bg-brand-50 text-brand-700' : 'border-brand-200 text-brand-700 hover:bg-brand-50'}`}
           >
             Semana actual
           </button>
@@ -1432,7 +1432,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
             <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Pedidos</p>
           </div>
           <div className="bg-white p-3 text-center">
-            <p className="text-xl font-bold text-green-700">{stats.viandas}</p>
+            <p className="text-xl font-bold text-brand-700">{stats.viandas}</p>
             <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Viandas</p>
           </div>
           <div className="bg-white p-3 text-center">
@@ -1464,7 +1464,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
               placeholder="Buscar empleado o empresa..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400"
+              className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-400"
             />
           </div>
         )}
@@ -1472,7 +1472,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
         {esSeguimiento && (
         <div className="grid gap-2 grid-cols-2">
           <select
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 bg-white"
+            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 bg-white"
             value={empresaFiltro}
             onChange={e => { setEmpresaFiltro(e.target.value); setSelected(new Set()); }}
           >
@@ -1480,7 +1480,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
             {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
           <select
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 bg-white"
+            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 bg-white"
             value={estadoFiltro}
             onChange={e => setEstadoFiltro(e.target.value)}
           >
@@ -1501,7 +1501,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
       {filtrosActivos && (
         <p className="text-xs text-gray-500 mb-3 print:hidden">
           Mostrando {pedidos.length} de {pedidosRaw.length} pedidos
-          <button onClick={limpiarFiltros} className="ml-2 text-green-700 underline">Limpiar filtros</button>
+          <button onClick={limpiarFiltros} className="ml-2 text-brand-700 underline">Limpiar filtros</button>
         </p>
       )}
 
@@ -1520,7 +1520,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-gray-500">
-          <div className="animate-spin w-8 h-8 border-2 border-green-700 border-t-transparent rounded-full" />
+          <div className="animate-spin w-8 h-8 border-2 border-brand-700 border-t-transparent rounded-full" />
           <p>Cargando pedidos...</p>
         </div>
       )}
@@ -1540,7 +1540,7 @@ export default function PedidosAdmin({ vistaFija = null, titulo = 'Seguimiento d
         return (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs text-gray-500 pb-1 print:hidden">
-              <input type="checkbox" checked={selected.size === pedidos.length && pedidos.length > 0} onChange={toggleSelectAll} className="w-4 h-4 accent-green-700 cursor-pointer" />
+              <input type="checkbox" checked={selected.size === pedidos.length && pedidos.length > 0} onChange={toggleSelectAll} className="w-4 h-4 accent-brand-700 cursor-pointer" />
               <span>{selected.size === pedidos.length ? 'Deseleccionar todos' : 'Seleccionar todos'}</span>
             </div>
             {grupos.map(([empresa, grupo]) => (

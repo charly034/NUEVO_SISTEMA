@@ -424,7 +424,7 @@ function PagoForm({ tipo, sujetoId, nombre, periodo, grupal = false, onClose, on
         </label>
         <div className="flex justify-end gap-2 md:col-span-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm">Cancelar</button>
-          <button type="submit" disabled={registrarPago.isPending} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={registrarPago.isPending} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {registrarPago.isPending ? 'Guardando...' : 'Registrar'}
           </button>
         </div>
@@ -482,7 +482,7 @@ function AsociarForm({ pedidos, pagos, onClose, onSaved }) {
         </label>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm">Cancelar</button>
-          <button type="submit" disabled={aplicarPago.isPending} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={aplicarPago.isPending} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {aplicarPago.isPending ? 'Aplicando...' : 'Asociar'}
           </button>
         </div>
@@ -556,7 +556,7 @@ function ComprobanteForm({ pago, onClose, onSaved }) {
         </label>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm">Cancelar</button>
-          <button type="submit" disabled={actualizarPago.isPending} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={actualizarPago.isPending} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {actualizarPago.isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -640,7 +640,7 @@ function ResumenViandasModal({ nombre, periodo, pedidos, metrics, onClose }) {
                 type="button"
                 onClick={() => exportarResumenViandas({ nombre, periodo, rows })}
                 disabled={!rows.length}
-                className="rounded-lg bg-green-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 Exportar Excel
               </button>
@@ -672,7 +672,7 @@ function ResumenViandasModal({ nombre, periodo, pedidos, metrics, onClose }) {
                   const abierto = abiertos.has(row.key);
                   return (
                     <Fragment key={row.key}>
-                      <tr className="bg-white hover:bg-green-50">
+                      <tr className="bg-white hover:bg-brand-50">
                         <td className="border border-gray-900 px-2 py-1.5 tabular-nums">{formatDate(row.fecha)}</td>
                         <td className="border border-gray-900 px-2 py-1.5 font-medium">{DIAS_NOMBRE[row.dia] || row.dia}</td>
                         <td className="border border-gray-900 px-2 py-1.5 text-right font-semibold tabular-nums">
@@ -886,8 +886,8 @@ export default function CuentaCorrienteFicha({ tipo, id, nombre, onClose }) {
             <p className="text-sm text-gray-500">Periodo: {periodo.desde ? formatDate(periodo.desde) : 'inicio'} a {periodo.hasta ? formatDate(periodo.hasta) : 'hoy'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setModal('pago')} className="rounded-lg bg-green-700 px-3 py-2 text-sm font-semibold text-white">Registrar pago</button>
-            {tipo === 'empresa' && <button type="button" onClick={() => setModal('pago-grupal')} className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">Pago grupal</button>}
+            <button type="button" onClick={() => setModal('pago')} className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white">Registrar pago</button>
+            {tipo === 'empresa' && <button type="button" onClick={() => setModal('pago-grupal')} className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">Pago grupal</button>}
             <button type="button" onClick={() => setModal('resumen-viandas')} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Resumen viandas</button>
             <button type="button" onClick={exportarExcel} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">Excel</button>
             <button type="button" onClick={exportarCsv} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">CSV</button>
@@ -916,7 +916,7 @@ export default function CuentaCorrienteFicha({ tipo, id, nombre, onClose }) {
               key={item}
               type="button"
               onClick={() => setTab(item)}
-              className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${tab === item ? 'bg-green-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${tab === item ? 'bg-brand-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
             >
               {item}
             </button>
@@ -1002,12 +1002,12 @@ export default function CuentaCorrienteFicha({ tipo, id, nombre, onClose }) {
                   { key: 'monto_aplicado', label: 'Aplicado', align: 'right', render: p => formatMoney(p.monto_aplicado) },
                   { key: 'saldo', label: 'Saldo pago', align: 'right', render: p => formatMoney(Math.max(toNumber(p.monto) - toNumber(p.monto_aplicado), 0)) },
                   { key: 'pedidos', label: 'Pedidos cubiertos', render: p => p.aplicaciones?.length ? (
-                    <button type="button" onClick={() => setModal({ tipo: 'aplicaciones', pago: p })} className="text-green-700 underline">
+                    <button type="button" onClick={() => setModal({ tipo: 'aplicaciones', pago: p })} className="text-brand-700 underline">
                       {p.aplicaciones.length} aplic.
                     </button>
                   ) : 'Sin aplicaciones' },
                   { key: 'comprobante', label: 'Comprobante', render: p => (
-                    <button type="button" onClick={() => setModal({ tipo: 'comprobante', pago: p })} className="text-green-700 underline">
+                    <button type="button" onClick={() => setModal({ tipo: 'comprobante', pago: p })} className="text-brand-700 underline">
                       {p.comprobante_url ? 'Ver/editar' : 'Adjuntar'}
                     </button>
                   ) },
@@ -1039,8 +1039,8 @@ export default function CuentaCorrienteFicha({ tipo, id, nombre, onClose }) {
                 { key: 'id', label: 'Pago', render: p => `#${p.id}` },
                 { key: 'fecha_pago', label: 'Fecha', render: p => formatDate(p.fecha_pago) },
                 { key: 'monto', label: 'Monto', align: 'right', render: p => formatMoney(p.monto) },
-                { key: 'comprobante_url', label: 'Comprobante', render: p => p.comprobante_url ? <a href={p.comprobante_url} target="_blank" rel="noreferrer" className="text-green-700 underline">Abrir</a> : '-' },
-                { key: 'accion', label: 'Accion', render: p => <button type="button" onClick={() => setModal({ tipo: 'comprobante', pago: p })} className="text-green-700 underline">Editar</button> },
+                { key: 'comprobante_url', label: 'Comprobante', render: p => p.comprobante_url ? <a href={p.comprobante_url} target="_blank" rel="noreferrer" className="text-brand-700 underline">Abrir</a> : '-' },
+                { key: 'accion', label: 'Accion', render: p => <button type="button" onClick={() => setModal({ tipo: 'comprobante', pago: p })} className="text-brand-700 underline">Editar</button> },
               ]}
               rows={pagos}
               empty="Sin comprobantes en el periodo."

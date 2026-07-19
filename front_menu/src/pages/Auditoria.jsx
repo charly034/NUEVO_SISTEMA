@@ -88,7 +88,7 @@ export default function Auditoria() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700">{evento.accion}</span>
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-700">{evento.accion}</span>
                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{evento.entidad_tipo} #{evento.entidad_id || '-'}</span>
                   </div>
                   <h2 className="mt-2 font-semibold text-gray-900">{evento.resumen || 'Acción administrativa'}</h2>

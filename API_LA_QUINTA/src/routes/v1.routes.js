@@ -24,6 +24,7 @@ import gruposRotativosRoutes from '../modules/grupos-rotativos/grupos-rotativos.
 import semanaOpcionesRoutes from '../modules/semana-opciones/semana-opciones.routes.js';
 import categoriasRoutes from '../modules/categorias/categorias.routes.js';
 import menuItemsRoutes from '../modules/menu-items/menu-items.routes.js';
+import configuracionRoutes from '../modules/configuracion/configuracion.routes.js';
 
 const router = Router();
 
@@ -52,5 +53,6 @@ router.use('/grupos-rotativos', gruposRotativosRoutes);
 router.use('/semana-opciones', semanaOpcionesRoutes);
 router.use('/categorias', categoriasRoutes);
 router.use('/menu-items', menuItemsRoutes);
+router.use('/configuracion', configuracionRoutes);
 
 export default router;

@@ -135,7 +135,7 @@ export default function RecomendacionesMenu() {
             <select
               value={semana}
               onChange={event => setSemana(event.target.value)}
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600"
             >
               {semanas.map(item => (
                 <option key={item.inicio} value={item.inicio}>{item.label}</option>
@@ -147,7 +147,7 @@ export default function RecomendacionesMenu() {
             <select
               value={empresaId}
               onChange={event => setEmpresaId(event.target.value)}
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600"
             >
               <option value="">Todas las empresas</option>
               {empresas.map(empresa => (
@@ -168,7 +168,7 @@ export default function RecomendacionesMenu() {
             type="button"
             onClick={handleGuardarOpciones}
             disabled={guardarOpciones.isPending}
-            className="self-start px-3 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+            className="self-start px-3 py-2 bg-brand-700 text-white rounded-lg text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {guardarOpciones.isPending ? 'Guardando...' : 'Guardar opciones'}
           </button>
@@ -179,7 +179,7 @@ export default function RecomendacionesMenu() {
             value={busquedaPlato}
             onChange={event => setBusquedaPlato(event.target.value)}
             placeholder="Buscar plato del catalogo..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600"
           />
         </div>
 
@@ -196,7 +196,7 @@ export default function RecomendacionesMenu() {
                   key={plato.id}
                   type="button"
                   onClick={() => togglePlato(plato.id)}
-                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${activo ? 'border-green-700 bg-green-700 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-green-300'}`}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${activo ? 'border-brand-700 bg-brand-700 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-brand-300'}`}
                 >
                   {plato.nombre}
                 </button>
@@ -248,7 +248,7 @@ export default function RecomendacionesMenu() {
               {sugerencia.ideas?.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {sugerencia.ideas.map((idea, index) => (
-                    <span key={`${sugerencia.id}-${index}`} className="px-2.5 py-1 bg-green-50 text-green-800 border border-green-100 rounded-lg text-sm">
+                    <span key={`${sugerencia.id}-${index}`} className="px-2.5 py-1 bg-brand-50 text-brand-800 border border-brand-100 rounded-lg text-sm">
                       {idea}
                     </span>
                   ))}

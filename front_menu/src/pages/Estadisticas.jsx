@@ -10,7 +10,7 @@ const MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'
 const TAG_COLORS = {
   Pollo: 'bg-amber-100 text-amber-800', Carnes: 'bg-red-100 text-red-800',
   Cerdo: 'bg-orange-100 text-orange-800', Pescado: 'bg-blue-100 text-blue-800',
-  Vegetariano: 'bg-green-100 text-green-800', Pasta: 'bg-yellow-100 text-yellow-800',
+  Vegetariano: 'bg-brand-100 text-brand-800', Pasta: 'bg-yellow-100 text-yellow-800',
   Arroz: 'bg-lime-100 text-lime-800', Guisos: 'bg-stone-100 text-stone-700',
   Ensaladas: 'bg-emerald-100 text-emerald-800', Wok: 'bg-cyan-100 text-cyan-800',
   Tartas: 'bg-violet-100 text-violet-800', Milanesas: 'bg-rose-100 text-rose-800',

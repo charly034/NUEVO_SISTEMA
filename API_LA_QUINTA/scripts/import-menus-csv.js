@@ -321,8 +321,8 @@ async function main() {
           const platoId = await obtenerOCrearPlato(nombreA);
           const viandaId = await obtenerOCrearViandaGeneral(platoId);
           await client.query(
-            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, vianda_id)
-             VALUES ($1, $2, 'A', $3, $4)
+            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, vianda_id, categoria_id)
+             VALUES ($1, $2, 'A', $3, $4, (SELECT id FROM categorias WHERE slug = 'especiales'))
              ON CONFLICT DO NOTHING`,
             [menuId, dia, platoId, viandaId]
           );
@@ -334,8 +334,8 @@ async function main() {
           const platoId = await obtenerOCrearPlato(nombreC);
           const viandaId = await obtenerOCrearViandaGeneral(platoId);
           await client.query(
-            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, vianda_id)
-             VALUES ($1, $2, 'C', $3, $4)
+            `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, vianda_id, categoria_id)
+             VALUES ($1, $2, 'C', $3, $4, (SELECT id FROM categorias WHERE slug = 'especiales'))
              ON CONFLICT DO NOTHING`,
             [menuId, dia, platoId, viandaId]
           );

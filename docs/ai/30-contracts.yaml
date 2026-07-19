@@ -537,7 +537,7 @@ payload_formats:
       query: "{ page?: integer, limit?: integer<=200, entidad_tipo?: string, accion?: string, admin_id?: integer }"
       storage: "admin_auditoria"
       response_data: "{ eventos: array, pagination: object }"
-      note: "Registra acciones admin nivel 2 para menus, pedidos y empleados; el logger no rompe operaciones si la tabla aun no fue migrada."
+      note: "Registra acciones admin nivel 2; el logger no rompe operaciones si la tabla aun no fue migrada. 2026-07-17: cobertura ampliada a entidad_tipo empresa, plato, guarnicion, salsa y usuario_admin (crear/actualizar/eliminar), ademas de menu_semanal, pedido, empleado y finanzas ya existentes. Guardrail: usuario_admin nunca guarda password_hash (solo id/nombre/apellido/email/rol/activo + metadata.cambio_password). Las ediciones de grilla de menu_semanal (agregar_plato/quitar_plato/actualizar_empresas_slot) guardan metadata.estado_menu para trazar ediciones sobre semanas publicadas."
     finanzas:
       endpoints:
         - "GET /api/v1/finanzas/mi-historial"

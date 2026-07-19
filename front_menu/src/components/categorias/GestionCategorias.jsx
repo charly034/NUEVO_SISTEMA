@@ -23,7 +23,7 @@ const CRITERIOS = [
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500';
+const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 // ── Buscar y agregar un plato a un grupo ────────────────────────────────
 function AgregarPlatoAGrupo({ categoriaId, grupoId }) {
@@ -145,7 +145,7 @@ function GrupoRow({ categoriaId, grupo }) {
             <div className="flex flex-wrap gap-1">
               {MESES.map((m, i) => (
                 <button key={m} type="button" onClick={() => toggleMes(i + 1)}
-                  className={`px-2 py-1 text-xs rounded border transition-colors ${meses.includes(i + 1) ? 'bg-green-100 border-green-300 text-green-800' : 'bg-white border-gray-200 text-gray-500'}`}>
+                  className={`px-2 py-1 text-xs rounded border transition-colors ${meses.includes(i + 1) ? 'bg-brand-100 border-brand-300 text-brand-800' : 'bg-white border-gray-200 text-gray-500'}`}>
                   {m}
                 </button>
               ))}
@@ -156,7 +156,7 @@ function GrupoRow({ categoriaId, grupo }) {
 
       {criterio !== grupo.criterio || criterio === 'cada_n' || criterio === 'rango_fechas' || criterio === 'semana_mes' || criterio === 'ciclo' ? (
         <button type="button" onClick={guardar} disabled={actualizar.isPending || invalido}
-          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors">
+          className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
           Guardar rotación
         </button>
       ) : null}
@@ -229,7 +229,7 @@ function GruposEditor({ categoriaId, menuId }) {
       <div className="flex gap-2">
         <input type="text" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onCrear()} placeholder="Nombre del grupo nuevo" className={inputCls} />
         <button type="button" onClick={onCrear} disabled={crearGrupo.isPending || !nombreNuevo.trim()}
-          className="rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors shrink-0">
+          className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors shrink-0">
           + Grupo
         </button>
       </div>
@@ -346,7 +346,7 @@ function CategoriaForm({ categoria, menuId, onGuardado, onVolver }) {
       )}
 
       <button type="button" onClick={guardar} disabled={pending}
-        className="w-full rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
+        className="w-full rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5">
         {pending && <Spinner size="sm" />}
         {editando ? 'Guardar cambios' : 'Crear categoría'}
       </button>
@@ -441,7 +441,7 @@ export default function GestionCategorias({ open, onClose, menuId, categoriaInic
         ) : (
           <div className="space-y-3">
             <button type="button" onClick={() => setVista({ modo: 'form' })}
-              className="w-full rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors">
+              className="w-full rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 transition-colors">
               + Nueva categoría
             </button>
             <p className="text-xs text-gray-400">Arrastrá para reordenar. Tocá una categoría para configurarla.</p>

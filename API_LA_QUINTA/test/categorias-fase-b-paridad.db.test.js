@@ -58,9 +58,20 @@ test('paridad fijos: leer de menu_semanal_dias == leer del catalogo, en los 25 m
 
     // Sanity: el conjunto de fijos no debe ser vacio (si lo fuera, la
     // materializacion no habria insertado nada y la "paridad" seria trivial).
+    // El umbral se DERIVA del path viejo (catalogo) del mismo menu, no de un
+    // numero fijo: la cantidad real de fijos por semana depende de cuantos
+    // fijos se anclaron como vianda en el seed (hoy ~14/semana con el CSV
+    // historico), asi que hardcodear >=20 hacia fallar el test en un reseed
+    // limpio sin que la materializacion tuviera ningun bug.
     const primerMenu = menus[0].id;
     const nuevoPrimero = (await cargarPlatosFijosDesdeMenu(client, null, primerMenu)).rows;
-    assert.ok(nuevoPrimero.length >= 20, `el primer menu debe materializar >=20 fijos, dio ${nuevoPrimero.length}`);
+    const viejoPrimero = (await cargarPlatosFijos(client, null, primerMenu)).rows;
+    assert.ok(viejoPrimero.length > 0, `el primer menu debe tener fijos en el catalogo, dio ${viejoPrimero.length}`);
+    assert.equal(
+      nuevoPrimero.length,
+      viejoPrimero.length,
+      `el primer menu debe materializar exactamente los fijos del catalogo (${viejoPrimero.length}), dio ${nuevoPrimero.length}`,
+    );
 
     assert.ok(comparaciones >= menus.length, 'se compararon todos los menus');
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, createContext, useContext } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -25,6 +25,8 @@ import {
 import Spinner from '../components/ui/Spinner.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import SideDrawer from '../components/ui/SideDrawer.jsx';
+import { useColoresCeldas, useUpdateColoresCeldas, COLORES_DEFAULT } from '../hooks/useConfigColores.js';
+import { useActualizarCategoria } from '../hooks/useCategorias.js';
 import GestionCategorias from '../components/categorias/GestionCategorias.jsx';
 import { pedirTexto, confirmarAccion, confirmar } from '../lib/confirm.js';
 import { toast } from '../lib/toast.js';
@@ -39,7 +41,7 @@ const SALSA_MODOS = [
 
 const ESTADO_CFG = {
   borrador:  { label: 'Borrador',  chipCls: 'bg-gray-100 text-gray-600 border-gray-200' },
-  publicado: { label: 'Publicado', chipCls: 'bg-green-100 text-green-700 border-green-200' },
+  publicado: { label: 'Publicado', chipCls: 'bg-brand-100 text-brand-700 border-brand-200' },
   cerrado:   { label: 'Cerrado',   chipCls: 'bg-orange-100 text-orange-700 border-orange-200' },
 };
 
@@ -59,6 +61,24 @@ function nombreSugerido(lunesIso) {
 
 // ── Modales de acciones (movidos desde Semanas.jsx: ahora que el click en
 // una semana navega directo acá, este es el único lugar donde tienen sentido) ──
+// Verdadero cuando la semana que se esta editando ya esta publicada (empleados
+// pueden haber pedido). Los guardados de grilla lo consumen para pedir una
+// confirmacion explicita antes de tocar una semana publicada -- ver
+// debt-menu-semanal-sin-bloqueo-por-estado-publicado. Provisto en el root
+// (MenuResumen) para no threadear el estado por toda la jerarquia de drawers.
+const SemanaPublicadaContext = createContext(false);
+
+// Confirmacion reutilizable: los handlers de edicion de grilla la llaman al
+// inicio; si la semana esta publicada, exige un OK explicito antes de mutar.
+async function confirmarEdicionPublicada(semanaPublicada) {
+  if (!semanaPublicada) return true;
+  return confirmarAccion({
+    titulo: 'Esta semana ya está publicada',
+    texto: 'Los empleados pueden haber hecho pedidos para esta semana. Editar la grilla puede desincronizar lo que ya pidieron. ¿Guardar los cambios igual?',
+    botonConfirmar: 'Guardar igual',
+  });
+}
+
 function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
   const [fecha, setFecha] = useState('');
   const [hora, setHora]   = useState('10:00');
@@ -71,9 +91,9 @@ function ModalPublicarForm({ menu, onConfirm, onCancel, loading }) {
         </label>
         <div className="flex gap-2">
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
           <input type="time" value={hora} onChange={e => setHora(e.target.value)}
-            className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+            className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         <p className="text-xs text-gray-500 mt-1.5">Sin fecha: los pedidos quedan abiertos hasta cerrarlos manualmente.</p>
       </div>
@@ -193,12 +213,12 @@ function BarraAcciones({ id, menu, totalPedidos }) {
 
       <div className="flex flex-wrap gap-2">
         {estado === 'borrador' && (
-          <button onClick={() => setModalPublicar(true)} disabled={estadoPending} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
+          <button onClick={() => setModalPublicar(true)} disabled={estadoPending} className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50">
             Publicar
           </button>
         )}
         {estado === 'cerrado' && (
-          <button onClick={() => setConfirmReabrir(true)} disabled={estadoPending} className="rounded-lg border border-green-200 bg-green-50 px-3.5 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
+          <button onClick={() => setConfirmReabrir(true)} disabled={estadoPending} className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50">
             Reabrir pedidos
           </button>
         )}
@@ -246,9 +266,9 @@ function BarraAcciones({ id, menu, totalPedidos }) {
             <div className="mt-3 space-y-2">
               <div className="flex gap-2">
                 <input type="date" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
                 <input type="time" value={horaLimite} onChange={e => setHoraLimite(e.target.value)}
-                  className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div className="flex gap-2">
                 <button type="button" disabled={estadoPending}
@@ -350,42 +370,122 @@ function ToggleSinServicio({ dia, marcar, quitar }) {
   );
 }
 
-// ── Código de color de celda: combina vianda_activa + disponible_por_kilo ──
+// ── Colores de celda (personalizables): las clases .celda-*/.chip-* leen las
+// CSS variables --c-* que setea coloresVars() en el contenedor de la página. ──
+function hexToRgba(hex, alpha) {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex || '');
+  if (!m) return hex;
+  const int = parseInt(m[1], 16);
+  return `rgba(${(int >> 16) & 255},${(int >> 8) & 255},${int & 255},${alpha})`;
+}
+
+function coloresVars(c) {
+  return {
+    '--c-vianda': c.vianda,   '--c-vianda-bg': hexToRgba(c.vianda, 0.16),
+    '--c-porkilo': c.porKilo, '--c-porkilo-bg': hexToRgba(c.porKilo, 0.16),
+    '--c-ambos': c.ambos,     '--c-ambos-bg': hexToRgba(c.ambos, 0.16),
+    '--c-ninguno': c.ninguno, '--c-ninguno-bg': hexToRgba(c.ninguno, 0.16),
+  };
+}
+
 function colorCeldaCls(item) {
   const v = item.vianda_activa;
   const k = item.disponible_por_kilo;
-  if (v && k) return 'bg-purple-50 hover:bg-purple-100';
-  if (v) return 'bg-emerald-50 hover:bg-emerald-100';
-  if (k) return 'bg-blue-50 hover:bg-blue-100';
-  return 'bg-white hover:bg-gray-50';
+  if (v && k) return 'celda-estado celda-ambos';
+  if (v) return 'celda-estado celda-vianda';
+  if (k) return 'celda-estado celda-porkilo';
+  return 'celda-estado celda-ninguno';
 }
 
-// Mismo código de color pero para chips (borde + texto del mismo tono).
+// Mismo código de color pero para chips (borde + tinte del mismo tono).
 function chipColorCls(item) {
   const v = item.vianda_activa;
   const k = item.disponible_por_kilo;
-  if (v && k) return 'bg-purple-50 border-purple-200 text-purple-800';
-  if (v) return 'bg-emerald-50 border-emerald-200 text-emerald-800';
-  if (k) return 'bg-blue-50 border-blue-200 text-blue-800';
-  return 'bg-white border-gray-200 text-gray-700';
+  if (v && k) return 'chip-estado chip-ambos';
+  if (v) return 'chip-estado chip-vianda';
+  if (k) return 'chip-estado chip-porkilo';
+  return 'chip-estado chip-ninguno';
 }
 
-function Leyenda() {
+// ── Detecta si una fila tiene el MISMO plato (y mismo estado) en TODOS los días
+// de servicio. En ese caso la fila se muestra como una sola celda que atraviesa
+// la semana ("Todos los días"), en vez de repetir el plato en cada columna. ──
+function itemUniformeSemana(itemsPorDia, dias) {
+  if (dias.length < 2) return null;
+  const base = itemsPorDia[0];
+  if (!base || !(base.plato_nombre || base.nombre_vianda)) return null;
+  const idBase = base.plato_id ?? base.plato_nombre ?? base.nombre_vianda;
+  for (let i = 0; i < dias.length; i++) {
+    if (dias[i].sin_servicio) return null;   // un día sin servicio rompe "todos los días"
+    const it = itemsPorDia[i];
+    if (!it) return null;
+    const id = it.plato_id ?? it.plato_nombre ?? it.nombre_vianda;
+    if (id !== idBase) return null;
+    if (!!it.vianda_activa !== !!base.vianda_activa) return null;
+    if (!!it.disponible_por_kilo !== !!base.disponible_por_kilo) return null;
+  }
+  return base;
+}
+
+// ── Celda que atraviesa todos los días (mismo plato toda la semana). ──
+function CeldaTodosLosDias({ item, span, onAbrir }) {
+  return (
+    <td colSpan={span} className="border border-gray-100 p-0 align-top h-14">
+      <button
+        type="button"
+        onClick={() => onAbrir(item)}
+        className={`flex h-full w-full items-center gap-2 p-1.5 text-left transition-colors ${colorCeldaCls(item)}`}
+      >
+        <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gray-500">
+          Todos los días
+        </span>
+        <span className="min-w-0">
+          <p className="truncate text-xs text-gray-800">{item.nombre_vianda || item.plato_nombre}</p>
+          {item.grupo_nombre && <span className="block text-[10px] text-gray-400">{item.grupo_nombre}</span>}
+        </span>
+      </button>
+    </td>
+  );
+}
+
+function Leyenda({ filtro, onFiltrar }) {
   const items = [
-    { cls: 'bg-emerald-50 border-emerald-200', label: 'Vianda' },
-    { cls: 'bg-blue-50 border-blue-200', label: 'Por kilo' },
-    { cls: 'bg-purple-50 border-purple-200', label: 'Ambos' },
-    { cls: 'bg-white border-gray-200', label: 'Ninguno' },
+    { estado: 'vianda', cls: 'celda-estado celda-vianda', label: 'Vianda' },
+    { estado: 'porkilo', cls: 'celda-estado celda-porkilo', label: 'Por kilo' },
+    { estado: 'ambos', cls: 'celda-estado celda-ambos', label: 'Ambos' },
+    { estado: 'ninguno', cls: 'celda-estado celda-ninguno', label: 'Ninguno' },
   ];
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-      <span className="font-semibold text-gray-600">Se ofrece como:</span>
-      {items.map((it) => (
-        <div key={it.label} className="flex items-center gap-1.5">
-          <span className={`inline-block w-3 h-3 rounded border ${it.cls}`} />
-          {it.label}
-        </div>
-      ))}
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
+      <span className="mr-1 font-semibold text-gray-600">Filtrar por:</span>
+      {items.map((it) => {
+        const activo = filtro === it.estado;
+        return (
+          <button
+            key={it.label}
+            type="button"
+            onClick={() => onFiltrar(activo ? null : it.estado)}
+            aria-pressed={activo}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 transition-colors ${
+              activo
+                ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700'
+                : 'border-transparent text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <span className={`inline-block h-3 w-3 rounded border border-gray-200 ${it.cls}`} />
+            {it.label}
+          </button>
+        );
+      })}
+      {filtro && (
+        <button
+          type="button"
+          onClick={() => onFiltrar(null)}
+          className="ml-1 rounded-full px-2 py-0.5 font-medium text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+        >
+          Ver todo ✕
+        </button>
+      )}
     </div>
   );
 }
@@ -425,9 +525,35 @@ function CeldaMenu({ item, onAbrir, onAgregar }) {
   );
 }
 
-function EtiquetaGrupo({ children, rowSpan, colorCls, onAgregarFila, onConfigurar }) {
+// ── Color por categoría (etiqueta de la grilla) ────────────────────────────
+// Contexto para que EtiquetaGrupo lea la config de colores sin threading.
+const ColoresCatContext = createContext(COLORES_DEFAULT);
+
+// Colores por defecto: los históricos por slug conocido, y para el resto una
+// paleta por rotación (hash del slug) para que cada categoría arranque distinta.
+const CAT_PALETTE = ['#2b7330', '#6366f1', '#f97316', '#0ea5e9', '#8b5cf6', '#e11d48', '#0891b2', '#ca8a04'];
+const CAT_DEFAULT_SLUG = {
+  especiales: '#10b981', 'fijos-x-dia': '#d97706', 'fijos-de-siempre': '#6b7280',
+  guarniciones: '#0284c7', salsas: '#7c3aed', 'sin-categorizar': '#e11d48',
+};
+function hashSlug(s) {
+  let h = 0;
+  const str = s || '';
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
+}
+function colorCategoriaDefault(cat) {
+  return CAT_DEFAULT_SLUG[cat.slug] || CAT_PALETTE[hashSlug(cat.slug) % CAT_PALETTE.length];
+}
+function colorCategoria(cat, colores) {
+  return colores?.categorias?.[cat.slug] || colorCategoriaDefault(cat);
+}
+
+function EtiquetaGrupo({ cat, children, rowSpan, onAgregarFila, onConfigurar }) {
+  const colores = useContext(ColoresCatContext);
+  const color = colorCategoria(cat, colores);
   return (
-    <th rowSpan={rowSpan} className={`border border-gray-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-left align-top whitespace-nowrap ${colorCls}`}>
+    <th rowSpan={rowSpan} style={{ '--cat': color }} className="etq border border-gray-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-left align-top whitespace-nowrap">
       <div className="flex flex-col gap-1 py-0.5">
         {onConfigurar ? (
           <button type="button" onClick={onConfigurar} title="Configurar categoría" className="text-left uppercase font-bold hover:underline flex items-center gap-1">
@@ -438,7 +564,7 @@ function EtiquetaGrupo({ children, rowSpan, colorCls, onAgregarFila, onConfigura
           <span>{children}</span>
         )}
         {onAgregarFila && (
-          <button type="button" onClick={onAgregarFila} className="normal-case font-semibold text-emerald-700 hover:underline text-left">
+          <button type="button" onClick={onAgregarFila} className="normal-case font-semibold hover:underline text-left opacity-90">
             + fila
           </button>
         )}
@@ -858,6 +984,7 @@ const nombrePorId = (lista, id) => (id ? (lista.find((x) => x.id === Number(id))
 // se muestra con su procedencia; las excepciones por empresa van inline, con la fila
 // "Las demás → base". Solo para especiales (celdas slot con opción).
 function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesIniciales, onClose }) {
+  const semanaPublicada = useContext(SemanaPublicadaContext);
   const item = celda.item;
   const { data: guarniciones = [] } = useGuarniciones();
   const { data: salsas = [] } = useSalsas();
@@ -964,6 +1091,7 @@ function CeldaComposicionUnificada({ celda, menuId, empresas, excepcionesInicial
   const cancelar = () => onClose?.();
 
   const guardar = async () => {
+    if (!(await confirmarEdicionPublicada(semanaPublicada))) return;
     setGuardando(true);
     // Sin transacción del lado servidor (son endpoints independientes), así que se
     // arman todas las operaciones que cambiaron y se corren CONTINUANDO ante error: una
@@ -1459,6 +1587,7 @@ function DetalleCeldaDrawer({ celda, menuId, onClose }) {
 // nueva, sin resetear el SideDrawer que lo envuelve (que si se remontara
 // perderia la animacion de cierre).
 function BuscarOCrearPlato({ celdaVacia, menuId, onClose }) {
+  const semanaPublicada = useContext(SemanaPublicadaContext);
   const [busqueda, setBusqueda] = useState('');
   const [creando, setCreando] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState('');
@@ -1475,7 +1604,8 @@ function BuscarOCrearPlato({ celdaVacia, menuId, onClose }) {
   // cualquier plato viejo que nunca tuvo una vianda armada, no la tiene
   // todavia. En vez de bloquear al usuario mandandolo a Viandas, se la
   // creamos general (sin guarnicion/salsa) y reintentamos una sola vez.
-  const asignar = (platoId) => {
+  const asignar = async (platoId) => {
+    if (!(await confirmarEdicionPublicada(semanaPublicada))) return;
     agregarPlato.mutate(
       { dia: celdaVacia.dia, opcion: celdaVacia.opcion, plato_id: platoId },
       {
@@ -1526,7 +1656,7 @@ function BuscarOCrearPlato({ celdaVacia, menuId, onClose }) {
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder="Buscar plato..."
         autoFocus
-        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
       />
 
       <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -1557,7 +1687,7 @@ function BuscarOCrearPlato({ celdaVacia, menuId, onClose }) {
               onChange={(e) => setNombreNuevo(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && crearYAsignar()}
               autoFocus
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => { setCreando(false); setNombreNuevo(''); }} className="btn-secondary text-xs">
@@ -1658,7 +1788,7 @@ function BuscarOCrearFijo({ modo, diaInicial, menuId, onClose }) {
           <select
             value={dia}
             onChange={(e) => setDia(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
           >
             {DIAS_ORDEN.map((d) => <option key={d} value={d}>{DIA_NOMBRE[d]}</option>)}
           </select>
@@ -1673,7 +1803,7 @@ function BuscarOCrearFijo({ modo, diaInicial, menuId, onClose }) {
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder="Buscar plato..."
         autoFocus
-        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
       />
 
       <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -1704,7 +1834,7 @@ function BuscarOCrearFijo({ modo, diaInicial, menuId, onClose }) {
               onChange={(e) => setNombreNuevo(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && crearYAsignar()}
               autoFocus
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => { setCreando(false); setNombreNuevo(''); }} className="btn-secondary text-xs">
@@ -1806,7 +1936,7 @@ function BuscarOCrearItemCatalogo({ tipo, menuId, onClose }) {
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder={`Buscar ${esGuarnicion ? 'guarnición' : 'salsa'}...`}
         autoFocus
-        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
       />
 
       <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -1836,7 +1966,7 @@ function BuscarOCrearItemCatalogo({ tipo, menuId, onClose }) {
               onChange={(e) => setNombreNuevo(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && crearYAsignar()}
               autoFocus
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => { setCreando(false); setNombreNuevo(''); }} className="btn-secondary text-xs">
@@ -1925,7 +2055,7 @@ function BuscarOCrearPlatoCategoria({ destino, menuId, onClose }) {
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder="Buscar plato..."
         autoFocus
-        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
       />
 
       <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -1954,7 +2084,7 @@ function BuscarOCrearPlatoCategoria({ destino, menuId, onClose }) {
               onChange={(e) => setNombreNuevo(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && crearYAsignar()}
               autoFocus
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             <div className="flex gap-2">
               <button type="button" onClick={() => { setCreando(false); setNombreNuevo(''); }} className="btn-secondary text-xs">Cancelar</button>
@@ -2019,18 +2149,6 @@ function BotonEliminarFila({ onEliminar, title }) {
 
 // Color de la etiqueta de grupo por categoría (preserva los colores actuales
 // de las de sistema; las custom reciben uno propio).
-function colorEtiqueta(cat) {
-  const map = {
-    especiales: 'bg-emerald-50 text-emerald-700',
-    'fijos-x-dia': 'bg-amber-50 text-amber-700',
-    'fijos-de-siempre': 'bg-gray-100 text-gray-600',
-    guarniciones: 'bg-sky-50 text-sky-700',
-    salsas: 'bg-violet-50 text-violet-700',
-    'sin-categorizar': 'bg-rose-50 text-rose-700',
-  };
-  return map[cat.slug] || 'bg-indigo-50 text-indigo-700';
-}
-
 const tipoDrawer = (cat) => (cat.tipo_item === 'fijo' ? 'fijo' : 'especial');
 
 // ── Bloque MATRIZ (Especiales y custom con opción): filas por letra A/B/C,
@@ -2090,30 +2208,42 @@ function MatrizBloque({ cat, dias, menuId, onAbrirDetalle, onAbrirAgregar, onAbr
 
   return (
     <>
-      {letras.map((letra, i) => (
+      {letras.map((letra, i) => {
+        const itemsPorDia = dias.map((dia) => (dia.sin_servicio ? null : (porOpcionDia.get(`${letra}|${dia.dia}`) ?? null)));
+        const unif = itemUniformeSemana(itemsPorDia, dias);
+        return (
         <tr key={`${cat.slug}-op-${letra}`}>
           {i === 0 && (
-            <EtiquetaGrupo rowSpan={letras.length} colorCls={colorEtiqueta(cat)} onAgregarFila={agregarFila} onConfigurar={() => onConfigurar(cat)}>
+            <EtiquetaGrupo rowSpan={letras.length} cat={cat} onAgregarFila={agregarFila} onConfigurar={() => onConfigurar(cat)}>
               {cat.nombre}
             </EtiquetaGrupo>
           )}
-          {dias.map((dia) => {
-            const item = dia.sin_servicio ? null : (porOpcionDia.get(`${letra}|${dia.dia}`) ?? null);
-            const agregar = esEspeciales
-              ? () => onAbrirAgregar({ dia: dia.dia, diaLabel: DIA_NOMBRE[dia.dia], opcion: letra })
-              : () => onAbrirAgregarCategoria({ categoria_id: cat.id, nombre: cat.nombre, dia: dia.dia, opcion: letra });
-            return (
-              <CeldaMenu
-                key={dia.dia}
-                item={item}
-                onAbrir={(it) => onAbrirDetalle({ item: it, tipo: tipoDrawer(cat), cat, dia: dia.dia, diaLabel: DIA_NOMBRE[dia.dia], opcionLabel: it.opcion })}
-                onAgregar={!item && !dia.sin_servicio ? agregar : null}
-              />
-            );
-          })}
+          {unif ? (
+            <CeldaTodosLosDias
+              item={unif}
+              span={dias.length}
+              onAbrir={(it) => onAbrirDetalle({ item: it, tipo: tipoDrawer(cat), cat, dia: null, diaLabel: 'Todos los días', opcionLabel: it.opcion })}
+            />
+          ) : (
+            dias.map((dia) => {
+              const item = dia.sin_servicio ? null : (porOpcionDia.get(`${letra}|${dia.dia}`) ?? null);
+              const agregar = esEspeciales
+                ? () => onAbrirAgregar({ dia: dia.dia, diaLabel: DIA_NOMBRE[dia.dia], opcion: letra })
+                : () => onAbrirAgregarCategoria({ categoria_id: cat.id, nombre: cat.nombre, dia: dia.dia, opcion: letra });
+              return (
+                <CeldaMenu
+                  key={dia.dia}
+                  item={item}
+                  onAbrir={(it) => onAbrirDetalle({ item: it, tipo: tipoDrawer(cat), cat, dia: dia.dia, diaLabel: DIA_NOMBRE[dia.dia], opcionLabel: it.opcion })}
+                  onAgregar={!item && !dia.sin_servicio ? agregar : null}
+                />
+              );
+            })
+          )}
           <BotonEliminarFila onEliminar={() => eliminarFila(letra)} title={`Eliminar fila ${letra}`} />
         </tr>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -2161,30 +2291,42 @@ function ListaDiaBloque({ cat, dias, menuId, onAbrirDetalle, onAbrirAgregarFijo,
 
   return (
     <>
-      {Array.from({ length: maxSlots }, (_, slot) => (
+      {Array.from({ length: maxSlots }, (_, slot) => {
+        const itemsPorDia = dias.map((dia, di) => (dia.sin_servicio ? null : (porDia[di][slot] ?? null)));
+        const unif = itemUniformeSemana(itemsPorDia, dias);
+        return (
         <tr key={`${cat.slug}-fd-${slot}`}>
           {slot === 0 && (
-            <EtiquetaGrupo rowSpan={maxSlots} colorCls={colorEtiqueta(cat)} onAgregarFila={() => setFilasExtra((n) => n + 1)} onConfigurar={() => onConfigurar(cat)}>
+            <EtiquetaGrupo rowSpan={maxSlots} cat={cat} onAgregarFila={() => setFilasExtra((n) => n + 1)} onConfigurar={() => onConfigurar(cat)}>
               {cat.nombre}
             </EtiquetaGrupo>
           )}
-          {dias.map((dia, di) => {
-            const item = dia.sin_servicio ? null : (porDia[di][slot] ?? null);
-            const agregar = esFijo
-              ? () => onAbrirAgregarFijo({ modo: 'fijo_dia', dia: dia.dia })
-              : () => onAbrirAgregarCategoria({ categoria_id: cat.id, nombre: cat.nombre, dia: dia.dia, opcion: null });
-            return (
-              <CeldaMenu
-                key={dia.dia}
-                item={item}
-                onAbrir={(it) => onAbrirDetalle({ item: it, tipo: tipoDrawer(cat), cat, dia: dia.dia, diaLabel: DIA_NOMBRE[dia.dia], opcionLabel: it.opcion })}
-                onAgregar={!item && !dia.sin_servicio ? agregar : null}
-              />
-            );
-          })}
+          {unif ? (
+            <CeldaTodosLosDias
+              item={unif}
+              span={dias.length}
+              onAbrir={(it) => onAbrirDetalle({ item: it, tipo: tipoDrawer(cat), cat, dia: null, diaLabel: 'Todos los días', opcionLabel: it.opcion })}
+            />
+          ) : (
+            dias.map((dia, di) => {
+              const item = dia.sin_servicio ? null : (porDia[di][slot] ?? null);
+              const agregar = esFijo
+                ? () => onAbrirAgregarFijo({ modo: 'fijo_dia', dia: dia.dia })
+                : () => onAbrirAgregarCategoria({ categoria_id: cat.id, nombre: cat.nombre, dia: dia.dia, opcion: null });
+              return (
+                <CeldaMenu
+                  key={dia.dia}
+                  item={item}
+                  onAbrir={(it) => onAbrirDetalle({ item: it, tipo: tipoDrawer(cat), cat, dia: dia.dia, diaLabel: DIA_NOMBRE[dia.dia], opcionLabel: it.opcion })}
+                  onAgregar={!item && !dia.sin_servicio ? agregar : null}
+                />
+              );
+            })
+          )}
           <BotonEliminarFila onEliminar={() => eliminarFila(slot)} title="Eliminar fila" />
         </tr>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -2218,7 +2360,7 @@ function ListaSiempreBloque({ cat, dias, menuId, onAbrirDetalle, onAbrirAgregarF
   return (
     <>
       <tr>
-        <EtiquetaGrupo rowSpan={filas} colorCls={colorEtiqueta(cat)} onConfigurar={() => onConfigurar(cat)}>{cat.nombre}</EtiquetaGrupo>
+        <EtiquetaGrupo rowSpan={filas} cat={cat} onConfigurar={() => onConfigurar(cat)}>{cat.nombre}</EtiquetaGrupo>
         <td colSpan={dias.length + 1} className="border border-gray-100 p-1.5">
           <div className="flex items-center justify-between gap-2">
             <button type="button" onClick={() => setAbierto((v) => !v)} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5">
@@ -2276,7 +2418,7 @@ function ListaCatalogoBloque({ cat, dias, menuId, onAbrirAgregarCatalogo, onConf
   return (
     <>
       <tr>
-        <EtiquetaGrupo rowSpan={filas} colorCls={colorEtiqueta(cat)} onConfigurar={() => onConfigurar(cat)}>{cat.nombre}</EtiquetaGrupo>
+        <EtiquetaGrupo rowSpan={filas} cat={cat} onConfigurar={() => onConfigurar(cat)}>{cat.nombre}</EtiquetaGrupo>
         <td colSpan={dias.length + 1} className="border border-gray-100 p-1.5">
           <div className="flex items-center justify-between gap-2">
             <button type="button" onClick={() => setAbierto((v) => !v)} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5">
@@ -2315,7 +2457,7 @@ function SinCategorizarBloque({ cat, dias, onAbrirDetalle }) {
   return (
     <>
       <tr>
-        <EtiquetaGrupo rowSpan={filas} colorCls={colorEtiqueta(cat)}>{cat.nombre}</EtiquetaGrupo>
+        <EtiquetaGrupo rowSpan={filas} cat={cat}>{cat.nombre}</EtiquetaGrupo>
         <td colSpan={dias.length + 1} className="border border-gray-100 p-1.5">
           <button type="button" onClick={() => setAbierto((v) => !v)} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5">
             <span className="text-[10px]">{abierto ? '▾' : '▸'}</span>
@@ -2531,6 +2673,212 @@ function TablaSemana({
   );
 }
 
+// ── Drawer para reordenar las categorías de la grilla ──────────────────────
+// Persiste el campo `orden` de cada categoría (PATCH /categorias/:id). Reusa
+// los valores de `orden` ya existentes del conjunto (ordenados) para no pisar
+// el orden de las categorías de "sueltos".
+function OrdenarCategoriasDrawer({ open, onClose, categorias }) {
+  const actualizar = useActualizarCategoria();
+  const [orden, setOrden] = useState(categorias);
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [saving, setSaving] = useState(false);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setOrden(categorias);
+  }
+
+  const mover = (from, to) => {
+    if (to < 0 || to >= orden.length) return;
+    setOrden((arr) => {
+      const n = [...arr];
+      const [it] = n.splice(from, 1);
+      n.splice(to, 0, it);
+      return n;
+    });
+  };
+
+  const guardar = async () => {
+    const slots = categorias.map((c) => c.orden ?? 0).sort((a, b) => a - b);
+    const cambios = orden
+      .map((cat, i) => ({ cat, nuevoOrden: slots[i] }))
+      .filter(({ cat, nuevoOrden }) => (cat.orden ?? 0) !== nuevoOrden);
+    if (cambios.length === 0) { onClose(); return; }
+    setSaving(true);
+    try {
+      await Promise.all(cambios.map(({ cat, nuevoOrden }) =>
+        actualizar.mutateAsync({ id: cat.id, data: { orden: nuevoOrden } })));
+      toast.success('Orden guardado');
+      onClose();
+    } catch (e) {
+      toast.error(e?.message || 'No se pudo guardar el orden');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SideDrawer open={open} onClose={onClose} title="Ordenar categorías" width="md">
+      <div className="space-y-3 p-5">
+        <p className="text-sm text-gray-500">
+          Arrastrá las categorías o usá las flechas para ordenarlas. El orden se aplica a la tabla del resumen.
+        </p>
+        <ul className="space-y-1.5">
+          {orden.map((cat, i) => (
+            <li
+              key={cat.slug}
+              draggable
+              onDragStart={() => setDragIdx(i)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragIdx !== null && dragIdx !== i) { mover(dragIdx, i); setDragIdx(i); }
+              }}
+              onDragEnd={() => setDragIdx(null)}
+              className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition-colors ${dragIdx === i ? 'border-brand-400 shadow-sm' : 'border-gray-200'}`}
+            >
+              <span className="cursor-grab select-none text-gray-300" title="Arrastrar">⠿</span>
+              <span className="w-5 shrink-0 text-center font-mono text-xs text-gray-400">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">{cat.nombre}</span>
+              <button type="button" onClick={() => mover(i, i - 1)} disabled={i === 0} className="rounded p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-30" aria-label={`Subir ${cat.nombre}`}>▲</button>
+              <button type="button" onClick={() => mover(i, i + 1)} disabled={i === orden.length - 1} className="rounded p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-30" aria-label={`Bajar ${cat.nombre}`}>▼</button>
+            </li>
+          ))}
+          {orden.length === 0 && <li className="text-xs text-gray-400">No hay categorías en la grilla todavía.</li>}
+        </ul>
+        <div className="flex items-center gap-2 pt-2">
+          <button onClick={guardar} disabled={saving} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+            {saving ? 'Guardando…' : 'Guardar orden'}
+          </button>
+          <button onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </SideDrawer>
+  );
+}
+
+// ── Drawer de personalización de colores de celda ──────────────────────────
+function ColoresDrawer({ open, onClose, colores, categorias = [] }) {
+  const update = useUpdateColoresCeldas();
+  const [draft, setDraft] = useState(colores);
+  // Al abrir el drawer, arrancar el borrador desde los colores actuales
+  // (patrón "ajustar estado en render" de React, sin useEffect).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setDraft(colores);
+  }
+
+  const filas = [
+    { k: 'vianda', label: 'Vianda', cls: 'celda-estado celda-vianda' },
+    { k: 'porKilo', label: 'Por kilo', cls: 'celda-estado celda-porkilo' },
+    { k: 'ambos', label: 'Ambos', cls: 'celda-estado celda-ambos' },
+    { k: 'ninguno', label: 'Ninguno', cls: 'celda-estado celda-ninguno' },
+  ];
+
+  const guardar = async () => {
+    try {
+      await update.mutateAsync(draft);
+      toast.success('Colores guardados');
+      onClose();
+    } catch (e) {
+      toast.error(e?.message || 'No se pudieron guardar los colores');
+    }
+  };
+
+  return (
+    <SideDrawer open={open} onClose={onClose} title="Colores de las celdas" width="md">
+      <div className="space-y-4 p-5" style={coloresVars(draft)}>
+        <p className="text-sm text-gray-500">
+          Elegí el color de cada estado. Se aplica como fondo suave + barra lateral en cada celda del resumen.
+        </p>
+        {filas.map(({ k, label, cls }) => (
+          <div key={k} className="flex items-center gap-3">
+            <input
+              type="color"
+              value={draft[k]}
+              onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))}
+              className="h-9 w-12 shrink-0 cursor-pointer rounded border border-gray-200 bg-white p-0.5"
+              aria-label={`Color de ${label}`}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-800">{label}</p>
+              <p className="font-mono text-xs uppercase text-gray-400">{draft[k]}</p>
+            </div>
+            <span className={`${cls} inline-block h-9 w-20 rounded border border-gray-200`} />
+          </div>
+        ))}
+
+        {/* Etiquetas de categoría: estilo global + color por categoría */}
+        <div className="border-t border-gray-100 pt-4" data-cat-estilo={draft.categoriaEstilo || 'sobrio'}>
+          <p className="text-sm font-semibold text-gray-800">Etiquetas de categoría</p>
+          <p className="mt-0.5 text-xs text-gray-500">Estilo de las etiquetas de la grilla, y color de cada categoría.</p>
+          <div className="mt-2 flex gap-1.5">
+            {[{ k: 'solido', label: 'Sólido' }, { k: 'sobrio', label: 'Sobrio' }, { k: 'contorno', label: 'Contorno' }].map((op) => (
+              <button
+                key={op.k}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, categoriaEstilo: op.k }))}
+                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                  (draft.categoriaEstilo || 'sobrio') === op.k
+                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {op.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 space-y-2">
+            {categorias.map((cat) => {
+              const color = (draft.categorias && draft.categorias[cat.slug]) || colorCategoriaDefault(cat);
+              return (
+                <div key={cat.slug} className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setDraft((d) => ({ ...d, categorias: { ...(d.categorias || {}), [cat.slug]: e.target.value } }))}
+                    className="h-9 w-12 shrink-0 cursor-pointer rounded border border-gray-200 bg-white p-0.5"
+                    aria-label={`Color de ${cat.nombre}`}
+                  />
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">{cat.nombre}</p>
+                  <span className="etq inline-flex h-9 w-24 items-center justify-center overflow-hidden whitespace-nowrap rounded px-1 text-[10px] font-bold uppercase tracking-wide" style={{ '--cat': color }}>
+                    {cat.nombre}
+                  </span>
+                </div>
+              );
+            })}
+            {categorias.length === 0 && <p className="text-xs text-gray-400">No hay categorías en la grilla todavía.</p>}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 pt-2">
+          <button
+            onClick={guardar}
+            disabled={update.isPending}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+          >
+            {update.isPending ? 'Guardando…' : 'Guardar'}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => setDraft(COLORES_DEFAULT)}
+            className="ml-auto rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Restaurar default
+          </button>
+        </div>
+      </div>
+    </SideDrawer>
+  );
+}
+
 export default function MenuResumen() {
   const { id } = useParams();
   const { data, isLoading, isError, error } = useSemanaOpciones(id);
@@ -2544,6 +2892,11 @@ export default function MenuResumen() {
   const [categoriaVacia, setCategoriaVacia] = useState(null);
   const [gestionAbierta, setGestionAbierta] = useState(false);
   const [configCategoriaId, setConfigCategoriaId] = useState(null);
+  const [coloresAbierto, setColoresAbierto] = useState(false);
+  const [ordenAbierto, setOrdenAbierto] = useState(false);
+  const [filtroEstado, setFiltroEstado] = useState(null);
+  const coloresQ = useColoresCeldas();
+  const colores = coloresQ.data ?? COLORES_DEFAULT;
 
   const abrirConfigCategoria = (cat) => {
     setConfigCategoriaId(cat.id ?? null);
@@ -2575,8 +2928,11 @@ export default function MenuResumen() {
   // (fijos de siempre, guarniciones, salsas, custom modo-único y rotaciones)
   // salen a la sección "Sueltos"; "Sin categorizar" va a un bloque al final.
   const categorias = data.categorias ?? [];
-  const gridCats = categorias.filter((c) => c.render === 'matriz' || c.render === 'lista_dia');
-  const sueltosCats = categorias.filter((c) => c.render === 'lista_siempre' || c.render === 'lista_catalogo');
+  // Las categorías custom "de siempre" (lista_siempre) van en la MISMA tabla que
+  // el resto. Solo guarniciones/salsas de catálogo (lista_catalogo) quedan aparte
+  // en "Sueltos de la semana".
+  const gridCats = categorias.filter((c) => c.render === 'matriz' || c.render === 'lista_dia' || c.render === 'lista_siempre');
+  const sueltosCats = categorias.filter((c) => c.render === 'lista_catalogo');
   const sinCategorizar = categorias.find((c) => c.render === 'sin_categorizar');
 
   // Mantiene el drawer sincronizado con la data fresca tras cada mutacion
@@ -2594,7 +2950,9 @@ export default function MenuResumen() {
   })();
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <SemanaPublicadaContext.Provider value={menuQ.data?.estado === 'publicado'}>
+    <ColoresCatContext.Provider value={colores}>
+    <div className="p-4 md:p-6 space-y-5" style={coloresVars(colores)} data-filtro={filtroEstado || undefined} data-cat-estilo={colores.categoriaEstilo || 'sobrio'}>
       <div>
         <div className="flex items-center justify-between mb-1">
           <Link to="/semanas" className="text-xs text-gray-500 hover:text-brand-600 transition-colors">
@@ -2611,7 +2969,31 @@ export default function MenuResumen() {
 
       <div className="card p-4 md:p-6">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <Leyenda />
+          <Leyenda filtro={filtroEstado} onFiltrar={setFiltroEstado} />
+          <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOrdenAbierto(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+              <path d="M7 3v18M7 3l-3 4M7 3l3 4M17 21V3M17 21l3-4M17 21l-3-4" />
+            </svg>
+            Ordenar
+          </button>
+          <button
+            type="button"
+            onClick={() => setColoresAbierto(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="14" cy="7" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="16.5" cy="11.5" r="1.5" fill="currentColor" stroke="none" />
+              <path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.2.3-2.2 1.6-2.2H16a5 5 0 0 0 5-5c0-4.5-4-6-9-6z" />
+            </svg>
+            Colores
+          </button>
           <button
             type="button"
             onClick={() => setGestionAbierta(true)}
@@ -2625,6 +3007,7 @@ export default function MenuResumen() {
             </svg>
             Gestionar categorías
           </button>
+          </div>
         </div>
         <div className="overflow-x-auto -mx-1 px-1">
           <TablaSemana
@@ -2661,6 +3044,10 @@ export default function MenuResumen() {
       <AgregarCatalogoDrawer catalogoVacio={catalogoVacio} menuId={id} onClose={() => setCatalogoVacio(null)} />
       <AgregarACategoriaDrawer destino={categoriaVacia} menuId={id} onClose={() => setCategoriaVacia(null)} />
       <GestionCategorias open={gestionAbierta} onClose={cerrarGestion} menuId={id} categoriaInicialId={configCategoriaId} />
+      <OrdenarCategoriasDrawer open={ordenAbierto} onClose={() => setOrdenAbierto(false)} categorias={gridCats} />
+      <ColoresDrawer open={coloresAbierto} onClose={() => setColoresAbierto(false)} colores={colores} categorias={gridCats} />
     </div>
+    </ColoresCatContext.Provider>
+    </SemanaPublicadaContext.Provider>
   );
 }

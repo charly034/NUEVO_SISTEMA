@@ -363,9 +363,9 @@ async function asegurarMenusDeTest(client, semanasConfig, platosEspeciales, plat
       for (const [opcionIndex, plato] of platosDia.entries()) {
         const opcion = OPCIONES_MENU_SEED[opcionIndex] || String.fromCharCode(65 + opcionIndex);
         const insertado = await client.query(
-          `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (menu_semanal_id, dia, opcion) DO NOTHING
+          `INSERT INTO menu_semanal_dias (menu_semanal_id, dia, opcion, plato_id, categoria_id)
+           VALUES ($1, $2, $3, $4, (SELECT id FROM categorias WHERE slug = 'especiales'))
+           ON CONFLICT (menu_semanal_id, categoria_id, dia, opcion) DO NOTHING
            RETURNING id`,
           [menuId, dia, opcion, plato.id],
         );

@@ -90,7 +90,7 @@ export default function Administradores() {
         </div>
         <button
           onClick={() => setModalUser({})}
-          className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800"
+          className="bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-800"
         >
           + Nuevo admin
         </button>
@@ -128,7 +128,7 @@ export default function Administradores() {
                       {usuario.nombre} {usuario.apellido}
                       {esActual && <span className="ml-2 text-[10px] bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full">Vos</span>}
                     </p>
-                    <p className={`text-xs mt-1 ${usuario.activo ? 'text-green-700' : 'text-gray-500'}`}>
+                    <p className={`text-xs mt-1 ${usuario.activo ? 'text-brand-700' : 'text-gray-500'}`}>
                       {usuario.activo ? 'Activo' : 'Inactivo'}
                     </p>
                   </div>
@@ -200,7 +200,7 @@ export default function Administradores() {
                 </div>
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</dt>
-                  <dd className={`mt-1 font-semibold ${detalleUser.activo ? 'text-green-700' : 'text-gray-500'}`}>
+                  <dd className={`mt-1 font-semibold ${detalleUser.activo ? 'text-brand-700' : 'text-gray-500'}`}>
                     {detalleUser.activo ? 'Activo' : 'Inactivo'}
                   </dd>
                 </div>
@@ -214,7 +214,7 @@ export default function Administradores() {
               <button
                 type="button"
                 onClick={() => { const usuario = detalleUser; setDetalleUser(null); setModalUser(usuario); }}
-                className="w-full rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
+                className="w-full rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
               >
                 Editar administrador
               </button>
@@ -353,7 +353,7 @@ function AdminUserModal({ usuario, adminActual, onCerrar }) {
             <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">
               Cancelar
             </button>
-            <button disabled={loading} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
+            <button disabled={loading} className="bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
               {loading ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
@@ -372,4 +372,4 @@ function Campo({ label, children }) {
   );
 }
 
-const input = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:cursor-not-allowed';
+const input = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:cursor-not-allowed';

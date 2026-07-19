@@ -7,7 +7,7 @@ import Spinner from '../components/ui/Spinner.jsx';
 import { toast } from '../lib/toast.js';
 
 // ── helpers ───────────────────────────────────────────────────────────
-const input = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-200';
+const input = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-200';
 
 function Campo({ label, children, hint }) {
   return (
@@ -173,14 +173,14 @@ function FormPlan({ plan, puedeDesactivar, onGuardado, onCancelar, onDesactivar 
           />
         </Campo>
         <label className={`flex items-center gap-2 cursor-pointer rounded-xl border px-3 py-3 text-sm mb-0 transition-colors
-          ${form.activo ? 'border-green-300 bg-green-50 text-green-800' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
+          ${form.activo ? 'border-brand-300 bg-brand-50 text-brand-800' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
           <input
             type="checkbox" className="hidden"
             checked={form.activo}
             onChange={e => set('activo', e.target.checked)}
           />
           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0
-            ${form.activo ? 'border-green-500 bg-green-500' : 'border-gray-300 bg-white'}`}>
+            ${form.activo ? 'border-brand-500 bg-brand-500' : 'border-gray-300 bg-white'}`}>
             {form.activo && <div className="w-2 h-2 rounded-full bg-white" />}
           </div>
           <span className="font-semibold">{form.activo ? 'Activo' : 'Inactivo'}</span>
@@ -273,7 +273,7 @@ export default function Planes() {
                 onClick={() => setFiltro(f.key)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
                   ${filtro === f.key
-                    ? 'bg-green-600 text-white'
+                    ? 'bg-brand-600 text-white'
                     : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
               >
                 {f.label}
@@ -287,7 +287,7 @@ export default function Planes() {
           </div>
           <button
             onClick={() => setDrawerPlan('nuevo')}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors shrink-0"
           >
             + Nuevo plan
           </button>
@@ -351,7 +351,7 @@ export default function Planes() {
                     {/* Empresas que lo usan */}
                     <div className="w-20 text-center hidden sm:block">
                       {numEmpresas > 0 ? (
-                        <span className="text-sm font-semibold text-green-700">{numEmpresas}</span>
+                        <span className="text-sm font-semibold text-brand-700">{numEmpresas}</span>
                       ) : (
                         <span className="text-sm text-gray-500">—</span>
                       )}

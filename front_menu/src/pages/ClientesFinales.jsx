@@ -11,7 +11,7 @@ function normalizarFechaInput(fecha) {
   return fecha ? String(fecha).split('T')[0] : '';
 }
 
-const inputClass = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
+const inputClass = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 function Campo({ label, children }) {
   return (
@@ -131,7 +131,7 @@ function DrawerClienteFinal({ empleado, empresas, onCerrar }) {
           <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
             Cancelar
           </button>
-          <button type="submit" disabled={isPending} className="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-60">
+          <button type="submit" disabled={isPending} className="rounded-lg bg-brand-700 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60">
             {isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -146,7 +146,7 @@ function ModalResetCode({ data, onCerrar }) {
       <p className="text-sm text-gray-500 mb-4">
         Compartilo con el cliente para que pueda cambiar su contrasena en la app.
       </p>
-      <div className="rounded-lg bg-green-50 px-4 py-3 text-center text-2xl font-mono font-bold tracking-widest text-green-800 mb-4">
+      <div className="rounded-lg bg-brand-50 px-4 py-3 text-center text-2xl font-mono font-bold tracking-widest text-brand-800 mb-4">
         {data?.codigo}
       </div>
       {data?.expira && (
@@ -191,13 +191,13 @@ export default function ClientesFinales() {
     <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-6">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-56"
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-56"
           placeholder="Buscar nombre o email..."
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
         />
         <select
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={filtroEmpresa}
           onChange={e => setFiltroEmpresa(e.target.value)}
         >
@@ -206,7 +206,7 @@ export default function ClientesFinales() {
         </select>
         <button
           onClick={() => setDrawerEmpleado({})}
-          className="ml-auto rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
+          className="ml-auto rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
         >
           + Nuevo cliente
         </button>
@@ -230,7 +230,7 @@ export default function ClientesFinales() {
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <button
                   onClick={() => updateEmpleado.mutate({ id: emp.id, data: { activo: !emp.activo } })}
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${emp.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${emp.activo ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500'}`}
                 >
                   {emp.activo ? 'Activo' : 'Inactivo'}
                 </button>

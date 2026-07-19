@@ -53,7 +53,7 @@ function semanasDelMes(year, month) {
 // ── config de estado ──────────────────────────────────────────────────
 const ESTADO_CFG = {
   borrador:  { label: 'Borrador',  accentCls: 'bg-gray-400',   chipCls: 'bg-gray-100 text-gray-600 border-gray-200',   rowTint: '' },
-  publicado: { label: 'Publicado', accentCls: 'bg-green-500',  chipCls: 'bg-green-100 text-green-700 border-green-200',  rowTint: 'bg-green-50/60' },
+  publicado: { label: 'Publicado', accentCls: 'bg-brand-500',  chipCls: 'bg-brand-100 text-brand-700 border-brand-200',  rowTint: 'bg-brand-50/60' },
   cerrado:   { label: 'Cerrado',   accentCls: 'bg-orange-400', chipCls: 'bg-orange-100 text-orange-700 border-orange-200',rowTint: 'bg-orange-50/40' },
   vacio:     { label: 'Sin menu',  accentCls: 'bg-gray-200',   chipCls: 'bg-gray-50 text-gray-500 border-gray-100',      rowTint: '' },
 };
@@ -86,7 +86,7 @@ function CeldaDia({ lunesIso, diaIdx, menu, esHoy }) {
       <div className="flex items-center gap-1.5 mb-1">
         <span className={`inline-flex items-center justify-center shrink-0 text-[11px] font-bold leading-none
           ${esHoy
-            ? 'w-5 h-5 rounded-full bg-green-600 text-white'
+            ? 'w-5 h-5 rounded-full bg-brand-600 text-white'
             : esFDS ? 'text-gray-500' : 'text-gray-500'
           }`}>
           {diaNum}
@@ -102,7 +102,7 @@ function CeldaDia({ lunesIso, diaIdx, menu, esHoy }) {
           {platos.slice(0, 2).map((p, i) => (
             <div key={i} className="flex items-start gap-0.5 min-w-0">
               {p.opcion && (
-                <span className="shrink-0 text-[8px] font-black text-green-600 leading-tight mt-px">{p.opcion[0]}</span>
+                <span className="shrink-0 text-[8px] font-black text-brand-600 leading-tight mt-px">{p.opcion[0]}</span>
               )}
               <span className="text-[9px] leading-tight text-gray-600 truncate">{p.plato_nombre}</span>
             </div>
@@ -115,7 +115,7 @@ function CeldaDia({ lunesIso, diaIdx, menu, esHoy }) {
 
       {/* Dot indicador abajo si tiene platos */}
       {!esSinServicio && platos.length > 0 && (
-        <div className="absolute bottom-1.5 right-1.5 w-1 h-1 rounded-full bg-green-400 opacity-70" />
+        <div className="absolute bottom-1.5 right-1.5 w-1 h-1 rounded-full bg-brand-400 opacity-70" />
       )}
     </div>
   );
@@ -130,7 +130,7 @@ function FilaSemana({ lunesIso, menu, isActiva, onClick, hoyIso, lunesActual }) 
   return (
     <div
       className={`grid cursor-pointer select-none group transition-colors duration-150
-        ${isActiva ? 'ring-2 ring-inset ring-green-400' : 'hover:brightness-[0.97]'}
+        ${isActiva ? 'ring-2 ring-inset ring-brand-400' : 'hover:brightness-[0.97]'}
         ${cfg.rowTint}`}
       style={{ gridTemplateColumns: '80px repeat(7, minmax(0,1fr))' }}
       onClick={onClick}
@@ -209,7 +209,7 @@ function DrawerContenido({ lunesIso, onCreado, onClose }) {
             type="text" value={nombre} onChange={e => setNombre(e.target.value)}
             placeholder={nombreSugerido(lunesIso)} autoFocus
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 mb-3"
           />
           <div className="flex gap-2 justify-center">
             <button onClick={() => { setCreando(false); setNombre(''); }} className="btn-secondary">Cancelar</button>

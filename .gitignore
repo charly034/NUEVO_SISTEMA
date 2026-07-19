@@ -38,3 +38,4 @@ API_LA_QUINTA/uploads/*
 !API_LA_QUINTA/uploads/platos/
 API_LA_QUINTA/uploads/platos/*
 !API_LA_QUINTA/uploads/platos/.gitkeep
+.gstack/

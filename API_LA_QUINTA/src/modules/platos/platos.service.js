@@ -1,5 +1,7 @@
+import { getClient } from '../../database/connection.js';
 import * as platosRepository from './platos.repository.js';
 import { borrarImagenPlato, guardarImagenPlato } from './platos-imagen.service.js';
+import * as auditoriaService from '../admin-auditoria/admin-auditoria.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 
 export const getAllPlatos = async ({ page = 1, limit = 20, activo, search, tag, tipo, disponibilidad, sort_by, sort_dir } = {}) => {
@@ -29,15 +31,43 @@ export const getPlatoById = async (id) => {
   return plato;
 };
 
-export const createPlato = async (data, file = null) => {
+export const createPlato = async (data, file = null, adminUser = null) => {
   const foto_url = file ? await guardarImagenPlato(file, data.nombre) : data.foto_url;
-  return platosRepository.create({ ...data, foto_url });
+
+  // El plato y su vianda "general" (sin guarnicion/salsa, empresa_id NULL) se
+  // crean en UNA transaccion: asi el plato queda usable en el diseño de menu al
+  // instante, sin el paso manual de "asociar una vianda" (evita el error "no
+  // tiene una vianda activa" al agregarlo a un menu). Ver decision del
+  // /plan-eng-review 2026-07-18 en docs/ai/91-spec-menu-compuesto.md.
+  const client = await getClient();
+  let plato;
+  try {
+    await client.query('BEGIN');
+    plato = await platosRepository.create({ ...data, foto_url }, client.query.bind(client));
+    await client.query('INSERT INTO viandas (plato_id) VALUES ($1)', [plato.id]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'crear',
+    entidad_tipo: 'plato',
+    entidad_id: plato.id,
+    resumen: `Creó el plato ${plato.nombre}`,
+    despues: plato,
+  });
+  return plato;
 };
 
 // SQLSTATE 23514 (check_violation) es lo que el trigger platos_bloquear_desactivacion
 // levanta (ver migración create-viandas-table) cuando el plato está usado por una
 // vianda activa -- se traduce a 409, mismo patrón que el bloqueo de borrado en uso.
-export const updatePlato = async (id, data, file = null) => {
+export const updatePlato = async (id, data, file = null, adminUser = null) => {
   const plato = await platosRepository.findById(id);
   if (!plato) throw ApiError.notFound(`Plato con id ${id} no encontrado`);
 
@@ -47,15 +77,26 @@ export const updatePlato = async (id, data, file = null) => {
     await borrarImagenPlato(plato.foto_url);
   }
 
+  let actualizado;
   try {
-    return await platosRepository.update(id, fields);
+    actualizado = await platosRepository.update(id, fields);
   } catch (err) {
     if (err.code === '23514') throw ApiError.conflict(err.message);
     throw err;
   }
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'actualizar',
+    entidad_tipo: 'plato',
+    entidad_id: id,
+    resumen: `Actualizó el plato ${actualizado.nombre}`,
+    antes: plato,
+    despues: actualizado,
+  });
+  return actualizado;
 };
 
-export const deletePlato = async (id) => {
+export const deletePlato = async (id, adminUser = null) => {
   const plato = await platosRepository.findById(id);
   if (!plato) throw ApiError.notFound(`Plato con id ${id} no encontrado`);
 
@@ -68,6 +109,14 @@ export const deletePlato = async (id) => {
 
   await platosRepository.remove(id);
   await borrarImagenPlato(plato.foto_url);
+  await auditoriaService.registrarAdminAction({
+    adminUser,
+    accion: 'eliminar',
+    entidad_tipo: 'plato',
+    entidad_id: id,
+    resumen: `Eliminó el plato ${plato.nombre}`,
+    antes: plato,
+  });
 };
 
 export const getVisibilidadEmpresas = async (id) => {

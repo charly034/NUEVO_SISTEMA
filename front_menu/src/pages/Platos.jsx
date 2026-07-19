@@ -55,7 +55,7 @@ const TAG_COLORS = [
   'bg-teal-50 text-teal-700',
   'bg-indigo-50 text-indigo-700',
   'bg-orange-50 text-orange-700',
-  'bg-green-50 text-green-700',
+  'bg-brand-50 text-brand-700',
 ];
 
 function leerActivo(value) {
@@ -372,7 +372,7 @@ function DetallePlatoModal({ plato, onClose, onEdit, onDelete }) {
             {plato?.disponibilidad ? <DisponibilidadBadge disponibilidad={plato.disponibilidad} diaFijo={plato.dia_fijo} /> : null}
             {plato?.tipo ? <TipoBadge tipo={plato.tipo} /> : null}
             {plato?.guarnicion_modo && plato.guarnicion_modo !== 'sin_guarnicion' ? (
-              <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
                 {plato.guarnicion_modo === 'libre' ? 'Guarnicion a eleccion' : 'Guarnicion fija'}
               </span>
             ) : null}

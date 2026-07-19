@@ -294,8 +294,12 @@ export const agregarPlatoDia = async (menuSemanalId, { dia, opcion = 'A', plato_
     accion: 'agregar_plato',
     entidad_tipo: 'menu_semanal',
     entidad_id: menuSemanalId,
-    resumen: `Agregó ${plato.nombre} al ${dia} opción ${opcion}`,
+    resumen: `Agregó ${plato.nombre} al ${dia} opción ${opcion}${menu.estado === 'publicado' ? ' (semana PUBLICADA)' : ''}`,
     despues: agregado,
+    // estado del menu al momento de la edicion: permite auditar ediciones sobre
+    // semanas ya publicadas (a las que empleados pueden haber pedido) -- ver
+    // debt-menu-semanal-sin-bloqueo-por-estado-publicado.
+    metadata: { estado_menu: menu.estado },
   });
   return agregado;
 };
@@ -325,9 +329,10 @@ export const setEmpresasSlot = async (menuSemanalId, dia, opcion, { empresa_ids 
     entidad_tipo: 'menu_semanal',
     entidad_id: menuSemanalId,
     resumen: empresa_ids.length === 0
-      ? `Slot ${dia} op. ${opcion}: visible para todas las empresas`
-      : `Slot ${dia} op. ${opcion}: restringido a ${empresa_ids.length} empresa(s)`,
+      ? `Slot ${dia} op. ${opcion}: visible para todas las empresas${menu.estado === 'publicado' ? ' (semana PUBLICADA)' : ''}`
+      : `Slot ${dia} op. ${opcion}: restringido a ${empresa_ids.length} empresa(s)${menu.estado === 'publicado' ? ' (semana PUBLICADA)' : ''}`,
     despues: { slotId, empresa_ids },
+    metadata: { estado_menu: menu.estado },
   });
 
   return { slotId, empresa_ids };
@@ -383,8 +388,9 @@ export const quitarPlatoDia = async (menuSemanalId, dia, opcion, adminUser = nul
     accion: 'quitar_plato',
     entidad_tipo: 'menu_semanal',
     entidad_id: menuSemanalId,
-    resumen: `Quitó la opción ${opcion} del ${dia}`,
+    resumen: `Quitó la opción ${opcion} del ${dia}${menu.estado === 'publicado' ? ' (semana PUBLICADA)' : ''}`,
     antes: anterior,
+    metadata: { estado_menu: menu.estado },
   });
   // El historial NO se toca: si se quitó un plato de la planificación,
   // el registro histórico de que alguna vez estuvo asignado se conserva.

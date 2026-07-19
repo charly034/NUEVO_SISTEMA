@@ -142,8 +142,8 @@ export const create = async ({
   descripcion_larga = null,
   disponibilidad = 'especial',
   dia_fijo = null,
-}) => {
-  const result = await query(
+}, db = query) => {
+  const result = await db(
     `INSERT INTO platos (
        nombre, descripcion, tags, tipo, tiene_guarnicion,
        vegetariano, calorias, alergenos, foto_url, descripcion_larga,

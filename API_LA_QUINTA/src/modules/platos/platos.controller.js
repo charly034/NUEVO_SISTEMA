@@ -35,17 +35,17 @@ export const setDisponibilidadLocal = asyncHandler(async (req, res) => {
 });
 
 export const createPlato = asyncHandler(async (req, res) => {
-  const plato = await platosService.createPlato(req.body, req.file);
+  const plato = await platosService.createPlato(req.body, req.file, req.adminUser);
   sendCreated(res, plato, 'Plato creado exitosamente');
 });
 
 export const updatePlato = asyncHandler(async (req, res) => {
-  const plato = await platosService.updatePlato(req.params.id, req.body, req.file);
+  const plato = await platosService.updatePlato(req.params.id, req.body, req.file, req.adminUser);
   sendSuccess(res, plato, 'Plato actualizado exitosamente');
 });
 
 export const deletePlato = asyncHandler(async (req, res) => {
-  await platosService.deletePlato(req.params.id);
+  await platosService.deletePlato(req.params.id, req.adminUser);
   sendNoContent(res);
 });
 

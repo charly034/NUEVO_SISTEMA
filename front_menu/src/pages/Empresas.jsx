@@ -164,7 +164,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
           <h1 className="text-2xl font-bold text-gray-900">Empresas</h1>
           <p className="text-sm text-gray-500">{textoCantidadEmpresas}</p>
         </div>
-        <button onClick={() => setModalEmpresa('nueva')} className="self-start bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800">
+        <button onClick={() => setModalEmpresa('nueva')} className="self-start bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-800">
           + Nueva empresa
         </button>
       </div>
@@ -175,7 +175,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
           value={busquedaEmpresa}
           onChange={(event) => { setBusquedaEmpresa(event.target.value); setPage(1); }}
           placeholder="Nombre, @slug o email de contacto..."
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:outline-none sm:max-w-sm"
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none sm:max-w-sm"
         />
         <EstadoFiltroChips value={estadoFiltro} onChange={(value) => { setEstadoFiltro(value); setPage(1); }} />
       </div>
@@ -268,7 +268,7 @@ const [modalPlazo, setModalPlazo] = useState(null); // empresa | null
                 </p>
               )}
               {empresaActiva.plazo_override_hasta && new Date() <= new Date(empresaActiva.plazo_override_hasta) && (
-                <p className="text-xs font-medium text-green-700">
+                <p className="text-xs font-medium text-brand-700">
                   Plazo reabierto hasta {new Date(empresaActiva.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
                 </p>
               )}
@@ -406,8 +406,8 @@ function EstadoFiltroChips({ value, onChange }) {
           onClick={() => onChange(id)}
           className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
             value === id
-              ? 'border-green-700 bg-green-700 text-white'
-              : 'border-gray-200 bg-white text-gray-600 hover:border-green-200 hover:text-green-800'
+              ? 'border-brand-700 bg-brand-700 text-white'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-brand-200 hover:text-brand-800'
           }`}
         >
           {label}
@@ -447,7 +447,7 @@ function EstadoEmpresaBadge({ activa }) {
   return (
     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${
       activa
-        ? 'border-green-200 bg-green-100 text-green-800'
+        ? 'border-brand-200 bg-brand-100 text-brand-800'
         : 'border-red-100 bg-red-50 text-red-700'
     }`}
     >
@@ -649,7 +649,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
           <button onClick={() => setModalImportar(true)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
             Importar CSV
           </button>
-          <button onClick={() => setModalEmpleado({ empresa_id: empresa.id })} className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-800">
+          <button onClick={() => setModalEmpleado({ empresa_id: empresa.id })} className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800">
             + Agregar
           </button>
         </div>
@@ -680,7 +680,7 @@ function EmpleadosPanel({ empresa, esSuperAdmin, onAbrirCuenta }) {
               </button>
               <button
                 onClick={() => updateEmpleado.mutate({ id: emp.id, data: { activo: !emp.activo } })}
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${emp.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${emp.activo ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500'}`}
               >
                 {emp.activo ? 'Activo' : 'Inactivo'}
               </button>
@@ -871,7 +871,7 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
           value={texto}
           onChange={(event) => { setTexto(event.target.value); setResultado(null); }}
           rows={8}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs focus:border-green-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs focus:border-brand-500 focus:outline-none"
         />
         <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
           <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview: {filas.length} fila{filas.length !== 1 ? 's' : ''}</p>
@@ -885,7 +885,7 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
           </div>
         </div>
         {resultado && (
-          <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-sm text-green-800">
+          <div className="rounded-lg border border-brand-100 bg-brand-50 p-3 text-sm text-brand-800">
             <p className="font-semibold">
               {resultado.creados?.length || 0} creados · {resultado.omitidos?.length || 0} omitidos · {resultado.errores?.length || 0} errores
             </p>
@@ -898,7 +898,7 @@ function ModalImportarEmpleados({ empresa, onCerrar }) {
         )}
         <div className="flex justify-end gap-3">
           <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cerrar</button>
-          <button type="submit" disabled={importar.isPending} className="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="submit" disabled={importar.isPending} className="rounded-lg bg-brand-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {importar.isPending ? 'Importando...' : 'Importar'}
           </button>
         </div>
@@ -998,7 +998,7 @@ function ModalEmpresa({ empresa, planes, onGuardar, onCerrar, loading }) {
       footer={(
         <>
           <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancelar</button>
-          <button type="submit" form="empresa-form" disabled={loading} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
+          <button type="submit" form="empresa-form" disabled={loading} className="bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
             {loading ? 'Guardando...' : 'Guardar'}
           </button>
         </>
@@ -1192,7 +1192,7 @@ function ModalEmpleado({ empresas, empleado, onCerrar }) {
       footer={(
         <>
           <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm text-gray-600">Cancelar</button>
-          <button type="submit" form="empleado-form" disabled={createEmpleado.isPending || updateEmpleado.isPending} className="bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
+          <button type="submit" form="empleado-form" disabled={createEmpleado.isPending || updateEmpleado.isPending} className="bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">
             {createEmpleado.isPending || updateEmpleado.isPending ? 'Guardando...' : 'Guardar'}
           </button>
         </>
@@ -1325,8 +1325,8 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
     <Modal onCerrar={onCerrar} titulo={`Reabrir plazo "" ${empresa.nombre}`}>
       <div className="space-y-4">
         {tieneOverrideActivo && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-sm text-green-800 font-medium">
+          <div className="bg-brand-50 border border-brand-200 rounded-lg p-3">
+            <p className="text-sm text-brand-800 font-medium">
               ðŸ"" Plazo actualmente abierto hasta las{' '}
               {new Date(empresa.plazo_override_hasta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}hs
             </p>
@@ -1375,4 +1375,4 @@ function ModalReopenPlazo({ empresa, onReabrir, onCerrarOverride, onCerrar, load
   );
 }
 
-const input = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500';
+const input = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500';

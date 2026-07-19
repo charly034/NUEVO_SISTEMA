@@ -16,7 +16,7 @@ function ErrorFallback({ onRetry }) {
           <button
             type="button"
             onClick={onRetry}
-            className="w-full rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-800 sm:w-auto"
+            className="w-full rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-800 sm:w-auto"
           >
             Reintentar
           </button>

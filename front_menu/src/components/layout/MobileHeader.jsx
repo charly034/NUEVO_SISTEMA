@@ -34,25 +34,28 @@ export default function MobileHeader({ onLogout, onOpenMenu }) {
     ?? (location.pathname.startsWith('/semanas/') ? 'Detalle de menú' : 'Panel admin');
 
   return (
-    <header className="print:hidden lg:hidden flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100 flex-shrink-0 sticky top-0 z-30">
+    <header className="print:hidden lg:hidden flex items-center justify-between px-4 h-14 bg-brand-700 flex-shrink-0 sticky top-0 z-30">
       <div className="flex min-w-0 items-center gap-2.5">
         <button
           type="button"
           onClick={onOpenMenu}
-          className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-600"
+          className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10"
           aria-label="Abrir menú lateral"
         >
           <MenuIcon />
         </button>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-tight text-brand-700">La Quinta</p>
-          <p className="truncate text-[11px] leading-tight text-gray-500">Sistema de menús · {title}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-white/15 text-xs font-bold text-white">Q</span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold leading-tight text-white">La Quinta</p>
+            <p className="truncate text-[11px] leading-tight text-brand-200">{title}</p>
+          </div>
         </div>
       </div>
       <button
         type="button"
         onClick={onLogout}
-        className="text-xs text-gray-500 hover:text-red-500 transition-colors px-2 py-1 rounded"
+        className="text-xs font-medium text-brand-100 hover:text-white transition-colors px-2 py-1 rounded"
         aria-label="Cerrar sesión del panel admin"
       >
         Salir

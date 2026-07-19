@@ -288,7 +288,7 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         <div className="grid grid-cols-3 gap-2">
           {GUARNICION_MODO.map((g) => (
             <button key={g.value} type="button" onClick={() => setVal('guarnicion_modo', g.value)}
-              className={'flex flex-col gap-1 px-3 py-3 rounded-xl border-2 text-center transition-colors ' + (form.guarnicion_modo === g.value ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-200 text-gray-500 hover:border-green-300')}>
+              className={'flex flex-col gap-1 px-3 py-3 rounded-xl border-2 text-center transition-colors ' + (form.guarnicion_modo === g.value ? 'bg-brand-500 border-brand-500 text-white' : 'bg-white border-gray-200 text-gray-500 hover:border-brand-300')}>
               <span className="text-xs font-bold">{g.label}</span>
               <span className={'text-xs leading-tight ' + (form.guarnicion_modo === g.value ? 'opacity-80' : 'text-gray-500')}>{g.desc}</span>
             </button>
