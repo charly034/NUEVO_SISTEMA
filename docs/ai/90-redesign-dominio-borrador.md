@@ -431,7 +431,11 @@ Chunk 1 (trigger + write-flip) **hecho y verificado**:
 - **Write-flip (puente de transición)** — migración `1719000085000_semana-id-autopopulate.js`: trigger `BEFORE INSERT/UPDATE` en `pedidos`/`menus_semanales`/3 sugerencias que auto-popula `semana_id` (getOrCreate concurrente-seguro). Garantiza que toda fila nueva quede linkeada sin tocar la transacción crítica de pedidos (write-before-read para que el trigger reescrito cuente pedidos nuevos). Se **retira en S4** (lee `semana_inicio`/`fecha_inicio`, que se dropean).
 - Tests: `test/semanas-autopopulate.db.test.js` (write-flip). Suite: 166 pass, 3 fail preexistentes. Viandas (trigger) y pedidos (auto-populate) verdes.
 
-**Pendiente S2 chunk 2**: flip de **lecturas** a `semana_id`/`JOIN semanas` en las queries de `pedidos.repository`, `cocina.repository` (conteos), `estadisticas.repository` (aritmética de fecha), `notificaciones` (templating), `finanzas` — con paridad shadow-read. Luego S3 (NOT NULL + UNIQUEs + guardia en createMenuSemanal + swap del UNIQUE de pedidos) y S4 (drop columnas + retirar el puente auto-populate).
+Chunk 2 (flip de lecturas) — **en progreso**:
+- ✅ **`cocina.repository`**: los 4 conteos/agregados (`findConteosPedidos`, `findDetalleEtiquetas`, `findKPIsHoy`, `findTotalesPorDia`) leen la semana vía `JOIN semanas ON semana_id` + `se.fecha_inicio` (antes `p.semana_inicio`). Verificado: 0 refs a `p.semana_inicio`, cocina test verde, suite 166/3.
+- ⏭️ **Pendiente**: `pedidos.repository` (~11 sitios), `estadisticas.repository` (aritmética `semana_inicio::date + offset` → JOIN + `se.fecha_inicio`), `notificaciones` (templating `{{semana_inicio}}`), `finanzas` (área sensible). Todos con la misma técnica (JOIN semanas, paridad garantizada por el auto-populate).
+
+**Pendiente S3**: `semana_id` NOT NULL + `UNIQUE(menus_semanales.semana_id)` + guardia en `createMenuSemanal` + swap del UNIQUE de `pedidos` a `(empleado_id, semana_id)` y de las 3 sugerencias. **S4**: drop `semana_inicio`/`fecha_inicio`/`fecha_fin` + retirar el puente auto-populate + código de app setea `semana_id` directo.
 
 ## GSTACK REVIEW REPORT
 
