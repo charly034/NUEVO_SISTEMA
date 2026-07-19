@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useCreatePlato, useDeletePlato, usePlatos, useUpdatePlato, useVisibilidadEmpresas, useSetVisibilidadEmpresas, useDisponibilidadLocal, useSetDisponibilidadLocal } from '../hooks/usePlatos.js';
+import { useCreatePlato, useDeletePlato, usePlatos, useUpdatePlato, useVisibilidadEmpresas, useSetVisibilidadEmpresas } from '../hooks/usePlatos.js';
 import { useEmpresas } from '../hooks/useEmpresas.js';
 import { useHistorialPlato } from '../hooks/useHistorial.js';
 import Modal from '../components/ui/Modal.jsx';
@@ -11,16 +11,6 @@ import ErrorMessage from '../components/ui/ErrorMessage.jsx';
 import PlatoPhoto from '../components/ui/PlatoPhoto.jsx';
 import { toast } from '../lib/toast.js';
 import { DIA_ABREV as DIAS_LABEL } from '../lib/dias.js';
-
-const DIAS_SEMANA = [
-  { value: 'lunes', label: 'Lun' },
-  { value: 'martes', label: 'Mar' },
-  { value: 'miercoles', label: 'Mie' },
-  { value: 'jueves', label: 'Jue' },
-  { value: 'viernes', label: 'Vie' },
-  { value: 'sabado', label: 'Sab' },
-  { value: 'domingo', label: 'Dom' },
-];
 
 const DISPONIBLE_VIANDA_FILTROS = [
   { label: 'Todos', value: undefined },
@@ -163,7 +153,7 @@ function TipoBadge({ tipo }) {
 function DisponibleViandaBadge({ disponibleVianda }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${disponibleVianda ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
-      {disponibleVianda ? 'Vianda: sí' : 'Vianda: no'}
+      {disponibleVianda ? 'Se ofrece como vianda' : 'Solo local'}
     </span>
   );
 }
@@ -234,113 +224,18 @@ function VisibilidadEmpresas({ platoId }) {
   );
 }
 
-function DisponibilidadLocal({ platoId }) {
-  const { data, isLoading } = useDisponibilidadLocal(platoId);
-  const setDisponibilidad = useSetDisponibilidadLocal();
-  const [fechaNueva, setFechaNueva] = useState('');
-
-  const entradas = data?.entradas ?? [];
-  const esDiario = entradas.some((e) => e.patron === 'diario');
-  const diasSemana = new Set(entradas.filter((e) => e.patron === 'dia_semana').map((e) => e.dia_semana));
-  const fechas = entradas.filter((e) => e.patron === 'fecha').map((e) => String(e.fecha).slice(0, 10));
-
-  const guardar = (nuevasEntradas) => {
-    setDisponibilidad.mutate(
-      { id: platoId, entradas: nuevasEntradas },
-      { onError: () => toast.error('Error al guardar disponibilidad en el local') }
-    );
-  };
-
-  const toggleDiario = () => {
-    if (esDiario) guardar([]);
-    else guardar([{ patron: 'diario' }]);
-  };
-
-  const toggleDia = (dia) => {
-    if (esDiario) return;
-    const next = new Set(diasSemana);
-    if (next.has(dia)) next.delete(dia); else next.add(dia);
-    guardar([
-      ...[...next].map((d) => ({ patron: 'dia_semana', dia_semana: d })),
-      ...fechas.map((f) => ({ patron: 'fecha', fecha: f })),
-    ]);
-  };
-
-  const agregarFecha = () => {
-    if (!fechaNueva || fechas.includes(fechaNueva)) return;
-    guardar([
-      ...[...diasSemana].map((d) => ({ patron: 'dia_semana', dia_semana: d })),
-      ...fechas.map((f) => ({ patron: 'fecha', fecha: f })),
-      { patron: 'fecha', fecha: fechaNueva },
-    ]);
-    setFechaNueva('');
-  };
-
-  const quitarFecha = (fecha) => {
-    guardar([
-      ...[...diasSemana].map((d) => ({ patron: 'dia_semana', dia_semana: d })),
-      ...fechas.filter((f) => f !== fecha).map((f) => ({ patron: 'fecha', fecha: f })),
-    ]);
-  };
-
-  if (isLoading) return <div className="flex justify-center py-3"><Spinner /></div>;
-
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Disponibilidad en el local</p>
-      <p className="text-xs text-gray-500">Solo informativo para cocina: el local no gestiona precio ni pedidos en este sistema.</p>
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-100 px-2 py-1.5 hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={esDiario}
-          onChange={toggleDiario}
-          className="h-3.5 w-3.5 rounded border-gray-300 text-brand-600"
-        />
-        <span className="text-xs text-gray-700">Todos los días</span>
-      </label>
-      {!esDiario ? (
-        <div className="flex flex-wrap gap-1.5">
-          {DIAS_SEMANA.map((d) => (
-            <button
-              key={d.value}
-              type="button"
-              onClick={() => toggleDia(d.value)}
-              className={`rounded-lg border-2 px-2.5 py-1 text-xs font-medium transition-colors ${
-                diasSemana.has(d.value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <div className="flex items-center gap-2 pt-1">
-        <input
-          type="date"
-          value={fechaNueva}
-          onChange={(e) => setFechaNueva(e.target.value)}
-          className="rounded-lg border border-gray-300 px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <button type="button" onClick={agregarFecha} className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">
-          + Fecha puntual
-        </button>
-      </div>
-      {fechas.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {fechas.map((f) => (
-            <span key={f} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-              {f}
-              <button type="button" onClick={() => quitarFecha(f)} className="text-gray-400 hover:text-red-500">&times;</button>
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function DetallePlatoModal({ plato, onClose, onEdit, onDelete }) {
   const { data, isLoading, isError, error } = useHistorialPlato(plato?.id);
+
+  // `tipo` (legacy) casi siempre repite lo que ya dice `disponibilidad` (p. ej.
+  // ambos muestran "Especial"). Solo aporta info cuando es 'ambos' (Fijo +
+  // Especial), que disponibilidad no puede expresar; si no, se omite el badge
+  // para no duplicarlo.
+  const mostrarTipo = plato?.tipo === 'ambos' || (!plato?.disponibilidad && !!plato?.tipo);
+  // Un tag que repite un alérgeno (case-insensitive) no se muestra dos veces:
+  // "Pescado" (tag) junto a "pescado" (alérgeno) se veía duplicado.
+  const alergenosLower = new Set((plato?.alergenos ?? []).map((a) => a.toLowerCase()));
+  const tagsVisibles = (plato?.tags ?? []).filter((t) => !alergenosLower.has(t.toLowerCase()));
 
   return (
     <Modal open={!!plato} onClose={onClose} title={plato?.nombre ?? ''}>
@@ -370,7 +265,7 @@ function DetallePlatoModal({ plato, onClose, onEdit, onDelete }) {
             {plato?.vegetariano ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Vegetariano</span> : null}
             <DisponibleViandaBadge disponibleVianda={plato?.disponible_vianda} />
             {plato?.disponibilidad ? <DisponibilidadBadge disponibilidad={plato.disponibilidad} diaFijo={plato.dia_fijo} /> : null}
-            {plato?.tipo ? <TipoBadge tipo={plato.tipo} /> : null}
+            {mostrarTipo ? <TipoBadge tipo={plato.tipo} /> : null}
             {plato?.guarnicion_modo && plato.guarnicion_modo !== 'sin_guarnicion' ? (
               <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
                 {plato.guarnicion_modo === 'libre' ? 'Guarnicion a eleccion' : 'Guarnicion fija'}
@@ -384,7 +279,7 @@ function DetallePlatoModal({ plato, onClose, onEdit, onDelete }) {
             {(plato?.alergenos ?? []).map((alergeno) => (
               <span key={alergeno} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">{alergeno}</span>
             ))}
-            {(plato?.tags ?? []).map((tag) => <TagBadge key={tag} tag={tag} />)}
+            {tagsVisibles.map((tag) => <TagBadge key={tag} tag={tag} />)}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -427,12 +322,6 @@ function DetallePlatoModal({ plato, onClose, onEdit, onDelete }) {
               <VisibilidadEmpresas platoId={plato.id} />
             </div>
           )}
-
-          {plato?.id ? (
-            <div className="border-t border-gray-100 pt-3">
-              <DisponibilidadLocal platoId={plato.id} />
-            </div>
-          ) : null}
 
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
             <button

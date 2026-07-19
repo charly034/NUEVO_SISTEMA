@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react';
 import Spinner from '../ui/Spinner.jsx';
 import PlatoPhoto from '../ui/PlatoPhoto.jsx';
-import { useGuarniciones } from '../../hooks/useGuarniciones.js';
-import { useSalsas } from '../../hooks/useSalsas.js';
 
 const TIPOS = [
   { value: 'especial', label: 'Especial', desc: 'Solo aparece cuando lo elegis en el menu', sel: 'bg-amber-500 border-amber-500 text-white', idle: 'bg-white border-gray-200 text-gray-600 hover:border-amber-300' },
@@ -24,18 +22,6 @@ const DIAS = [
   { value: 'viernes',   label: 'Vie' },
   { value: 'sabado',    label: 'Sab' },
   { value: 'domingo',   label: 'Dom' },
-];
-
-const GUARNICION_MODO = [
-  { value: 'sin_guarnicion', label: 'Sin guarnicion', desc: 'Se sirve solo'                                    },
-  { value: 'libre',          label: 'A eleccion',     desc: 'El cliente elige entre las guarniciones activas'  },
-  { value: 'fija',           label: 'Fija',           desc: 'Sale siempre con la misma guarnicion'             },
-];
-
-const SALSA_MODO = [
-  { value: 'sin_salsa', label: 'Sin salsa', desc: 'Se sirve sin salsa'                          },
-  { value: 'libre',     label: 'A eleccion', desc: 'El cliente elige entre las salsas activas'  },
-  { value: 'fija',      label: 'Fija',       desc: 'Sale siempre con la misma salsa'            },
 ];
 
 const TAGS_SUGERIDOS = ['Pollo','Carnes','Pescado','Vegetariano','Pasta','Tartas','Milanesas','Hamburguesas','Sin TACC','Vegano'];
@@ -98,29 +84,19 @@ function ToggleCard({ active, onClick, children }) {
 }
 
 export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
-  const { data: guarniciones = [] } = useGuarniciones();
-  const guarnicionesActivas = guarniciones.filter((g) => g.activo);
-  const { data: salsas = [] } = useSalsas();
-  const salsasActivas = salsas.filter((s) => s.activo);
   const nombreRef = useRef(null);
 
   const [form, setForm] = useState(() => ({
     nombre:             initial?.nombre             ?? '',
     descripcion:        initial?.descripcion        ?? '',
     descripcion_larga:  initial?.descripcion_larga  ?? '',
-    nombre_vianda:      initial?.nombre_vianda      ?? '',
     calorias:           initial?.calorias           ?? '',
     alergenos:          initial?.alergenos          ?? [],
     vegetariano:        initial?.vegetariano        ?? false,
     foto:               null,
     tipo:               initial?.tipo               ?? 'especial',
-    disponible_vianda:  initial?.disponible_vianda  ?? true,
     disponibilidad:     initial?.disponibilidad     ?? 'especial',
     dia_fijo:           initial?.dia_fijo           ?? '',
-    guarnicion_modo:    initial?.guarnicion_modo    ?? 'sin_guarnicion',
-    guarnicion_fija_id: initial?.guarnicion_fija_id ?? '',
-    salsa_modo:         initial?.salsa_modo         ?? 'sin_salsa',
-    salsa_fija_id:      initial?.salsa_fija_id      ?? '',
     tags:               initial?.tags               ?? [],
   }));
   const [fotoPreview, setFotoPreview] = useState(initial?.foto_url ?? '');
@@ -144,8 +120,6 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
     if (!form.nombre.trim()) err.nombre = 'El nombre es obligatorio';
     else if (form.nombre.trim().length < 2) err.nombre = 'Minimo 2 caracteres';
     if (form.disponibilidad === 'fijo_dia' && !form.dia_fijo) err.dia_fijo = 'Selecciona el dia fijo';
-    if (form.guarnicion_modo === 'fija' && !form.guarnicion_fija_id) err.guarnicion_fija_id = 'Selecciona la guarnicion fija';
-    if (form.salsa_modo === 'fija' && !form.salsa_fija_id) err.salsa_fija_id = 'Selecciona la salsa fija';
     return err;
   };
 
@@ -161,20 +135,13 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
       nombre:             form.nombre.trim(),
       descripcion:        form.descripcion.trim() || undefined,
       descripcion_larga:  form.descripcion_larga.trim() || undefined,
-      nombre_vianda:      form.nombre_vianda.trim() || undefined,
       calorias:           form.calorias === '' ? null : Number(form.calorias),
       alergenos:          form.alergenos,
       vegetariano:        form.vegetariano,
       foto:               form.foto,
       tipo:               form.tipo,
-      disponible_vianda:  form.disponible_vianda,
       disponibilidad:     form.disponibilidad,
       dia_fijo:           form.disponibilidad === 'fijo_dia' ? form.dia_fijo : undefined,
-      guarnicion_modo:    form.guarnicion_modo,
-      guarnicion_fija_id: form.guarnicion_modo === 'fija' ? (Number(form.guarnicion_fija_id) || null) : undefined,
-      tiene_guarnicion:   form.guarnicion_modo !== 'sin_guarnicion',
-      salsa_modo:         form.salsa_modo,
-      salsa_fija_id:      form.salsa_modo === 'fija' ? (Number(form.salsa_fija_id) || null) : undefined,
       tags:               form.tags,
     });
   };
@@ -188,16 +155,6 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         <input ref={nombreRef} type="text" value={form.nombre} onChange={set('nombre')} placeholder="Ej: Milanesa de pollo" autoFocus
           className={'w-full px-3 py-2 text-sm border rounded-lg outline-none transition-colors focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ' + (errors.nombre ? 'border-red-400 bg-red-50' : 'border-gray-300')} />
         {errors.nombre ? <p className="text-xs text-red-500 mt-1">{errors.nombre}</p> : null}
-      </div>
-
-      {/* Nombre en vianda */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Nombre en vianda <span className="text-gray-500 font-normal">(opcional)</span>
-        </label>
-        <input type="text" value={form.nombre_vianda} onChange={set('nombre_vianda')} placeholder="Ej: Milanesa de pollo con pure"
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors" />
-        <p className="text-xs text-gray-500 mt-1">Completar solo si el nombre en vianda es distinto al nombre del local.</p>
       </div>
 
       {/* Foto */}
@@ -249,11 +206,10 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         <span>{form.vegetariano ? 'Marcado como vegetariano' : 'No marcado como vegetariano'}</span>
       </ToggleCard>
 
-      {/* Disponible para vianda */}
-      <ToggleCard active={form.disponible_vianda} onClick={() => setVal('disponible_vianda', !form.disponible_vianda)}>
-        <span>{form.disponible_vianda ? 'Disponible para vianda (empresas)' : 'No disponible para vianda'}</span>
-      </ToggleCard>
-
+      {/* Disponibilidad y tipo: definen cuando entra el plato al menu (canal por kilo /
+          fijos por dia). Solo visibles al EDITAR, fuera del alta. La guarnicion, la salsa
+          y el "disponible para vianda" se manejan en el diseno del menu, no aca. */}
+      {initial && (<>
       {/* Disponibilidad */}
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Disponibilidad en el menu</p>
@@ -282,70 +238,6 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
         ) : null}
       </div>
 
-      {/* Guarnicion */}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Guarnicion</p>
-        <div className="grid grid-cols-3 gap-2">
-          {GUARNICION_MODO.map((g) => (
-            <button key={g.value} type="button" onClick={() => setVal('guarnicion_modo', g.value)}
-              className={'flex flex-col gap-1 px-3 py-3 rounded-xl border-2 text-center transition-colors ' + (form.guarnicion_modo === g.value ? 'bg-brand-500 border-brand-500 text-white' : 'bg-white border-gray-200 text-gray-500 hover:border-brand-300')}>
-              <span className="text-xs font-bold">{g.label}</span>
-              <span className={'text-xs leading-tight ' + (form.guarnicion_modo === g.value ? 'opacity-80' : 'text-gray-500')}>{g.desc}</span>
-            </button>
-          ))}
-        </div>
-        {form.guarnicion_modo === 'libre' ? (
-          <p className="mt-2 text-xs text-gray-500">
-            El cliente va a poder elegir entre {guarnicionesActivas.length} guarnicion{guarnicionesActivas.length !== 1 ? 'es' : ''} disponible{guarnicionesActivas.length !== 1 ? 's' : ''}.
-          </p>
-        ) : null}
-        {form.guarnicion_modo === 'fija' ? (
-          <div className="mt-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Guarnicion fija <span className="text-red-500">*</span></label>
-            <select value={form.guarnicion_fija_id} onChange={set('guarnicion_fija_id')}
-              className={'w-full px-3 py-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors ' + (errors.guarnicion_fija_id ? 'border-red-400 bg-red-50' : 'border-gray-300')}>
-              <option value="">-- Elegir guarnicion --</option>
-              {guarnicionesActivas.map((g) => (
-                <option key={g.id} value={g.id}>{g.nombre}</option>
-              ))}
-            </select>
-            {errors.guarnicion_fija_id ? <p className="text-xs text-red-500 mt-1">{errors.guarnicion_fija_id}</p> : null}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Salsa */}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Salsa</p>
-        <div className="grid grid-cols-3 gap-2">
-          {SALSA_MODO.map((s) => (
-            <button key={s.value} type="button" onClick={() => setVal('salsa_modo', s.value)}
-              className={'flex flex-col gap-1 px-3 py-3 rounded-xl border-2 text-center transition-colors ' + (form.salsa_modo === s.value ? 'bg-red-500 border-red-500 text-white' : 'bg-white border-gray-200 text-gray-500 hover:border-red-300')}>
-              <span className="text-xs font-bold">{s.label}</span>
-              <span className={'text-xs leading-tight ' + (form.salsa_modo === s.value ? 'opacity-80' : 'text-gray-500')}>{s.desc}</span>
-            </button>
-          ))}
-        </div>
-        {form.salsa_modo === 'libre' ? (
-          <p className="mt-2 text-xs text-gray-500">
-            El cliente va a poder elegir entre {salsasActivas.length} salsa{salsasActivas.length !== 1 ? 's' : ''} disponible{salsasActivas.length !== 1 ? 's' : ''}.
-          </p>
-        ) : null}
-        {form.salsa_modo === 'fija' ? (
-          <div className="mt-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Salsa fija <span className="text-red-500">*</span></label>
-            <select value={form.salsa_fija_id} onChange={set('salsa_fija_id')}
-              className={'w-full px-3 py-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors ' + (errors.salsa_fija_id ? 'border-red-400 bg-red-50' : 'border-gray-300')}>
-              <option value="">-- Elegir salsa --</option>
-              {salsasActivas.map((s) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
-            {errors.salsa_fija_id ? <p className="text-xs text-red-500 mt-1">{errors.salsa_fija_id}</p> : null}
-          </div>
-        ) : null}
-      </div>
-
       {/* Tipo (uso) */}
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Como se usa este plato?</p>
@@ -359,6 +251,7 @@ export default function PlatoForm({ initial, onSubmit, onCancel, loading }) {
           ))}
         </div>
       </div>
+      </>)}
 
       {/* Tags */}
       <div>
