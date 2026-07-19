@@ -25,6 +25,7 @@ import semanaOpcionesRoutes from '../modules/semana-opciones/semana-opciones.rou
 import categoriasRoutes from '../modules/categorias/categorias.routes.js';
 import menuItemsRoutes from '../modules/menu-items/menu-items.routes.js';
 import configuracionRoutes from '../modules/configuracion/configuracion.routes.js';
+import semanasRoutes from '../modules/semanas/semanas.routes.js';
 
 const router = Router();
 
@@ -54,5 +55,6 @@ router.use('/semana-opciones', semanaOpcionesRoutes);
 router.use('/categorias', categoriasRoutes);
 router.use('/menu-items', menuItemsRoutes);
 router.use('/configuracion', configuracionRoutes);
+router.use('/semanas', semanasRoutes);
 
 export default router;
