@@ -134,6 +134,10 @@ endpoints:
       - "POST /api/v1/guarniciones"
       - "PATCH /api/v1/guarniciones/:id"
       - "DELETE /api/v1/guarniciones/:id"
+    semanas:
+      - "GET /api/v1/semanas (admin) -> lista de semanas (id, fecha_inicio=lunes, fecha_fin)"
+      - "GET /api/v1/semanas/actual (admin) -> semana que contiene hoy (getOrCreate)"
+      - "GET /api/v1/semanas/:id (admin)"
     empresas:
       - "GET /api/v1/empresas?page=&pageSize=&search=&estado=activa|inactiva|todas"
       - "GET /api/v1/empresas/:id"

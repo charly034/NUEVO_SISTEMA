@@ -293,3 +293,157 @@ Tras una crítica al modelo, el usuario resolvió:
 
 ## Próximo paso sugerido
 Traducir a un **plan de migración por fases** (tablas nuevas → backfill de compuestos desde platos/viandas actuales → flip de `menu_semanal_dias` y `pedidos` → UI admin/cliente → limpieza de columnas viejas), con paridad shadow-read como en el teardown de categorías. No tocar código hasta cerrar el modelo y las preguntas abiertas.
+
+---
+
+# Replanteo v3 — Semana como raíz (idea nueva 2026-07-18, EN DISCUSIÓN)
+
+> **Estado: DRAFT, en discusión. No implementado.** Reencuadre estructural propuesto por el usuario que **sube un nivel por encima de v2**: la **semana** deja de ser una fecha suelta y pasa a ser la **entidad raíz (aggregate root)** que contiene menús, pedidos, especiales, producción de cocina y disponibilidad del local. NO reemplaza al compuesto v2 — lo **re-enraíza** debajo de la semana. Ambos rediseños se fusionan en un solo modelo objetivo, un solo `/plan-eng-review` y un solo plan de migración (tocan las mismas tablas: `menus_semanales`, `menu_semanal_dias`, `pedidos`).
+
+## Origen / motivación
+El usuario arrancó el diseño menú-primero (v1/v2) y después se dio cuenta de que **lo que une todo es la semana**: cada semana tiene menús, pedidos, especiales y la producción de cocina. Los diseños viejos (menú como cuasi-raíz) son residuo de ese arranque invertido.
+
+## Diagnóstico del estado actual (verificado en migraciones, 2026-07-18)
+- **`menus_semanales` NO es "la semana": es un menú** con `id, nombre, fecha_inicio, fecha_fin, estado (borrador/publicado/cerrado)`. No tiene `empresa_id` ni `categoria_id`. La rotación (ciclos) vive **DENTRO** de un menú (`categoria_grupo` + `grupo_rotativo_seleccion_semana` + `categoria_grupo_seleccion_semana`, todas keyed por `menu_semanal_id`).
+- **La semana hoy = una fecha desparramada, sin entidad.** Aparece como `date` en ≥5 lugares atados solo por coincidencia de fecha: `menus_semanales.fecha_inicio`, `pedidos.semana_inicio`, `pedido_sugerencias.semana_inicio`, `sugerencias_empleados.semana_inicio`, `pedido_sugerencia_opciones.semana_inicio`.
+- **`pedidos`** tiene `menu_semanal_id` (FK blanda, ON DELETE SET NULL) **y** `semana_inicio date NOT NULL`; el invariante "un pedido por semana" es `UNIQUE(empleado_id, semana_inicio)` (la **fecha**, no el menú). El puente pedido↔menú es la igualdad de fechas (`pedidos.service.js` valida `menu.fecha_inicio == semana_inicio`), no una FK dura.
+- **Cocina** agrega la producción por `p.semana_inicio` (fecha), no por `menu_semanal_id` (`cocina.repository.js` `findConteosPedidos`/`findKPIsHoy`/`findTotalesPorDia`). Los slots del menú se leen aparte por `menu_semanal_id`. El puente menú↔pedidos es la fecha.
+
+## Decisión central (✅ decidido en sesión 2026-07-18)
+- ✅ **`semanas` = entidad nueva, aggregate root.** Identidad = `fecha_inicio` (el lunes), **UNIQUE** (una fila por semana calendario). `fecha_fin` derivable.
+- ✅ **`semana` 1—N `menus_semanales`** (el usuario eligió "varios menús por semana", una **capacidad nueva** — hoy es efectivamente 1 menú por semana). Ver ❓ de ruteo empresa→menú más abajo, que esta decisión abre.
+- ✅ **Todo lo que hoy se ata por `semana_inicio`/`fecha_inicio` (date) pasa a FK `semana_id`.**
+
+## Modelo objetivo (semana como raíz)
+```
+semanas  (NUEVA — PK propia; fecha_inicio UNIQUE = el lunes; fecha_fin)
+├── menus_semanales        → +semana_id FK  (1—N: varios menús por semana)
+│    └── menu_semanal_dias  → (bajo compuesto v2: menu_compuesto_id; celda = fijo/especial por categoria_id)
+├── pedidos                → +semana_id FK; UNIQUE(empleado_id, semana_id) reemplaza (empleado_id, semana_inicio)
+│                            conserva menu_semanal_id = de qué menú de la semana pidió
+├── pedido_sugerencias / sugerencias_empleados / pedido_sugerencia_opciones → +semana_id FK
+├── plan de local/buffet   → materialización por semana (ver ❓)
+└── producción de cocina   → DERIVADA: agregado de pedidos.semana_id + buffet de esa semana
+```
+
+## Reconciliación con el compuesto v2 (⚠️ un solo modelo)
+Las decisiones de v2 se **mantienen intactas**, solo cambia su raíz:
+- `menu_compuesto` / `menu_compuesto_componente` / `menu_compuesto_empresa_override` → sin cambios; `menu_semanal_dias.menu_compuesto_id` sigue igual.
+- fijo/especial en la celda (`categoria_id`), auto-crear compuesto al crear plato, salsa de primera clase, override standing por empresa → sin cambios.
+- Lo único que cambia: `menus_semanales` ahora cuelga de `semanas` (FK `semana_id`) en vez de identificarse por `fecha_inicio`.
+- **Consecuencia operativa**: se hace **una** migración grande (semana-raíz + compuesto), no dos seguidas sobre las mismas tablas.
+
+## Mapeo viejo→nuevo (los "diseños viejos que quedan")
+| Viejo (residuo del arranque menú-primero) | Problema | Nuevo (semana-raíz) |
+|---|---|---|
+| Semana como `date` suelta en ≥5 tablas | Sin entidad; unido por coincidencia de fecha | Entidad `semanas` + FK `semana_id` en todas |
+| `menus_semanales` cuasi-raíz por `fecha_inicio` | Es un menú, no la semana | Cuelga de `semanas` vía `semana_id` |
+| `pedidos` UNIQUE(empleado_id, `semana_inicio`) | Invariante sobre una fecha | UNIQUE(empleado_id, `semana_id`) |
+| Cocina agrega por `p.semana_inicio` | Producción unida por fecha | Agrega por `p.semana_id` (misma semana-entidad) |
+| `platos.disponibilidad`/`dia_fijo` | Mezcla "fijos del menú" (canal vianda) con "buffet" | La parte fijos-de-menú es de la celda/semana; la de buffet va al plan de local por semana |
+| `plato_disponibilidad_local` colgando del plato | Calendario global del plato, no por semana | Catálogo recurrente global + materialización por semana (ver ❓) |
+| `viandas` / `menu_semanal_dia_empresa_override` | (ya marcado en v2) | Subsumidos por compuesto v2 |
+
+## Preguntas abiertas ❓ (a cerrar en `/plan-eng-review`)
+1. **Ruteo empresa→menú** (la abre la decisión 1—N): con varios menús por semana y `menus_semanales` sin `empresa_id`, ¿cómo sabe cada empleado/empresa de QUÉ menú pedir? Hoy no hay ambigüedad (1 menú/semana). Opciones: tabla de asignación `empresa`↔`menu_semanal_id`, o `menus_semanales.empresa_id`, o visibilidad por menú. **Es la complejidad principal que introduce el modelo 1—N.**
+2. **Estado**: ¿`semanas.estado` (borrador/publicado/cerrado a nivel semana), o el `estado` sigue por menú? Con 1—N menús, lo natural es que el estado siga por menú y la semana sea solo el contenedor.
+3. **`menus_semanales.fecha_inicio`/`fecha_fin`**: ¿se dropean (derivables de `semanas`) o se mantienen denormalizados para no romper queries?
+4. **Buffet/local**: ¿el calendario del plato (`plato_disponibilidad_local`) se parte en "catálogo recurrente global" + "materialización por semana", o se mueve entero a la semana? (Conecta con la limpieza ya hecha: sacamos el editor de la ficha del plato; su hogar es Cocina/semana.)
+
+## Plan de migración (🟡 alto nivel — se fusiona con las 6 fases del compuesto v2)
+Al no estar en producción se migra directo, con paridad shadow-read como gate (patrón `categorias-fase-b-paridad`). Orden tentativo (se afina en eng-review):
+- **S0 — crear `semanas`** + backfill: una fila por cada `fecha_inicio` distinta de `menus_semanales` ∪ `semana_inicio` de `pedidos`/sugerencias.
+- **S1 — agregar `semana_id` NULLABLE** a `menus_semanales`, `pedidos` y las 3 tablas de sugerencias + backfill por igualdad de fecha. Cero cambio de comportamiento.
+- **S2 — flip de lecturas** a `semana_id` con paridad (leer por fecha == leer por `semana_id`) sobre todos los datos reales; incluye cocina (conteos por `semana_id`).
+- **S3 — swap del UNIQUE** de `pedidos` a `(empleado_id, semana_id)`; `semana_id` NOT NULL.
+- **S4 — limpieza**: drop `semana_inicio`/`fecha_inicio`/`fecha_fin` donde queden redundantes.
+- **Intercalado con compuesto v2** (mismas tablas): el orden real combina S0–S4 con las fases 0–6 del compuesto en un solo roadmap — lo define el eng-review.
+
+**Áreas de alto riesgo**: `pedidos` (cambia el invariante y el FK de semana), `cocina` (conteos por semana), y el ruteo empresa→menú (nuevo). Gate por fase: `npm test` secuencial verde + paridad verde antes de cada flip.
+
+## Próximo paso
+Correr `/plan-eng-review` sobre este modelo unificado (semana-raíz + compuesto v2) para lockear el plan de migración y resolver las 4 preguntas abiertas — sobre todo el **ruteo empresa→menú**, que es la consecuencia más pesada del modelo 1—N.
+
+## LOCK — decisiones de /plan-eng-review (2026-07-18)
+
+> **Scope reducido y lockeado.** El eng-review redujo el scope: **NO** se hace todo junto. Se **secuencia**.
+
+### Scope (✅ decidido)
+- ✅ **SECUENCIAR.** Migración 1 = **solo semana-raíz, cardinalidad 1—1**. Es la visión "la semana une todo", entregada con el menor blast radius y verificable sola.
+- ✅ **Compuesto v2 → DIFERIDO** a una migración posterior (concern distinto: composición de platos; casi no pisa las tablas de semana-raíz).
+- ✅ **Multi-menú 1—N y ruteo empresa→menú → DIFERIDOS** (scope especulativo, sin uso actual). El modelo 1—N descrito arriba en v3 queda como norte futuro, no como esta migración.
+
+### Decisiones de arquitectura (✅ lockeadas)
+1. ✅ **`menus_semanales.semana_id` FK + `UNIQUE(semana_id)`** (1—1 duro), **implementado completo** (D7 — cerró los agujeros de la voz externa):
+   - **Guardia en `createMenuSemanal`** (`menus-semanales.service.js:38-56`): hoy NO chequea unicidad de semana (solo `duplicarMenuSemanal`); agregar rechazo de un 2º menú para una semana ya usada. Sin esto el `UNIQUE` choca en runtime por el path normal de creación.
+   - **Remediación, no solo abort**: el pre-flight `SELECT fecha_inicio, COUNT(*) FROM menus_semanales GROUP BY fecha_inicio HAVING COUNT(*)>1` **presenta** los duplicados para resolver (elegir/mergear) antes de aplicar el UNIQUE — no aborta ciego.
+   - **Regla de dueño**: bajo 1—1 el único menú de la semana es dueño de sus pedidos; `pedidos.menu_semanal_id` queda derivable de `semana_id` (ver follow-up).
+2. ✅ **DROP `pedidos.semana_inicio` y `menus_semanales.fecha_inicio`/`fecha_fin`** — `semana_id` única fuente (D6, confirmado pese a la tensión). Consecuencias **obligatorias** (halladas por la voz externa, no opcionales):
+   - **Reescribir el trigger `trg_bloquear_desactivar_vianda`** (mig. `1719000067000:226`) para usar `semana_id`/JOIN `semanas` en vez de `p.semana_inicio`. **CRÍTICO**: dropear la columna NO falla en el DROP (plpgsql no se parsea) → revienta en runtime al desactivar una vianda. Test de regresión obligatorio.
+   - **`estadisticas`/`notificaciones` NO son swap de filtro**: hacen aritmética/templating sobre la fecha (`estadisticas.repository.js:21` `semana_inicio::date + offset`; `{{semana_inicio}}` en notificaciones). Requieren **JOIN `semanas`** para recuperar `fecha_inicio`/`fecha_fin`.
+   - **`fecha_fin`**: moverlo a `semanas` presume semana canónica lunes+6. Pre-flight que verifique que no haya spans no-canónicos; reescribir los range-checks "¿menú vivo?" (`findMenuActivoPorFecha` `cocina.repository.js:22`, `menuActivo`, `menusPublicadosList`) contra `semanas.fecha_fin`.
+   - **`pedido_sugerencia_opciones`** es `UNIQUE(semana_inicio, plato_id)` (shape distinto) → swap a `(semana_id, plato_id)`, no a `(empleado_id, semana_id)`.
+   - Cada switch `semana_inicio`→`semana_id` es **regresión potencial** → paridad shadow-read obligatoria.
+3. ✅ **Módulo `semanas` completo** (`routes/controller/service/repository/validation`, patrón estricto). Núcleo: `getOrCreateSemana(lunes)` idempotente que **consolida las 3 copias** del cálculo del lunes (`pedidos.service.js::lunesDeSemana`, `cocina.repository.js::lunesDe`, `pedidos.service.js::validarSemanaInicioLunes`). `semanas`: `id, fecha_inicio date UNIQUE NOT NULL (=lunes), fecha_fin date`.
+
+### Pre-flight de datos obligatorio (antes del backfill)
+La voz externa marcó que el backfill "por igualdad de fecha" asume lunes y nadie lo fuerza (`crearPedido` valida solo formato; `menus-semanales.schema` no exige lunes). Pre-flight que verifique y remedie ANTES de S1:
+- No haya `fecha_inicio`/`semana_inicio` que NO sean lunes (romperían el join a `semanas` normalizado → S3 NOT NULL falla).
+- No haya spans `menus_semanales` no-canónicos (fecha_fin ≠ fecha_inicio+6).
+- No haya semanas con >1 menú (habilita el `UNIQUE(semana_id)`; con remediación, no abort ciego).
+
+### Follow-up (TODO, no en esta migración)
+- **`pedidos.menu_semanal_id` queda redundante bajo 1—1** (derivable de `semana_id`) y hoy es `ON DELETE SET NULL` (puede desincronizarse). La voz externa lo señaló como la redundancia genuina. Evaluar limpiarlo en una pasada posterior — NO en esta migración (mantener el diff acotado).
+
+### Plan de migración lockeado (semana-raíz 1—1)
+- **S0** — crear `semanas` + módulo; backfill: una fila por cada `fecha_inicio` distinta de `menus_semanales` ∪ `semana_inicio` de `pedidos`/sugerencias.
+- **S1** — pre-flight dedup gate (aborta si multi-menú/semana). Agregar `semana_id` NULLABLE + índice a `menus_semanales`, `pedidos`, `pedido_sugerencias`, `sugerencias_empleados`, `pedido_sugerencia_opciones`; backfill por igualdad de fecha.
+- **S2** — flip de lecturas a `semana_id` con **paridad shadow-read** (pedidos, cocina, finanzas, estadisticas, notificaciones) sobre todos los datos reales.
+- **S3** — `semana_id` NOT NULL; `UNIQUE(menus_semanales.semana_id)`; swap `pedidos` UNIQUE → `(empleado_id, semana_id)` y los UNIQUE de las 3 tablas de sugerencias.
+- **S4** — DROP `semana_inicio`/`fecha_inicio`/`fecha_fin` una vez toda lectura migrada y en verde.
+- Gate por fase: `npm test` secuencial verde + paridad verde antes de cada flip.
+
+### Tests obligatorios
+- Pre-flight: dedup (>1 menú/semana), no-lunes, spans no-canónicos + rollback (down).
+- Paridad shadow-read por cada consumidor (pedidos/cocina/finanzas/estadisticas/notificaciones) — antes de dropear.
+- `UNIQUE(empleado_id, semana_id)` enforce 1/semana + upsert ON CONFLICT; `pedido_sugerencia_opciones` UNIQUE `(semana_id, plato_id)`.
+- `getOrCreateSemana` idempotente + `UNIQUE(fecha_inicio)`; `validarSemanaInicioLunes` sigue exigiendo lunes; guardia de `createMenuSemanal` rechaza 2º menú/semana.
+- **Regresión CRÍTICA**: `trg_bloquear_desactivar_vianda` sigue bloqueando la desactivación de vianda en uso tras el switch a `semana_id` (el test que hoy no existe para el path del trigger).
+
+### NO en scope (diferido)
+- Compuesto v2 (menú compuesto, componentes, override standing) — migración posterior.
+- Multi-menú por semana (1—N) y ruteo empresa→menú — sin uso actual.
+- Dropear `viandas` / `menu_semanal_dia_empresa_override` — pertenecen al compuesto v2.
+
+### Implementación — S0 (✅ hecha, 2026-07-19)
+Migración `1719000082000_create-semanas-table.js`: tabla `semanas` (`id, fecha_inicio date UNIQUE NOT NULL, fecha_fin date, timestamps`) + backfill de una fila por cada lunes distinto ya presente (`menus_semanales.fecha_inicio` ∪ `semana_inicio` de `pedidos`/3 sugerencias, normalizado con `date_trunc('week')`). No toca ninguna tabla vieja (cero cambio de comportamiento). Módulo `semanas` completo (`routes/controller/service/repository/validation`) montado en `/api/v1/semanas`: `getOrCreateSemana(fecha)` idempotente por lunes (upsert `ON CONFLICT (fecha_inicio)`, acepta `db` transaccional) + `lunesDe()` como fuente única del cálculo del lunes (las 3 copias históricas migran en fases siguientes). Endpoints admin: `GET /semanas`, `GET /semanas/actual`, `GET /semanas/:id`. Test `test/semanas.http-db.test.js` (3/3): idempotencia + normalización a lunes + `UNIQUE(fecha_inicio)` + endpoints. Lint limpio; suite: 155 pass, 3 fail preexistentes ajenos a S0 (2 pollution de `categorias-consistency` en menudb + 1 date-dependiente de `pedidos` por correr en domingo).
+
+### Implementación — S1 (✅ hecha, 2026-07-19)
+Migración `1719000083000_semanas-link-columns.js` (aditiva, cero cambio de comportamiento — nadie lee `semana_id` todavía):
+- **Pre-flights que ABORTAN con mensaje claro** (remediación, no abort ciego — D7): fechas no-lunes, spans no canónicos (`fecha_fin ≠ fecha_inicio+6`), semanas con >1 menú. Datos actuales verificados limpios (0 en las tres).
+- `semana_id integer` NULLABLE + FK `→ semanas(id)` + índice en `menus_semanales`, `pedidos`, `pedido_sugerencias`, `sugerencias_empleados`, `pedido_sugerencia_opciones`.
+- Backfill por igualdad de semana (`s.fecha_inicio = date_trunc('week', <fecha>)::date`) + guard post-backfill que RAISE si queda algún `semana_id` NULL.
+- Test `test/semanas-link.db.test.js` (10/10): sin NULL + **paridad** (`semana_id` resuelve a `date_trunc('week', fecha_vieja)`) por cada tabla. Suite: 165 pass, 3 fail preexistentes.
+
+### Implementación — S2 (🟡 en curso, 2026-07-19)
+Chunk 1 (trigger + write-flip) **hecho y verificado**:
+- **Trigger reescrito** — migración `1719000084000_trigger-vianda-semana-id.js`: `trg_bloquear_desactivar_vianda` ahora lee la semana vía `JOIN semanas` sobre `pedidos.semana_id` y `menus_semanales.semana_id` (antes `p.semana_inicio` / `ms.fecha_fin`). Verificado con `pg_get_functiondef`: 0 refs a `semana_inicio`, usa `JOIN semanas`. Elimina el landmine de runtime antes del drop (S4).
+- **Write-flip (puente de transición)** — migración `1719000085000_semana-id-autopopulate.js`: trigger `BEFORE INSERT/UPDATE` en `pedidos`/`menus_semanales`/3 sugerencias que auto-popula `semana_id` (getOrCreate concurrente-seguro). Garantiza que toda fila nueva quede linkeada sin tocar la transacción crítica de pedidos (write-before-read para que el trigger reescrito cuente pedidos nuevos). Se **retira en S4** (lee `semana_inicio`/`fecha_inicio`, que se dropean).
+- Tests: `test/semanas-autopopulate.db.test.js` (write-flip). Suite: 166 pass, 3 fail preexistentes. Viandas (trigger) y pedidos (auto-populate) verdes.
+
+**Pendiente S2 chunk 2**: flip de **lecturas** a `semana_id`/`JOIN semanas` en las queries de `pedidos.repository`, `cocina.repository` (conteos), `estadisticas.repository` (aritmética de fecha), `notificaciones` (templating), `finanzas` — con paridad shadow-read. Luego S3 (NOT NULL + UNIQUEs + guardia en createMenuSemanal + swap del UNIQUE de pedidos) y S4 (drop columnas + retirar el puente auto-populate).
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean | 3 issues (2 arch + 1 cq), scope reduced; outside voice folded |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **CROSS-MODEL:** Outside voice (Claude subagent; Codex no instalado) encontró 8 hallazgos. El más grave — un **landmine oculto**: el trigger `trg_bloquear_desactivar_vianda` usa `pedidos.semana_inicio` y rompería en runtime (no en la migración) al dropear la columna. Se folded como requisito obligatorio + test de regresión. Tensiones D6 (dropear) y D7 (1—1 duro) presentadas al usuario: eligió dropear igual (con manejo obligatorio del trigger/estadísticas/notificaciones/fecha_fin) y mantener 1—1 completo (guardia + remediación + regla de dueño).
+- **VERDICT:** ENG CLEARED (scope reducido a semana-raíz 1—1 como migración propia; compuesto v2 y multi-menú 1—N diferidos) — listo para implementar por fases S0–S4.
+
+NO UNRESOLVED DECISIONS

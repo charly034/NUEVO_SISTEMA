@@ -114,6 +114,21 @@ modules:
       - "Entidad independiente de guarniciones (replanteo de dominio 2026-07-10): un plato puede tener guarnicion y salsa a la vez, una sola, o ninguna, cada una con su propio modo (sin_X/fija/libre)."
       - "Ver docs/ai/90-redesign-dominio-borrador.md para el modelo completo (Vianda = Plato + Guarnicion opcional + Salsa opcional)."
 
+  - owner_module: "API_LA_QUINTA.semanas"
+    status: verified_in_repo
+    kind: api_module
+    paths:
+      - "API_LA_QUINTA/src/modules/semanas"
+      - "API_LA_QUINTA/src/database/migrations/1719000082000_create-semanas-table.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000083000_semanas-link-columns.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000084000_trigger-vianda-semana-id.js"
+      - "API_LA_QUINTA/src/database/migrations/1719000085000_semana-id-autopopulate.js"
+    routes_file: "API_LA_QUINTA/src/modules/semanas/semanas.routes.js"
+    owns: ["entidad semana como raiz (contenedor de menus/pedidos)", "getOrCreateSemana por lunes idempotente", "fuente unica del calculo del lunes (lunesDe)", "listado/detalle/actual admin de semanas"]
+    boundaries:
+      - "Fase S0-S2 del plan semana-raiz (docs/ai/90-redesign-dominio-borrador.md): semanas.fecha_inicio (lunes) UNIQUE es la identidad; menus_semanales/pedidos/3 tablas de sugerencias apuntan via semana_id (NULLABLE en S1-S2, NOT NULL+UNIQUE en S3)."
+      - "El trigger BEFORE INSERT/UPDATE set_semana_id (mig. 1719000085000) auto-popula semana_id desde la fecha; puente de transicion, se retira en S4."
+
   - owner_module: "API_LA_QUINTA.empresas"
     status: verified_in_repo
     kind: api_module
