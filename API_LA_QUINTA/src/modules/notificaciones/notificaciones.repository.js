@@ -394,7 +394,7 @@ export async function findEmpleadosSinPedidoSemanal(semanaInicio) {
      JOIN empresas emp ON emp.id = e.empresa_id
      LEFT JOIN pedidos p
        ON p.empleado_id = e.id
-      AND p.semana_inicio = $1
+      AND p.semana_id = (SELECT id FROM semanas WHERE fecha_inicio = date_trunc('week', $1::date)::date)
       AND p.estado <> 'cancelado'
      WHERE e.activo = TRUE
        AND emp.activo = TRUE
