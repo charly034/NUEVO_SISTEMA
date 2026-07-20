@@ -431,9 +431,11 @@ Chunk 1 (trigger + write-flip) **hecho y verificado**:
 - **Write-flip (puente de transición)** — migración `1719000085000_semana-id-autopopulate.js`: trigger `BEFORE INSERT/UPDATE` en `pedidos`/`menus_semanales`/3 sugerencias que auto-popula `semana_id` (getOrCreate concurrente-seguro). Garantiza que toda fila nueva quede linkeada sin tocar la transacción crítica de pedidos (write-before-read para que el trigger reescrito cuente pedidos nuevos). Se **retira en S4** (lee `semana_inicio`/`fecha_inicio`, que se dropean).
 - Tests: `test/semanas-autopopulate.db.test.js` (write-flip). Suite: 166 pass, 3 fail preexistentes. Viandas (trigger) y pedidos (auto-populate) verdes.
 
-Chunk 2 (flip de lecturas) — **en progreso**:
-- ✅ **`cocina.repository`**: los 4 conteos/agregados (`findConteosPedidos`, `findDetalleEtiquetas`, `findKPIsHoy`, `findTotalesPorDia`) leen la semana vía `JOIN semanas ON semana_id` + `se.fecha_inicio` (antes `p.semana_inicio`). Verificado: 0 refs a `p.semana_inicio`, cocina test verde, suite 166/3.
-- ⏭️ **Pendiente**: `pedidos.repository` (~11 sitios), `estadisticas.repository` (aritmética `semana_inicio::date + offset` → JOIN + `se.fecha_inicio`), `notificaciones` (templating `{{semana_inicio}}`), `finanzas` (área sensible). Todos con la misma técnica (JOIN semanas, paridad garantizada por el auto-populate).
+Chunk 2 (flip de lecturas) — **en progreso**. Técnica: reemplazar el read de `p.semana_inicio` por `JOIN semanas se ON se.id = p.semana_id` + `se.fecha_inicio`. Paridad garantizada por el auto-populate (semana_id siempre en sync).
+- ✅ **`cocina.repository`**: 4 conteos/agregados flipeados. Suite 166/3.
+- ✅ **`estadisticas.repository`**: `filtrosPedido` calcula la fecha de servicio desde `se.fecha_inicio` + JOIN en las 4 queries por-empresa. Suite 167/2.
+- ✅ **`notificaciones.repository`**: `findEmpleadosSinPedidoSemanal` filtra por `semana_id` (subquery a semanas). Los usos en `notificaciones.service.js` son a nivel app (leen `.fecha_inicio`/`.semana_inicio` de objetos de otras queries) → se resuelven cuando flipeen esas queries / en S4.
+- ⏭️ **Pendiente (tangled, cabeza fresca)**: `pedidos.repository` (~30 sitios: SELECTs que devuelven `semana_inicio` en el payload + ORDER + WHERE + los write/constraint `ON CONFLICT (empleado_id, semana_inicio)` que NO se tocan hasta S3/S4) y `finanzas` (mismo patrón + área sensible: SELECTs líneas 94/157/272/383/505, JSON 413/543, ORDER, WHERE). Ambos requieren flipear los SELECT-return a `se.fecha_inicio AS semana_inicio` cuidando el contrato de respuesta.
 
 **Pendiente S3**: `semana_id` NOT NULL + `UNIQUE(menus_semanales.semana_id)` + guardia en `createMenuSemanal` + swap del UNIQUE de `pedidos` a `(empleado_id, semana_id)` y de las 3 sugerencias. **S4**: drop `semana_inicio`/`fecha_inicio`/`fecha_fin` + retirar el puente auto-populate + código de app setea `semana_id` directo.
 
