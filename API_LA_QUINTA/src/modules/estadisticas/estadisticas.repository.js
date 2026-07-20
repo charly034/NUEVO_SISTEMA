@@ -18,7 +18,7 @@ END`;
 function filtrosPedido({ desde, hasta, empresa_id } = {}, startIndex = 1) {
   const conditions = ['pi.sin_pedido = false', 'pi.plato_id IS NOT NULL', "ped.estado <> 'cancelado'"];
   const values = [];
-  const fechaServicio = `(ped.semana_inicio::date + (${DIA_OFFSET}) * INTERVAL '1 day')::date`;
+  const fechaServicio = `(se.fecha_inicio + (${DIA_OFFSET}) * INTERVAL '1 day')::date`;
   if (desde) {
     values.push(desde);
     conditions.push(`${fechaServicio} >= $${startIndex + values.length - 1}`);
@@ -45,6 +45,7 @@ export async function platosmasUsados(filters = {}) {
              MIN(${filtros.fechaServicio}) AS primer_uso
       FROM pedido_items pi
       JOIN pedidos ped ON ped.id = pi.pedido_id
+      JOIN semanas se ON se.id = ped.semana_id
       JOIN platos p ON p.id = pi.plato_id
       WHERE ${filtros.where}
       GROUP BY p.id, p.nombre, p.tags
@@ -78,6 +79,7 @@ export async function distribucionTags(filters = {}) {
       SELECT tag, COUNT(*)::int AS usos
       FROM pedido_items pi
       JOIN pedidos ped ON ped.id = pi.pedido_id
+      JOIN semanas se ON se.id = ped.semana_id
       JOIN platos p ON p.id = pi.plato_id,
       unnest(p.tags) AS tag
       WHERE ${filtros.where}
@@ -109,6 +111,7 @@ export async function usoPorDia(filters = {}) {
              COUNT(DISTINCT pi.plato_id)::int AS platos_distintos
       FROM pedido_items pi
       JOIN pedidos ped ON ped.id = pi.pedido_id
+      JOIN semanas se ON se.id = ped.semana_id
       WHERE ${filtros.where}
       GROUP BY pi.dia
       ORDER BY ${DIA_ORDEN_PEDIDO}
@@ -136,6 +139,7 @@ export async function tendenciaMensual(filters = {}) {
              COUNT(DISTINCT pi.plato_id)::int AS platos_distintos
       FROM pedido_items pi
       JOIN pedidos ped ON ped.id = pi.pedido_id
+      JOIN semanas se ON se.id = ped.semana_id
       WHERE ${filtros.where}
       GROUP BY mes
       ORDER BY mes
