@@ -97,9 +97,14 @@ async function seed() {
     for (const sem of menus) {
       const fechaInicio = sem.fecha_inicio;
       const estado = estadoDe(fechaInicio);
+      // S4: el menú cuelga de semana_id; getOrCreate de la semana desde su lunes.
       const menuRes = await client.query(
-        `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado, publicado_at, cerrado_at)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        `WITH s AS (
+           INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($2, $3)
+           ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+         )
+         INSERT INTO menus_semanales (nombre, semana_id, estado, publicado_at, cerrado_at)
+         SELECT $1, s.id, $4, $5, $6 FROM s RETURNING id`,
         [
           nombreSemana(fechaInicio), fechaInicio, domingoDe(fechaInicio), estado,
           estado === 'publicado' || estado === 'cerrado' ? ahora : null,

@@ -121,6 +121,41 @@ export async function limpiarDatosTest(prefijo) {
 // un fixture que crea su menú para una semana ya ocupada choca. El test "posee" su
 // semana: la libera antes de crear su propio menú. Idempotente (si no hay menú, no
 // borra nada; si la semana ni existe en `semanas`, el subselect no matchea).
+// S4: los fixtures ya no pueden insertar menus_semanales.fecha_inicio/fecha_fin
+// (dropeadas). Este helper hace getOrCreate de la semana y cuelga el menú de
+// semana_id, devolviendo también fecha_inicio/fecha_fin (desde semanas) para los
+// fixtures que las usan. `db` puede ser el `query` global o un client (transacción).
+// Si estado='publicado' y no se pasa publicado_at, se setea NOW() automáticamente.
+export async function insertarMenuSemana(db, {
+  nombre,
+  fecha_inicio,
+  fecha_fin = null,
+  estado = 'borrador',
+  fecha_limite_pedidos = null,
+  publicado_at = null,
+} = {}) {
+  const run = typeof db === 'function' ? db : db.query.bind(db);
+  // publicado_at por defecto = ahora si el menú nace publicado (se computa en JS para
+  // no reusar el parámetro $estado en dos contextos de tipo distinto).
+  const pubAt = publicado_at ?? (estado === 'publicado' ? new Date() : null);
+  const r = await run(
+    `WITH s AS (
+       INSERT INTO semanas (fecha_inicio, fecha_fin)
+       VALUES ($2, COALESCE($3::date, $2::date + 6))
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW()
+       RETURNING id, fecha_inicio, fecha_fin
+     ),
+     m AS (
+       INSERT INTO menus_semanales (nombre, semana_id, estado, fecha_limite_pedidos, publicado_at)
+       SELECT $1, s.id, $4, $5, $6 FROM s
+       RETURNING *
+     )
+     SELECT m.*, s.fecha_inicio, s.fecha_fin FROM m JOIN s ON s.id = m.semana_id`,
+    [nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, pubAt],
+  );
+  return r.rows[0];
+}
+
 export async function liberarSemana(fechaInicio) {
   await query(
     `DELETE FROM menus_semanales ms
@@ -306,14 +341,13 @@ export async function crearFixturePedido({
   // S3: garantizar que la semana esté libre antes de crear el menú del fixture
   // (el seed histórico ocupa varias semanas reales, y el UNIQUE(semana_id) lo prohíbe).
   await liberarSemana(semanaInicio);
-  const menu = (await query(
-    `INSERT INTO menus_semanales (
-       nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at
-     )
-     VALUES ($1, $2, ($2::date + INTERVAL '4 days')::date, 'publicado', $3, NOW())
-     RETURNING *`,
-    [`${prefijo} Menu semanal`, semanaInicio, fechaLimitePedidos],
-  )).rows[0];
+  // S4: el menú cuelga de semana_id (fecha_inicio/fecha_fin dropeadas).
+  const menu = await insertarMenuSemana(query, {
+    nombre: `${prefijo} Menu semanal`,
+    fecha_inicio: semanaInicio,
+    estado: 'publicado',
+    fecha_limite_pedidos: fechaLimitePedidos,
+  });
 
   const catEspeciales = (await query(`SELECT id FROM categorias WHERE slug = 'especiales'`)).rows[0].id;
   await query(
@@ -384,9 +418,14 @@ export function payloadPedidoValido(fixture, overrides = {}) {
 }
 
 export async function crearPedidoDirecto(fixture, { empleado = fixture.empleado, items = [] } = {}) {
+  // S4: pedido cuelga de semana_id; getOrCreate de la semana desde la fecha del fixture.
   const pedido = (await query(
-    `INSERT INTO pedidos (empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado)
-     VALUES ($1, $2, $3, $4, 'pendiente')
+    `WITH sem AS (
+       INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($4, ($4::date + 6))
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+     )
+     INSERT INTO pedidos (empleado_id, empresa_id, menu_semanal_id, semana_id, estado)
+     SELECT $1, $2, $3, sem.id, 'pendiente' FROM sem
      RETURNING *`,
     [empleado.id, empleado.empresa_id, fixture.menu.id, fixture.semanaInicio],
   )).rows[0];
@@ -428,8 +467,8 @@ export async function obtenerPedidoDb(pedidoId) {
 export async function contarPedidosFixture(fixture) {
   return Number((await query(
     `SELECT COUNT(*) AS total
-     FROM pedidos
-     WHERE empleado_id = $1 AND semana_inicio = $2`,
+     FROM pedidos p JOIN semanas se ON se.id = p.semana_id
+     WHERE p.empleado_id = $1 AND se.fecha_inicio = $2`,
     [fixture.empleado.id, fixture.semanaInicio],
   )).rows[0].total);
 }

@@ -7,14 +7,14 @@ export const findAll = async ({ limit = 10, offset = 0, desde, hasta } = {}) => 
   const conditions = [];
   const values = [];
 
-  if (desde) { values.push(desde); conditions.push(`fecha_inicio >= $${values.length}`); }
-  if (hasta) { values.push(hasta); conditions.push(`fecha_fin <= $${values.length}`); }
+  if (desde) { values.push(desde); conditions.push(`se.fecha_inicio >= $${values.length}`); }
+  if (hasta) { values.push(hasta); conditions.push(`se.fecha_fin <= $${values.length}`); }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   values.push(limit, offset);
 
   const result = await query(
-    `SELECT ms.id, ms.nombre, ms.fecha_inicio, ms.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.publicado_at, ms.cerrado_at, ms.created_at, ms.updated_at,
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.publicado_at, ms.cerrado_at, ms.created_at, ms.updated_at,
       COALESCE(
         (SELECT json_agg(jsonb_build_object(
           'dia', d.dia,
@@ -33,8 +33,9 @@ export const findAll = async ({ limit = 10, offset = 0, desde, hasta } = {}) => 
          FROM menu_semanal_sin_servicio ss WHERE ss.menu_semanal_id = ms.id),
         '[]'::json
       ) AS sin_servicio
-     FROM menus_semanales ms ${where}
-     ORDER BY ms.fecha_inicio DESC
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id ${where}
+     ORDER BY se.fecha_inicio DESC
      LIMIT $${values.length - 1} OFFSET $${values.length}`,
     values
   );
@@ -45,17 +46,18 @@ export const countAll = async ({ desde, hasta } = {}) => {
   const conditions = [];
   const values = [];
 
-  if (desde) { values.push(desde); conditions.push(`fecha_inicio >= $${values.length}`); }
-  if (hasta) { values.push(hasta); conditions.push(`fecha_fin <= $${values.length}`); }
+  if (desde) { values.push(desde); conditions.push(`se.fecha_inicio >= $${values.length}`); }
+  if (hasta) { values.push(hasta); conditions.push(`se.fecha_fin <= $${values.length}`); }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const result = await query(`SELECT COUNT(*) as total FROM menus_semanales ${where}`, values);
+  const result = await query(`SELECT COUNT(*) as total FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id ${where}`, values);
   return parseInt(result.rows[0].total, 10);
 };
 
 export const findById = async (id) => {
   const result = await query(
-    'SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at, cerrado_at, created_at, updated_at FROM menus_semanales WHERE id = $1',
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.publicado_at, ms.cerrado_at, ms.created_at, ms.updated_at
+     FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id WHERE ms.id = $1`,
     [id]
   );
   return result.rows[0] || null;
@@ -64,12 +66,12 @@ export const findById = async (id) => {
 // Devuelve el menú publicado activo (el más cercano a hoy hacia adelante)
 export const findPublicadoActivo = async () => {
   const result = await query(
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at
-     FROM menus_semanales
-     WHERE estado = 'publicado' AND fecha_fin >= CURRENT_DATE
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.publicado_at
+     FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.estado = 'publicado' AND se.fecha_fin >= CURRENT_DATE
      ORDER BY
-       CASE WHEN CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin THEN 0 ELSE 1 END,
-       fecha_inicio ASC
+       CASE WHEN CURRENT_DATE BETWEEN se.fecha_inicio AND se.fecha_fin THEN 0 ELSE 1 END,
+       se.fecha_inicio ASC
      LIMIT 1`
   );
   return result.rows[0] || null;
@@ -90,8 +92,13 @@ export const cambiarEstado = async (id, estado, extra = {}) => {
   vals.push(id);
 
   const result = await query(
-    `UPDATE menus_semanales SET ${set}, updated_at = NOW() WHERE id = $${vals.length}
-     RETURNING id, nombre, estado, fecha_inicio, fecha_fin, fecha_limite_pedidos, publicado_at, cerrado_at`,
+    `WITH upd AS (
+       UPDATE menus_semanales SET ${set}, updated_at = NOW() WHERE id = $${vals.length}
+       RETURNING id, nombre, estado, semana_id, fecha_limite_pedidos, publicado_at, cerrado_at
+     )
+     SELECT upd.id, upd.nombre, upd.estado, se.fecha_inicio, se.fecha_fin,
+            upd.fecha_limite_pedidos, upd.publicado_at, upd.cerrado_at
+     FROM upd JOIN semanas se ON se.id = upd.semana_id`,
     vals
   );
   return result.rows[0] || null;
@@ -102,7 +109,8 @@ export const cambiarEstado = async (id, estado, extra = {}) => {
 // También incluye los días sin servicio
 export const findByIdWithDias = async (id) => {
   const menuResult = await query(
-    'SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, created_at, updated_at FROM menus_semanales WHERE id = $1',
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.created_at, ms.updated_at
+     FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id WHERE ms.id = $1`,
     [id]
   );
   const menu = menuResult.rows[0];
@@ -149,27 +157,39 @@ export const findByIdWithDias = async (id) => {
   };
 };
 
-// Guardia S3 del 1-1 semana<->menu: ¿ya hay un menú para esta semana? Se resuelve
-// por fecha_inicio (== el lunes) porque el UNIQUE duro es sobre semana_id y ambos
-// están 1-1 en sync (auto-populate). Devuelve el menú existente o null.
+// Guardia del 1-1 semana<->menu: ¿ya hay un menú para esta semana? Se resuelve por
+// la fecha del lunes vía JOIN semanas (S4: menus_semanales ya no tiene fecha_inicio;
+// el UNIQUE duro es sobre semana_id). Devuelve el menú existente o null.
 export const findBySemanaInicio = async (fechaInicio) => {
   const result = await query(
-    'SELECT id, nombre, fecha_inicio FROM menus_semanales WHERE fecha_inicio = $1 LIMIT 1',
+    `SELECT ms.id, ms.nombre, se.fecha_inicio
+     FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id
+     WHERE se.fecha_inicio = $1 LIMIT 1`,
     [fechaInicio]
   );
   return result.rows[0] || null;
 };
 
-export const create = async ({ nombre, fecha_inicio, fecha_fin, admin_id = null }) => {
+// S4: el menú cuelga de `semanas` vía semana_id; el service resuelve la semana
+// (getOrCreateByLunes) y pasa semana_id. RETURNING vía CTE+JOIN para exponer
+// fecha_inicio/fecha_fin (del contrato) desde semanas.
+export const create = async ({ nombre, semana_id, admin_id = null }) => {
   const result = await query(
-    `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id)
-     VALUES ($1, $2, $3, $4, $4)
-     RETURNING id, nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id, created_at, updated_at`,
-    [nombre, fecha_inicio, fecha_fin, admin_id]
+    `WITH nuevo AS (
+       INSERT INTO menus_semanales (nombre, semana_id, created_by_admin_id, updated_by_admin_id)
+       VALUES ($1, $2, $3, $3)
+       RETURNING id, nombre, semana_id, created_by_admin_id, updated_by_admin_id, created_at, updated_at
+     )
+     SELECT nuevo.id, nuevo.nombre, se.fecha_inicio, se.fecha_fin,
+            nuevo.created_by_admin_id, nuevo.updated_by_admin_id, nuevo.created_at, nuevo.updated_at
+     FROM nuevo JOIN semanas se ON se.id = nuevo.semana_id`,
+    [nombre, semana_id, admin_id]
   );
   return result.rows[0];
 };
 
+// `fields` NO puede incluir fecha_inicio/fecha_fin (S4: no existen en la tabla); el
+// service traduce un cambio de semana a `semana_id` antes de llamar. RETURNING vía CTE+JOIN.
 export const update = async (id, fields, admin_id = null) => {
   const allFields = admin_id ? { ...fields, updated_by_admin_id: admin_id } : fields;
   const keys = Object.keys(allFields);
@@ -178,8 +198,13 @@ export const update = async (id, fields, admin_id = null) => {
   values.push(id);
 
   const result = await query(
-    `UPDATE menus_semanales SET ${setClause}, updated_at = NOW() WHERE id = $${values.length}
-     RETURNING id, nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id, created_at, updated_at`,
+    `WITH upd AS (
+       UPDATE menus_semanales SET ${setClause}, updated_at = NOW() WHERE id = $${values.length}
+       RETURNING id, nombre, semana_id, created_by_admin_id, updated_by_admin_id, created_at, updated_at
+     )
+     SELECT upd.id, upd.nombre, se.fecha_inicio, se.fecha_fin,
+            upd.created_by_admin_id, upd.updated_by_admin_id, upd.created_at, upd.updated_at
+     FROM upd JOIN semanas se ON se.id = upd.semana_id`,
     values
   );
   return result.rows[0] || null;
@@ -362,8 +387,8 @@ export const findSinServicioMap = async (menuSemanalId) => {
 
 export const findDisenoById = async (id) => {
   const menuResult = await query(
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, created_at, updated_at
-     FROM menus_semanales WHERE id = $1`,
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.created_at, ms.updated_at
+     FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id WHERE ms.id = $1`,
     [id]
   );
   const menu = menuResult.rows[0];
@@ -490,12 +515,13 @@ export const findDisenoById = async (id) => {
 
 export const historialPorPlato = async (platoId) => {
   const result = await query(
-    `SELECT ms.id AS menu_semanal_id, ms.nombre, ms.fecha_inicio, ms.fecha_fin,
+    `SELECT ms.id AS menu_semanal_id, ms.nombre, se.fecha_inicio, se.fecha_fin,
             msd.dia, msd.opcion
      FROM menu_semanal_dias msd
      JOIN menus_semanales ms ON ms.id = msd.menu_semanal_id
+     JOIN semanas se ON se.id = ms.semana_id
      WHERE msd.plato_id = $1 AND msd.opcion IS NOT NULL
-     ORDER BY ms.fecha_inicio DESC, ${ORDEN_DIA}, msd.opcion ASC`,
+     ORDER BY se.fecha_inicio DESC, ${ORDEN_DIA}, msd.opcion ASC`,
     [platoId]
   );
   return result.rows;

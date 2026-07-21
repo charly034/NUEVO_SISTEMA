@@ -21,12 +21,13 @@ export const diaDeNombre = (fechaISO) => {
 
 export const findMenuActivoPorFecha = async (fechaISO) => {
   const result = await query(
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado
-     FROM menus_semanales
-     WHERE estado IN ('publicado', 'cerrado')
-       AND fecha_inicio <= $1
-       AND fecha_fin    >= $1
-     ORDER BY fecha_inicio DESC
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.estado IN ('publicado', 'cerrado')
+       AND se.fecha_inicio <= $1
+       AND se.fecha_fin    >= $1
+     ORDER BY se.fecha_inicio DESC
      LIMIT 1`,
     [fechaISO]
   );

@@ -161,8 +161,12 @@ test('CRUD de grupos y platos de grupo', async () => {
 test('reasignar categoría de una celda y borrarla', async () => {
   // Menú throwaway + una celda (sin materializar fijos, insert directo).
   const { rows: menuRows } = await query(
-    `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado)
-     VALUES ('fase-e-test menu', '2099-03-02', '2099-03-08', 'borrador') RETURNING id`
+    `WITH s AS (
+       INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ('2099-03-02', '2099-03-08')
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+     )
+     INSERT INTO menus_semanales (nombre, semana_id, estado)
+     SELECT 'fase-e-test menu', s.id, 'borrador' FROM s RETURNING id`
   );
   const menuId = menuRows[0].id;
   menusCreados.push(menuId);

@@ -8,6 +8,7 @@ import {
   cerrarPoolDb,
   iniciarServidorTest,
   requestJson,
+  insertarMenuSemana,
 } from '../test_helpers/pedidos-http.helper.js';
 
 let servidor;
@@ -118,16 +119,17 @@ test('GET /api/v1/cocina/hoy consolida conteo de vianda (con salsa) y checklist 
         [platoLocal.id, dia],
       );
 
-      const menu = (await query(
-        `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado, publicado_at)
-         VALUES ($1, $2, ($2::date + INTERVAL '6 days')::date, 'publicado', NOW())
-         RETURNING *`,
-        [`${prefijo} Menu`, lunes],
-      )).rows[0];
+      const menu = await insertarMenuSemana(query, {
+        nombre: `${prefijo} Menu`, fecha_inicio: lunes, estado: 'publicado',
+      });
 
       const pedido = (await query(
-        `INSERT INTO pedidos (empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado)
-         VALUES ($1, $2, $3, $4, 'pendiente')
+        `WITH sem AS (
+           INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($4, ($4::date + 6))
+           ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+         )
+         INSERT INTO pedidos (empleado_id, empresa_id, menu_semanal_id, semana_id, estado)
+         SELECT $1, $2, $3, sem.id, 'pendiente' FROM sem
          RETURNING *`,
         [empleado.id, empresa.id, menu.id, lunes],
       )).rows[0];

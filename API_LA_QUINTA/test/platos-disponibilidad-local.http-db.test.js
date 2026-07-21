@@ -7,6 +7,7 @@ import {
   cerrarPoolDb,
   iniciarServidorTest,
   requestJson,
+  insertarMenuSemana,
 } from '../test_helpers/pedidos-http.helper.js';
 
 let servidor;
@@ -143,12 +144,9 @@ test('POST /api/v1/menus-semanales/:id/dias rechaza un plato sin vianda activa',
     try {
       const plato = await crearPlatoTest(prefijo, { disponible_vianda: false });
 
-      const menu = (await query(
-        `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado)
-         VALUES ($1, '2026-08-03', '2026-08-07', 'borrador')
-         RETURNING *`,
-        [`${prefijo} Menu`],
-      )).rows[0];
+      const menu = await insertarMenuSemana(query, {
+        nombre: `${prefijo} Menu`, fecha_inicio: '2026-08-03',
+      });
 
       const respuesta = await requestJson(servidor.baseUrl, 'POST', `/menus-semanales/${menu.id}/dias`, {
         token,

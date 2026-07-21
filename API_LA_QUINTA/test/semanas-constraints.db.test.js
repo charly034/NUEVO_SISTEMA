@@ -1,7 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { query } from '../src/database/connection.js';
-import { cerrarPoolDb } from '../test_helpers/pedidos-http.helper.js';
+import { cerrarPoolDb, insertarMenuSemana } from '../test_helpers/pedidos-http.helper.js';
 import * as menusService from '../src/modules/menus-semanales/menus-semanales.service.js';
 
 // Fase S3 del plan "semana como raiz": el invariante paso de la fecha suelta a
@@ -76,29 +76,36 @@ test('pedidos: UNIQUE(empleado_id, semana_id) impide 2 pedidos en la misma seman
     [empresa.id, `${PREFIJO}+u@test.local`],
   )).rows[0];
 
-  // 1er pedido: el trigger set_semana_id deriva semana_id de semana_inicio.
+  // S4: el pedido cuelga de semana_id (getOrCreate de la semana desde el lunes).
+  const semanaId = (await query(
+    `INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($1, ($1::date + 6))
+     ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id`,
+    [LUNES],
+  )).rows[0].id;
+
+  // 1er pedido
   await query(
-    `INSERT INTO pedidos (empleado_id, empresa_id, semana_inicio, estado)
+    `INSERT INTO pedidos (empleado_id, empresa_id, semana_id, estado)
      VALUES ($1, $2, $3, 'pendiente')`,
-    [empleado.id, empresa.id, LUNES],
+    [empleado.id, empresa.id, semanaId],
   );
 
   // 2do pedido crudo misma semana -> viola UNIQUE(empleado_id, semana_id).
   await assert.rejects(
     query(
-      `INSERT INTO pedidos (empleado_id, empresa_id, semana_inicio, estado)
+      `INSERT INTO pedidos (empleado_id, empresa_id, semana_id, estado)
        VALUES ($1, $2, $3, 'pendiente')`,
-      [empleado.id, empresa.id, LUNES],
+      [empleado.id, empresa.id, semanaId],
     ),
     (err) => err.code === '23505' && /empleado_semana_id/.test(err.constraint),
   );
 
   // ON CONFLICT (empleado_id, semana_id) DO UPDATE: upsert, no error, sigue 1 fila.
   await query(
-    `INSERT INTO pedidos (empleado_id, empresa_id, semana_inicio, estado, observaciones)
+    `INSERT INTO pedidos (empleado_id, empresa_id, semana_id, estado, observaciones)
      VALUES ($1, $2, $3, 'pendiente', 'upsert')
      ON CONFLICT (empleado_id, semana_id) DO UPDATE SET observaciones = EXCLUDED.observaciones`,
-    [empleado.id, empresa.id, LUNES],
+    [empleado.id, empresa.id, semanaId],
   );
   const n = (await query('SELECT COUNT(*)::int AS n FROM pedidos WHERE empleado_id = $1', [empleado.id])).rows[0].n;
   assert.equal(n, 1, 'debe haber exactamente 1 pedido para el empleado en la semana');
@@ -111,14 +118,19 @@ test('pedido_sugerencia_opciones: UNIQUE(semana_id, plato_id) impide duplicar pl
     [`${PREFIJO} Plato sugerencia`],
   )).rows[0];
 
+  const semanaId = (await query(
+    `INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($1, ($1::date + 6))
+     ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id`,
+    [LUNES],
+  )).rows[0].id;
   await query(
-    `INSERT INTO pedido_sugerencia_opciones (semana_inicio, plato_id, orden) VALUES ($1, $2, 0)`,
-    [LUNES, plato.id],
+    `INSERT INTO pedido_sugerencia_opciones (semana_id, plato_id, orden) VALUES ($1, $2, 0)`,
+    [semanaId, plato.id],
   );
   await assert.rejects(
     query(
-      `INSERT INTO pedido_sugerencia_opciones (semana_inicio, plato_id, orden) VALUES ($1, $2, 1)`,
-      [LUNES, plato.id],
+      `INSERT INTO pedido_sugerencia_opciones (semana_id, plato_id, orden) VALUES ($1, $2, 1)`,
+      [semanaId, plato.id],
     ),
     (err) => err.code === '23505' && /semana_id_plato/.test(err.constraint),
   );
@@ -126,11 +138,7 @@ test('pedido_sugerencia_opciones: UNIQUE(semana_id, plato_id) impide duplicar pl
 
 // ── Guardia de createMenuSemanal: rechaza 2do menu/semana ───────────
 test('createMenuSemanal rechaza un 2do menu para una semana ya usada (409)', async () => {
-  await query(
-    `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado)
-     VALUES ($1, $2, ($2::date + 6), 'borrador')`,
-    [`${PREFIJO} Menu existente`, LUNES],
-  );
+  await insertarMenuSemana(query, { nombre: `${PREFIJO} Menu existente`, fecha_inicio: LUNES });
   await assert.rejects(
     menusService.createMenuSemanal({ nombre: `${PREFIJO} Menu duplicado`, fecha_inicio: LUNES, fecha_fin: '2031-03-09' }),
     (err) => err.statusCode === 409 || /[Yy]a existe un men/.test(err.message),

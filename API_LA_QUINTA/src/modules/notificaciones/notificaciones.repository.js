@@ -375,11 +375,12 @@ export async function findWhatsappTestLogs({ limit = 10 } = {}) {
 
 export async function findSemanaPublicadaObjetivo() {
   const { rows } = await query(
-    `SELECT id, nombre, fecha_inicio, fecha_fin
-     FROM menus_semanales
-     WHERE estado = 'publicado'
-       AND fecha_fin >= CURRENT_DATE
-     ORDER BY fecha_inicio ASC
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.estado = 'publicado'
+       AND se.fecha_fin >= CURRENT_DATE
+     ORDER BY se.fecha_inicio ASC
      LIMIT 1`
   );
   return rows[0] || null;

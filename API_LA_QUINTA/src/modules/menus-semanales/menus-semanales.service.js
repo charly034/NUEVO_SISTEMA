@@ -1,4 +1,5 @@
 import * as repo from './menus-semanales.repository.js';
+import * as semanasRepo from '../semanas/semanas.repository.js';
 import * as platosRepository from '../platos/platos.repository.js';
 import * as viandasRepository from '../viandas/viandas.repository.js';
 import { setSlotVianda } from '../semana-opciones/semana-opciones.repository.js';
@@ -44,7 +45,10 @@ export const createMenuSemanal = async (data, admin_id = null, adminUser = null)
   if (existente) {
     throw ApiError.conflict(`Ya existe un menú para la semana ${data.fecha_inicio}`);
   }
-  const menu = await repo.create({ ...data, admin_id });
+  // S4: la semana es la raíz. Resolver/crear la semana (idempotente) y colgar el
+  // menú de su semana_id; `create` devuelve fecha_inicio/fecha_fin desde `semanas`.
+  const semana = await semanasRepo.getOrCreateByLunes(data.fecha_inicio, data.fecha_fin);
+  const menu = await repo.create({ nombre: data.nombre, semana_id: semana.id, admin_id });
   // Sembrar los fijos "recurrentes" del catalogo como filas por-semana
   // (teardown Fase C): garantiza el invariante "todo menu tiene sus fijos
   // materializados", que es lo que hace seguro leer los fijos desde
@@ -66,7 +70,21 @@ export const createMenuSemanal = async (data, admin_id = null, adminUser = null)
 export const updateMenuSemanal = async (id, data, admin_id = null, adminUser = null) => {
   const menu = await repo.findById(id);
   if (!menu) throw ApiError.notFound(`Menú semanal con id ${id} no encontrado`);
-  const actualizado = await repo.update(id, data, admin_id);
+  // S4: fecha_inicio/fecha_fin ya no son columnas del menú -> un cambio de fecha se
+  // traduce a reasignar semana_id (getOrCreateByLunes idempotente). Si se mueve a una
+  // semana ya ocupada por otro menú, rechazar (1-1 duro).
+  const { fecha_inicio, fecha_fin, ...resto } = data;
+  const fields = { ...resto };
+  if (fecha_inicio !== undefined || fecha_fin !== undefined) {
+    const lunes = fecha_inicio ?? new Date(menu.fecha_inicio).toISOString().slice(0, 10);
+    const existente = await repo.findBySemanaInicio(lunes);
+    if (existente && existente.id !== Number(id)) {
+      throw ApiError.conflict(`Ya existe un menú para la semana ${lunes}`);
+    }
+    const semana = await semanasRepo.getOrCreateByLunes(lunes, fecha_fin ?? null);
+    fields.semana_id = semana.id;
+  }
+  const actualizado = await repo.update(id, fields, admin_id);
   await auditoriaService.registrarAdminAction({
     adminUser,
     accion: 'actualizar',
@@ -103,20 +121,25 @@ export const duplicarMenuSemanal = async (id, data, adminUser = null) => {
     await client.query('BEGIN');
 
     const existente = await client.query(
-      'SELECT id FROM menus_semanales WHERE fecha_inicio = $1',
+      `SELECT ms.id FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id
+       WHERE se.fecha_inicio = $1`,
       [data.fecha_inicio]
     );
     if (existente.rows[0]) {
       throw ApiError.conflict(`Ya existe un menú para la semana ${data.fecha_inicio}`);
     }
 
+    // S4: resolver/crear la semana dentro de la transacción y colgar el menú de semana_id.
+    const semana = await semanasRepo.getOrCreateByLunes(data.fecha_inicio, data.fecha_fin, client.query.bind(client));
     const creadoResult = await client.query(
-      `INSERT INTO menus_semanales (
-        nombre, fecha_inicio, fecha_fin, estado, created_by_admin_id, updated_by_admin_id
-      )
-       VALUES ($1, $2, $3, 'borrador', $4, $4)
-       RETURNING id, nombre, fecha_inicio, fecha_fin, estado, created_at, updated_at`,
-      [data.nombre, data.fecha_inicio, data.fecha_fin, adminUser?.sub ?? null]
+      `WITH nuevo AS (
+         INSERT INTO menus_semanales (nombre, semana_id, estado, created_by_admin_id, updated_by_admin_id)
+         VALUES ($1, $2, 'borrador', $3, $3)
+         RETURNING id, nombre, semana_id, estado, created_at, updated_at
+       )
+       SELECT nuevo.id, nuevo.nombre, se.fecha_inicio, se.fecha_fin, nuevo.estado, nuevo.created_at, nuevo.updated_at
+       FROM nuevo JOIN semanas se ON se.id = nuevo.semana_id`,
+      [data.nombre, semana.id, adminUser?.sub ?? null]
     );
     const nuevo = creadoResult.rows[0];
 

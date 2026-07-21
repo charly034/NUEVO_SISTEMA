@@ -22,10 +22,10 @@ export const findByLunes = async (lunes) => {
 // carrera get-then-insert cuando la creacion de un menu y la de un pedido de la
 // misma semana ocurren en paralelo. `db` opcional para correr dentro de una
 // transaccion (pasar `client.query.bind(client)`).
-export const getOrCreateByLunes = async (lunes, fechaFin, db = query) => {
+export const getOrCreateByLunes = async (lunes, fechaFin = null, db = query) => {
   const r = await db(
     `INSERT INTO semanas (fecha_inicio, fecha_fin)
-     VALUES ($1, $2)
+     VALUES ($1, COALESCE($2::date, $1::date + 6))
      ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW()
      RETURNING ${COLS}`,
     [lunes, fechaFin],

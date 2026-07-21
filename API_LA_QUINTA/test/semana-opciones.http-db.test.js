@@ -7,6 +7,7 @@ import {
   cerrarPoolDb,
   iniciarServidorTest,
   requestJson,
+  insertarMenuSemana,
 } from '../test_helpers/pedidos-http.helper.js';
 
 let servidor;
@@ -85,12 +86,7 @@ async function limpiarTest(prefijo) {
 }
 
 async function crearMenu(prefijo, fechaInicio = '2026-08-10') {
-  return (await query(
-    `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado)
-     VALUES ($1, $2, ($2::date + INTERVAL '6 days')::date, 'borrador')
-     RETURNING *`,
-    [`${prefijo} Menu`, fechaInicio],
-  )).rows[0];
+  return insertarMenuSemana(query, { nombre: `${prefijo} Menu`, fecha_inicio: fechaInicio });
 }
 
 async function crearPlatoConVianda(prefijo, nombre, extra = {}) {

@@ -185,10 +185,15 @@ async function seedMenus() {
       const estado = estadoDe(fechaInicio);
 
       const ahora = new Date().toISOString();
+      // S4: el menú cuelga de semana_id; getOrCreate de la semana desde su lunes.
       const menuRes = await client.query(
-        `INSERT INTO menus_semanales
-           (nombre, fecha_inicio, fecha_fin, estado, publicado_at, cerrado_at)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `WITH s AS (
+           INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($2, $3)
+           ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+         )
+         INSERT INTO menus_semanales
+           (nombre, semana_id, estado, publicado_at, cerrado_at)
+         SELECT $1, s.id, $4, $5, $6 FROM s
          RETURNING id`,
         [
           nombre,

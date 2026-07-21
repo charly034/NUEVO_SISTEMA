@@ -67,8 +67,12 @@ test('excepción manual (forzar) gana sobre el criterio', () => {
 
 test('setup: menú + plato throwaway', async () => {
   const { rows: m } = await query(
-    `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, estado)
-     VALUES ('fase-h-test menu', '2099-05-04', '2099-05-10', 'borrador') RETURNING id`
+    `WITH s AS (
+       INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ('2099-05-04', '2099-05-10')
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+     )
+     INSERT INTO menus_semanales (nombre, semana_id, estado)
+     SELECT 'fase-h-test menu', s.id, 'borrador' FROM s RETURNING id`
   );
   menuId = m[0].id;
   const { rows: p } = await query("SELECT id FROM platos WHERE activo = true ORDER BY id LIMIT 1");

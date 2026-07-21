@@ -93,7 +93,8 @@ export const menuSemana = async (semanaInicio, empresaId = null) => {
   // aparte porque, si la semana no tiene NINGUN especial todavia, variablesRes
   // puede venir vacio y nunca exponer ms.id.
   const menuRow = await query(
-    `SELECT id FROM menus_semanales WHERE fecha_inicio = $1 AND estado = 'publicado' LIMIT 1`,
+    `SELECT ms.id FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id
+     WHERE se.fecha_inicio = $1 AND ms.estado = 'publicado' LIMIT 1`,
     [semanaInicio]
   );
   const menuSemanalId = menuRow.rows[0]?.id ?? null;
@@ -104,12 +105,13 @@ export const menuSemana = async (semanaInicio, empresaId = null) => {
             p.tags, p.tiene_guarnicion, p.vegetariano,
             p.calorias, p.alergenos, p.foto_url,${VIANDA_SLOT_COLS}
             , ms.id AS menu_semanal_id, ms.nombre AS menu_nombre,
-            ms.fecha_inicio, ms.fecha_fin, ms.estado,
+            se.fecha_inicio, se.fecha_fin, ms.estado,
             ms.fecha_limite_pedidos
      FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
      JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
      JOIN platos p ON p.id = msd.plato_id${VIANDA_SLOT_JOINS}
-     WHERE ms.fecha_inicio = $1 AND ms.estado = 'publicado' AND p.activo = true
+     WHERE se.fecha_inicio = $1 AND ms.estado = 'publicado' AND p.activo = true
        AND msd.opcion IS NOT NULL  -- solo especiales/opcion-based; los fijos (opcion NULL) los trae cargarPlatosFijos (teardown Fase C)
        AND ${FILTRO_VISIBILIDAD_SLOT}
        AND ${FILTRO_VISIBILIDAD_PLATO}
@@ -249,16 +251,17 @@ async function cargarDetallesMenu(menu, db = query, fijosPrecargados = null, emp
 // Devuelve todos los menús publicados vigentes (fecha_fin >= hoy), ordenados por fecha_inicio
 export const menusPublicadosList = async (empresaId = null) => {
   const result = await query(
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at,
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos, ms.publicado_at,
             COALESCE((
               SELECT json_agg(json_build_object('dia', ss.dia, 'motivo', ss.motivo))
               FROM menu_semanal_sin_servicio ss
-              WHERE ss.menu_semanal_id = menus_semanales.id
+              WHERE ss.menu_semanal_id = ms.id
             ), '[]'::json) AS sin_servicio
-     FROM menus_semanales
-     WHERE estado IN ('publicado', 'cerrado')
-       AND fecha_inicio >= date_trunc('week', CURRENT_DATE)::date - INTERVAL '2 weeks'
-     ORDER BY fecha_inicio ASC`
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.estado IN ('publicado', 'cerrado')
+       AND se.fecha_inicio >= date_trunc('week', CURRENT_DATE)::date - INTERVAL '2 weeks'
+     ORDER BY se.fecha_inicio ASC`
   );
   // La visibilidad de fijos ahora es por semana, asi que ya no se puede
   // precargar una sola vez para todos los menus de la lista (cada semana
@@ -270,14 +273,15 @@ export const menusPublicadosList = async (empresaId = null) => {
 // Devuelve un menú publicado específico por su ID (para validar al guardar pedido)
 export const menuActivoPorId = async (id, db = query, empresaId = null) => {
   const menuRes = await execute(db,
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos,
             COALESCE((
               SELECT json_agg(json_build_object('dia', ss.dia, 'motivo', ss.motivo))
               FROM menu_semanal_sin_servicio ss
-              WHERE ss.menu_semanal_id = menus_semanales.id
+              WHERE ss.menu_semanal_id = ms.id
             ), '[]'::json) AS sin_servicio
-     FROM menus_semanales
-     WHERE id = $1 AND estado = 'publicado' AND fecha_fin >= CURRENT_DATE`,
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.id = $1 AND ms.estado = 'publicado' AND se.fecha_fin >= CURRENT_DATE`,
     [id]
   );
   const menu = menuRes.rows[0];
@@ -287,18 +291,19 @@ export const menuActivoPorId = async (id, db = query, empresaId = null) => {
 
 export const menuPublicadoPorSemana = async (semanaId, db = query, empresaId = null) => {
   const menuRes = await execute(db,
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos,
             COALESCE((
               SELECT json_agg(json_build_object('dia', ss.dia, 'motivo', ss.motivo))
               FROM menu_semanal_sin_servicio ss
-              WHERE ss.menu_semanal_id = menus_semanales.id
+              WHERE ss.menu_semanal_id = ms.id
             ), '[]'::json) AS sin_servicio
-     FROM menus_semanales
-     WHERE estado = 'publicado'
-       AND fecha_fin >= CURRENT_DATE
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.estado = 'publicado'
+       AND se.fecha_fin >= CURRENT_DATE
        AND (
-        id::text = $1
-        OR fecha_inicio = CASE
+        ms.id::text = $1
+        OR se.fecha_inicio = CASE
           WHEN $1 ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN $1::date
           ELSE NULL
         END
@@ -314,17 +319,18 @@ export const menuPublicadoPorSemana = async (semanaId, db = query, empresaId = n
 // Mantener por compatibilidad con menuHoy y otros usos internos
 export const menuActivo = async (db = query, empresaId = null) => {
   const menuRes = await execute(db,
-    `SELECT id, nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos,
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado, ms.fecha_limite_pedidos,
             COALESCE((
               SELECT json_agg(json_build_object('dia', ss.dia, 'motivo', ss.motivo))
               FROM menu_semanal_sin_servicio ss
-              WHERE ss.menu_semanal_id = menus_semanales.id
+              WHERE ss.menu_semanal_id = ms.id
             ), '[]'::json) AS sin_servicio
-     FROM menus_semanales
-     WHERE estado = 'publicado' AND fecha_fin >= CURRENT_DATE
+     FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
+     WHERE ms.estado = 'publicado' AND se.fecha_fin >= CURRENT_DATE
      ORDER BY
-       CASE WHEN CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin THEN 0 ELSE 1 END,
-       fecha_inicio ASC
+       CASE WHEN CURRENT_DATE BETWEEN se.fecha_inicio AND se.fecha_fin THEN 0 ELSE 1 END,
+       se.fecha_inicio ASC
      LIMIT 1`
   );
   const menu = menuRes.rows[0];
@@ -340,7 +346,8 @@ export const menuHoy = async () => {
   // Menu que cubre la fecha de hoy -- necesario para leer los fijos por-semana
   // (teardown Fase C, cargarPlatosFijosDesdeMenu necesita el menu_semanal_id).
   const menuRow = await query(
-    `SELECT id FROM menus_semanales WHERE fecha_inicio <= $1 AND fecha_fin >= $1 ORDER BY fecha_inicio DESC LIMIT 1`,
+    `SELECT ms.id FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id
+     WHERE se.fecha_inicio <= $1 AND se.fecha_fin >= $1 ORDER BY se.fecha_inicio DESC LIMIT 1`,
     [fechaHoy]
   );
   const menuSemanalId = menuRow.rows[0]?.id ?? null;
@@ -352,9 +359,10 @@ export const menuHoy = async () => {
             p.calorias, p.alergenos, p.foto_url,
             ms.id AS menu_semanal_id
      FROM menus_semanales ms
+     JOIN semanas se ON se.id = ms.semana_id
      JOIN menu_semanal_dias msd ON msd.menu_semanal_id = ms.id
      JOIN platos p ON p.id = msd.plato_id
-     WHERE ms.fecha_inicio <= $2 AND ms.fecha_fin >= $2
+     WHERE se.fecha_inicio <= $2 AND se.fecha_fin >= $2
        AND msd.dia::text = $1 AND p.activo = true
        AND msd.opcion IS NOT NULL  -- solo especiales; fijos via cargarPlatosFijos (teardown Fase C)
        AND NOT EXISTS (
@@ -374,7 +382,7 @@ export const menuHoy = async () => {
 
 export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = query) => {
   const r = await execute(db,
-    `SELECT p.*, json_agg(
+    `SELECT p.*, se.fecha_inicio AS semana_inicio, json_agg(
        json_build_object(
          'id', pi.id, 'dia', pi.dia, 'plato_id', pi.plato_id,
          'plato_nombre', pl.nombre, 'opcion', pi.opcion,
@@ -393,7 +401,7 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
      LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.empleado_id = $1 AND se.fecha_inicio = $2
-     GROUP BY p.id`,
+     GROUP BY p.id, se.id`,
     [empleadoId, semanaInicio]
   );
   return r.rows[0] || null;
@@ -555,30 +563,44 @@ export const upsertPedido = async ({
   plan_snapshot = {},
 }, db = query) => {
   const r = await execute(db,
-    `INSERT INTO pedidos (
-       empleado_id, empresa_id, menu_semanal_id, semana_inicio, observaciones,
-       plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
-       plan_incluye_postre, plan_incluye_bebida
+    // S4: el pedido cuelga de semana_id (no de semana_inicio, ya dropeada). La CTE
+    // `sem` hace getOrCreate de la semana desde $4 (reemplaza el trigger auto-populate
+    // retirado); ON CONFLICT (empleado_id, semana_id) mantiene "1 pedido/semana"; el
+    // SELECT final expone semana_inicio (=se.fecha_inicio) para el contrato.
+    `WITH sem AS (
+       INSERT INTO semanas (fecha_inicio, fecha_fin)
+       VALUES ($4, ($4::date + 6))
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW()
+       RETURNING id
+     ),
+     ins AS (
+       INSERT INTO pedidos (
+         empleado_id, empresa_id, menu_semanal_id, semana_id, observaciones,
+         plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
+         plan_incluye_postre, plan_incluye_bebida
+       )
+       SELECT $1, $2, $3, sem.id, $5, $6, $7, $8, $9, $10, $11, $12 FROM sem
+       ON CONFLICT (empleado_id, semana_id)
+       DO UPDATE SET menu_semanal_id = EXCLUDED.menu_semanal_id,
+         observaciones = EXCLUDED.observaciones,
+         plan_id = EXCLUDED.plan_id,
+         plan_codigo = EXCLUDED.plan_codigo,
+         plan_nombre = EXCLUDED.plan_nombre,
+         plan_gramaje_min = EXCLUDED.plan_gramaje_min,
+         plan_gramaje_max = EXCLUDED.plan_gramaje_max,
+         plan_incluye_postre = EXCLUDED.plan_incluye_postre,
+         plan_incluye_bebida = EXCLUDED.plan_incluye_bebida,
+         estado = 'pendiente',
+         updated_at = NOW()
+       RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_id, estado, observaciones,
+         plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
+         plan_incluye_postre, plan_incluye_bebida, created_at, updated_at
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-     -- S3: el invariante "1 pedido/semana" ahora es UNIQUE(empleado_id, semana_id).
-     -- El INSERT aun escribe semana_inicio; el trigger BEFORE set_semana_id deriva
-     -- semana_id antes del chequeo de arbitro (se setea semana_id directo en S4).
-     ON CONFLICT (empleado_id, semana_id)
-     DO UPDATE SET menu_semanal_id = EXCLUDED.menu_semanal_id,
-       observaciones = EXCLUDED.observaciones,
-       plan_id = EXCLUDED.plan_id,
-       plan_codigo = EXCLUDED.plan_codigo,
-       plan_nombre = EXCLUDED.plan_nombre,
-       plan_gramaje_min = EXCLUDED.plan_gramaje_min,
-       plan_gramaje_max = EXCLUDED.plan_gramaje_max,
-       plan_incluye_postre = EXCLUDED.plan_incluye_postre,
-       plan_incluye_bebida = EXCLUDED.plan_incluye_bebida,
-       estado = 'pendiente',
-       updated_at = NOW()
-     RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado, observaciones,
-       plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
-       plan_incluye_postre, plan_incluye_bebida, created_at, updated_at`,
+     SELECT ins.id, ins.empleado_id, ins.empresa_id, ins.menu_semanal_id,
+            se.fecha_inicio AS semana_inicio, ins.estado, ins.observaciones,
+            ins.plan_id, ins.plan_codigo, ins.plan_nombre, ins.plan_gramaje_min, ins.plan_gramaje_max,
+            ins.plan_incluye_postre, ins.plan_incluye_bebida, ins.created_at, ins.updated_at
+     FROM ins JOIN semanas se ON se.id = ins.semana_id`,
     [
       empleado_id,
       empresa_id,
@@ -753,7 +775,7 @@ export const validateItemForMenu = async (menuId, item, db = query, empresaId = 
 export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
   const r = await query(
     `SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.observaciones, p.created_at,
-            p.empresa_id, ms.nombre AS menu_nombre, ms.fecha_fin,
+            p.empresa_id, ms.nombre AS menu_nombre, mse.fecha_fin,
             json_agg(
               json_build_object(
                 'dia', pi.dia, 'plato_id', pi.plato_id,
@@ -767,12 +789,13 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
      FROM pedidos p
      JOIN semanas se ON se.id = p.semana_id
      LEFT JOIN menus_semanales ms ON ms.id = p.menu_semanal_id
+     LEFT JOIN semanas mse ON mse.id = ms.semana_id
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
      LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.empleado_id = $1
-     GROUP BY p.id, se.id, ms.id
+     GROUP BY p.id, se.id, ms.id, mse.id
      ORDER BY se.fecha_inicio DESC
      LIMIT $2`,
     [empleadoId, limit]
@@ -868,19 +891,27 @@ export const findOpcionesSugerenciaBySemanas = async (semanasInicio = [], db = q
 };
 
 export const replaceOpcionesSugerencia = async ({ semana_inicio, plato_ids }, db = query) => {
-  await execute(db, 'DELETE FROM pedido_sugerencia_opciones WHERE semana_inicio = $1', [semana_inicio]);
+  // S4: getOrCreate de la semana desde la fecha (reemplaza el trigger retirado) y
+  // trabajar por semana_id; semana_inicio se re-expone en el payload desde el param.
+  const semRes = await execute(db,
+    `INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($1, ($1::date + 6))
+     ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id`,
+    [semana_inicio]
+  );
+  const semanaId = semRes.rows[0].id;
+  await execute(db, 'DELETE FROM pedido_sugerencia_opciones WHERE semana_id = $1', [semanaId]);
 
   const rows = [];
   for (const [index, platoId] of plato_ids.entries()) {
     const r = await execute(db,
-      `INSERT INTO pedido_sugerencia_opciones (semana_inicio, plato_id, orden)
+      `INSERT INTO pedido_sugerencia_opciones (semana_id, plato_id, orden)
        SELECT $1, p.id, $3
        FROM platos p
        WHERE p.id = $2 AND p.activo = TRUE
-       RETURNING id, semana_inicio, plato_id, orden, activo, created_at, updated_at`,
-      [semana_inicio, platoId, index]
+       RETURNING id, plato_id, orden, activo, created_at, updated_at`,
+      [semanaId, platoId, index]
     );
-    if (r.rows[0]) rows.push(r.rows[0]);
+    if (r.rows[0]) rows.push({ ...r.rows[0], semana_inicio });
   }
 
   return rows;
@@ -894,19 +925,26 @@ export const upsertSugerencia = async ({
   comentario,
 }, db = query) => {
   const r = await execute(db,
-    `INSERT INTO pedido_sugerencias (
-       empleado_id, empresa_id, semana_inicio, ideas, comentario
+    // S4: sugerencia cuelga de semana_id; CTE `sem` hace getOrCreate desde $3
+    // (reemplaza el trigger retirado); SELECT final expone semana_inicio para el contrato.
+    `WITH sem AS (
+       INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($3, ($3::date + 6))
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+     ),
+     ins AS (
+       INSERT INTO pedido_sugerencias (empleado_id, empresa_id, semana_id, ideas, comentario)
+       SELECT $1, $2, sem.id, $4::jsonb, $5 FROM sem
+       ON CONFLICT (empleado_id, semana_id)
+       DO UPDATE SET
+         empresa_id = EXCLUDED.empresa_id,
+         ideas = EXCLUDED.ideas,
+         comentario = EXCLUDED.comentario,
+         updated_at = NOW()
+       RETURNING id, empleado_id, empresa_id, semana_id, ideas, comentario, created_at, updated_at
      )
-     VALUES ($1, $2, $3, $4::jsonb, $5)
-     -- S3: UNIQUE swap a (empleado_id, semana_id); semana_id lo deriva el trigger
-     -- BEFORE set_semana_id desde semana_inicio (se setea directo en S4).
-     ON CONFLICT (empleado_id, semana_id)
-     DO UPDATE SET
-       empresa_id = EXCLUDED.empresa_id,
-       ideas = EXCLUDED.ideas,
-       comentario = EXCLUDED.comentario,
-       updated_at = NOW()
-     RETURNING id, empleado_id, empresa_id, semana_inicio, ideas, comentario, created_at, updated_at`,
+     SELECT ins.id, ins.empleado_id, ins.empresa_id, se.fecha_inicio AS semana_inicio,
+            ins.ideas, ins.comentario, ins.created_at, ins.updated_at
+     FROM ins JOIN semanas se ON se.id = ins.semana_id`,
     [
       empleado_id,
       empresa_id,
@@ -920,18 +958,21 @@ export const upsertSugerencia = async ({
 
 export const cancelarPedidoByEmpleado = async (empleadoId, semanaInicio, db = query) => {
   const r = await execute(db,
+    // S4: targeting por semana vía JOIN semanas (semana_inicio dropeada); RETURNING
+    // expone semana_inicio desde semanas (se en el FROM del UPDATE).
     `WITH anterior AS (
-       SELECT id, estado AS estado_anterior
-       FROM pedidos
-       WHERE empleado_id = $1 AND semana_inicio = $2
-         AND estado IN ('pendiente', 'en_proceso')
-       FOR UPDATE
+       SELECT p2.id, p2.estado AS estado_anterior
+       FROM pedidos p2
+       JOIN semanas se2 ON se2.id = p2.semana_id
+       WHERE p2.empleado_id = $1 AND se2.fecha_inicio = $2
+         AND p2.estado IN ('pendiente', 'en_proceso')
+       FOR UPDATE OF p2
      )
      UPDATE pedidos p
      SET estado = 'cancelado', updated_at = NOW()
-     FROM anterior a
-     WHERE p.id = a.id
-     RETURNING p.id, a.estado_anterior::text, p.estado, p.semana_inicio`,
+     FROM anterior a, semanas se
+     WHERE p.id = a.id AND se.id = p.semana_id
+     RETURNING p.id, a.estado_anterior::text, p.estado, se.fecha_inicio AS semana_inicio`,
     [empleadoId, semanaInicio]
   );
   if (!r.rows[0]) return null;
@@ -941,8 +982,9 @@ export const cancelarPedidoByEmpleado = async (empleadoId, semanaInicio, db = qu
 
 export const updateEstado = async (id, estado, db = query) => {
   const r = await execute(db,
-    `UPDATE pedidos SET estado = $1, updated_at = NOW() WHERE id = $2
-     RETURNING id, estado, semana_inicio, empleado_id, empresa_id`,
+    `UPDATE pedidos p SET estado = $1, updated_at = NOW()
+     FROM semanas se WHERE p.id = $2 AND se.id = p.semana_id
+     RETURNING p.id, p.estado, se.fecha_inicio AS semana_inicio, p.empleado_id, p.empresa_id`,
     [estado, id]
   );
   return r.rows[0] || null;
@@ -1016,8 +1058,9 @@ export const calcularEstadoPedidoPorItems = async (pedidoId, db = query) => {
 
 export const touchPedido = async (id, db = query) => {
   const r = await execute(db,
-    `UPDATE pedidos SET updated_at = NOW() WHERE id = $1
-     RETURNING id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado, observaciones, created_at, updated_at`,
+    `UPDATE pedidos p SET updated_at = NOW()
+     FROM semanas se WHERE p.id = $1 AND se.id = p.semana_id
+     RETURNING p.id, p.empleado_id, p.empresa_id, p.menu_semanal_id, se.fecha_inicio AS semana_inicio, p.estado, p.observaciones, p.created_at, p.updated_at`,
     [id]
   );
   return r.rows[0] || null;

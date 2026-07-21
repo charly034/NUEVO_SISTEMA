@@ -2,7 +2,8 @@ import { query } from '../../database/connection.js';
 
 export const findMenu = async (menuSemanalId) => {
   const result = await query(
-    'SELECT id, nombre, fecha_inicio, fecha_fin, estado FROM menus_semanales WHERE id = $1',
+    `SELECT ms.id, ms.nombre, se.fecha_inicio, se.fecha_fin, ms.estado
+     FROM menus_semanales ms JOIN semanas se ON se.id = ms.semana_id WHERE ms.id = $1`,
     [menuSemanalId]
   );
   return result.rows[0] || null;
