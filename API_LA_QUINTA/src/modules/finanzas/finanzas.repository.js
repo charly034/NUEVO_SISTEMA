@@ -91,11 +91,12 @@ export async function findAplicacionesByPagoId(pagoId, db = query) {
   const result = await execute(db, `
     SELECT fpa.id, fpa.pago_id, fpa.pedido_id, fpa.pedido_item_id, fpa.monto_aplicado,
            fpa.created_by_admin_id, fpa.created_at,
-           p.semana_inicio, p.estado AS pedido_estado,
+           se.fecha_inicio AS semana_inicio, p.estado AS pedido_estado,
            e.nombre AS empleado_nombre, e.apellido AS empleado_apellido,
            emp.nombre AS empresa_nombre
     FROM finanzas_pago_aplicaciones fpa
     LEFT JOIN pedidos p ON p.id = fpa.pedido_id
+    LEFT JOIN semanas se ON se.id = p.semana_id
     LEFT JOIN empleados e ON e.id = p.empleado_id
     LEFT JOIN empresas emp ON emp.id = p.empresa_id
     WHERE fpa.pago_id = $1
@@ -154,13 +155,14 @@ export async function findPedidoFinancieroById(id, db = query) {
       WHERE pedido_id = $1 AND COALESCE(sin_pedido, false) = false
       GROUP BY pedido_id
     )
-    SELECT p.id, p.empleado_id, p.empresa_id, p.semana_inicio, p.estado,
+    SELECT p.id, p.empleado_id, p.empresa_id, se.fecha_inicio AS semana_inicio, p.estado,
            p.estado_financiero, p.importe_total, p.importe_pagado, p.moneda,
            COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0)::numeric AS importe_calculado,
            COALESCE(a.aplicado, 0)::numeric AS importe_aplicado,
            emp.nombre AS empresa_nombre,
            e.nombre AS empleado_nombre, e.apellido AS empleado_apellido
     FROM pedidos p
+    JOIN semanas se ON se.id = p.semana_id
     JOIN empresas emp ON emp.id = p.empresa_id
     JOIN empleados e ON e.id = p.empleado_id
     LEFT JOIN aplicaciones a ON a.pedido_id = p.id
@@ -208,12 +210,13 @@ export async function findPedidosParaAutoAplicar(pago, db = query) {
            COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0)::numeric AS importe_total,
            COALESCE(a.aplicado, 0)::numeric AS importe_pagado
     FROM pedidos p
+    JOIN semanas se ON se.id = p.semana_id
     LEFT JOIN aplicaciones a ON a.pedido_id = p.id
     LEFT JOIN items i ON i.pedido_id = p.id
     WHERE ${field} = $1
       AND p.estado <> 'cancelado'
       AND COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0) > COALESCE(a.aplicado, 0)
-    ORDER BY p.semana_inicio ASC, p.created_at ASC, p.id ASC
+    ORDER BY se.fecha_inicio ASC, p.created_at ASC, p.id ASC
   `, [value]);
   return result.rows;
 }
@@ -232,7 +235,7 @@ export async function listarPedidosPagos(filters = {}) {
   }
   if (filters.semana_inicio) {
     values.push(filters.semana_inicio);
-    conditions.push(`p.semana_inicio = $${values.length}`);
+    conditions.push(`se.fecha_inicio = $${values.length}`);
   }
   if (filters.estado_financiero) {
     values.push(filters.estado_financiero);
@@ -244,11 +247,11 @@ export async function listarPedidosPagos(filters = {}) {
   }
   if (filters.desde) {
     values.push(filters.desde);
-    conditions.push(`p.semana_inicio >= $${values.length}`);
+    conditions.push(`se.fecha_inicio >= $${values.length}`);
   }
   if (filters.hasta) {
     values.push(filters.hasta);
-    conditions.push(`p.semana_inicio <= $${values.length}`);
+    conditions.push(`se.fecha_inicio <= $${values.length}`);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -269,7 +272,7 @@ export async function listarPedidosPagos(filters = {}) {
       WHERE COALESCE(sin_pedido, false) = false
       GROUP BY pedido_id
     )
-    SELECT p.id, p.semana_inicio, p.estado, p.estado_financiero,
+    SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.estado_financiero,
            p.importe_total, p.importe_pagado, p.moneda,
            p.empleado_id, p.empresa_id,
            e.nombre AS empleado_nombre, e.apellido AS empleado_apellido, e.email AS empleado_email,
@@ -278,12 +281,13 @@ export async function listarPedidosPagos(filters = {}) {
            COALESCE(a.aplicado, 0)::numeric AS importe_aplicado,
            (COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0) - COALESCE(a.aplicado, 0))::numeric AS saldo
     FROM pedidos p
+    JOIN semanas se ON se.id = p.semana_id
     JOIN empleados e ON e.id = p.empleado_id
     JOIN empresas emp ON emp.id = p.empresa_id
     LEFT JOIN aplicaciones a ON a.pedido_id = p.id
     LEFT JOIN items i ON i.pedido_id = p.id
     ${where}
-    ORDER BY p.semana_inicio DESC, emp.nombre ASC, e.apellido ASC, e.nombre ASC
+    ORDER BY se.fecha_inicio DESC, emp.nombre ASC, e.apellido ASC, e.nombre ASC
     LIMIT $${values.length - 1} OFFSET $${values.length}
   `, values);
   return result.rows;
@@ -380,7 +384,7 @@ export async function cuentaCorriente({ tipo, id }) {
       LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
       GROUP BY pi.pedido_id
     )
-    SELECT p.id, p.semana_inicio, p.estado, p.estado_financiero, p.observaciones,
+    SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.estado_financiero, p.observaciones,
            COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0)::numeric AS importe_total,
            COALESCE(a.aplicado, 0)::numeric AS importe_pagado,
            (COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0) - COALESCE(a.aplicado, 0))::numeric AS saldo,
@@ -391,12 +395,13 @@ export async function cuentaCorriente({ tipo, id }) {
            e.nombre AS empleado_nombre, e.apellido AS empleado_apellido,
            emp.nombre AS empresa_nombre
     FROM pedidos p
+    JOIN semanas se ON se.id = p.semana_id
     JOIN empleados e ON e.id = p.empleado_id
     JOIN empresas emp ON emp.id = p.empresa_id
     LEFT JOIN aplicaciones a ON a.pedido_id = p.id
     LEFT JOIN items i ON i.pedido_id = p.id
     WHERE ${wherePedidos}
-    ORDER BY p.semana_inicio DESC, p.id DESC
+    ORDER BY se.fecha_inicio DESC, p.id DESC
   `, valuesPedidos);
 
   const pagos = await query(`
@@ -410,7 +415,7 @@ export async function cuentaCorriente({ tipo, id }) {
                  'pedido_item_id', fpa.pedido_item_id,
                  'monto_aplicado', fpa.monto_aplicado,
                  'created_at', fpa.created_at,
-                 'semana_inicio', pa.semana_inicio,
+                 'semana_inicio', sea.fecha_inicio,
                  'pedido_estado', pa.estado,
                  'estado_financiero', pa.estado_financiero,
                  'empleado_nombre', ea.nombre,
@@ -426,6 +431,7 @@ export async function cuentaCorriente({ tipo, id }) {
     LEFT JOIN empleados e ON e.id = fp.empleado_id
     LEFT JOIN finanzas_pago_aplicaciones fpa ON fpa.pago_id = fp.id
     LEFT JOIN pedidos pa ON pa.id = fpa.pedido_id
+    LEFT JOIN semanas sea ON sea.id = pa.semana_id
     LEFT JOIN empleados ea ON ea.id = pa.empleado_id
     LEFT JOIN empresas empa ON empa.id = pa.empresa_id
     WHERE ${wherePagos}
@@ -502,7 +508,7 @@ export async function cuentaCorrienteCliente({ empleadoId, empresaId, esResponsa
       LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
       GROUP BY pi.pedido_id
     )
-    SELECT p.id, p.semana_inicio, p.estado, p.estado_financiero,
+    SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.estado_financiero,
            COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0)::numeric AS importe_total,
            COALESCE(a.aplicado, 0)::numeric AS importe_pagado,
            (COALESCE(NULLIF(p.importe_total, 0), i.total_items, 0) - COALESCE(a.aplicado, 0))::numeric AS saldo,
@@ -516,12 +522,13 @@ export async function cuentaCorrienteCliente({ empleadoId, empresaId, esResponsa
            p.empleado_id, e.nombre AS empleado_nombre, e.apellido AS empleado_apellido,
            p.empresa_id, emp.nombre AS empresa_nombre
     FROM pedidos p
+    JOIN semanas se ON se.id = p.semana_id
     JOIN empleados e ON e.id = p.empleado_id
     JOIN empresas emp ON emp.id = p.empresa_id
     LEFT JOIN aplicaciones a ON a.pedido_id = p.id
     LEFT JOIN items i ON i.pedido_id = p.id
     WHERE ${wherePedidos}
-    ORDER BY p.semana_inicio DESC, p.id DESC
+    ORDER BY se.fecha_inicio DESC, p.id DESC
   `, [id]);
 
   const pagos = await query(`
@@ -540,7 +547,7 @@ export async function cuentaCorrienteCliente({ empleadoId, empresaId, esResponsa
                  'pedido_item_id', fpa.pedido_item_id,
                  'monto_aplicado', fpa.monto_aplicado,
                  'created_at', fpa.created_at,
-                 'semana_inicio', pa.semana_inicio,
+                 'semana_inicio', sea.fecha_inicio,
                  'pedido_estado', pa.estado,
                  'estado_financiero', pa.estado_financiero,
                  'empleado_nombre', ea.nombre,
@@ -555,6 +562,7 @@ export async function cuentaCorrienteCliente({ empleadoId, empresaId, esResponsa
     LEFT JOIN empleados e ON e.id = fp.empleado_id
     LEFT JOIN finanzas_pago_aplicaciones fpa ON fpa.pago_id = fp.id
     LEFT JOIN pedidos pa ON pa.id = fpa.pedido_id
+    LEFT JOIN semanas sea ON sea.id = pa.semana_id
     LEFT JOIN empleados ea ON ea.id = pa.empleado_id
     WHERE ${wherePagos}
       AND fp.estado = 'activo'
