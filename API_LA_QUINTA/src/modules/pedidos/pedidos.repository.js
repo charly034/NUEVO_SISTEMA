@@ -387,11 +387,12 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
        ) ORDER BY pi.dia
      ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
+     JOIN semanas se ON se.id = p.semana_id
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
      LEFT JOIN salsas s ON s.id = pi.salsa_id
-     WHERE p.empleado_id = $1 AND p.semana_inicio = $2
+     WHERE p.empleado_id = $1 AND se.fecha_inicio = $2
      GROUP BY p.id`,
     [empleadoId, semanaInicio]
   );
@@ -400,9 +401,10 @@ export const findPedidoByEmpleadoSemana = async (empleadoId, semanaInicio, db = 
 
 export const findPedidoCabeceraById = async (id, db = query) => {
   const r = await execute(db,
-    `SELECT id, empleado_id, empresa_id, menu_semanal_id, semana_inicio, estado
-     FROM pedidos
-     WHERE id = $1`,
+    `SELECT p.id, p.empleado_id, p.empresa_id, p.menu_semanal_id, se.fecha_inicio AS semana_inicio, p.estado
+     FROM pedidos p
+     JOIN semanas se ON se.id = p.semana_id
+     WHERE p.id = $1`,
     [id]
   );
   return r.rows[0] || null;
@@ -461,7 +463,7 @@ export const findEventosByPedidoIds = async (pedidoIds, db = query) => {
 
 export const findById = async (id) => {
   const r = await query(
-    `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
+    `SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.observaciones, p.created_at,
             p.empleado_id, p.empresa_id,
             p.plan_id, p.plan_codigo, p.plan_nombre, p.plan_gramaje_min, p.plan_gramaje_max,
             p.plan_incluye_postre, p.plan_incluye_bebida,
@@ -480,6 +482,7 @@ export const findById = async (id) => {
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
+     JOIN semanas se ON se.id = p.semana_id
      JOIN empleados e ON e.id = p.empleado_id
      JOIN empresas emp ON emp.id = p.empresa_id
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
@@ -487,7 +490,7 @@ export const findById = async (id) => {
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
      LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.id = $1
-     GROUP BY p.id, e.id, emp.id`,
+     GROUP BY p.id, se.id, e.id, emp.id`,
     [id]
   );
   const pedido = r.rows[0] || null;
@@ -500,14 +503,14 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
   const conds = [];
   const vals = [];
   if (empresa_id) { vals.push(empresa_id); conds.push(`p.empresa_id = $${vals.length}`); }
-  if (semana_inicio) { vals.push(semana_inicio); conds.push(`p.semana_inicio = $${vals.length}`); }
+  if (semana_inicio) { vals.push(semana_inicio); conds.push(`se.fecha_inicio = $${vals.length}`); }
   if (estado) { vals.push(estado); conds.push(`p.estado = $${vals.length}`); }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   vals.push(limit, offset);
 
   const r = await query(
-    `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
+    `SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.observaciones, p.created_at,
             p.empleado_id, p.empresa_id,
             p.plan_id, p.plan_codigo, p.plan_nombre, p.plan_gramaje_min, p.plan_gramaje_max,
             p.plan_incluye_postre, p.plan_incluye_bebida,
@@ -526,6 +529,7 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
+     JOIN semanas se ON se.id = p.semana_id
      JOIN empleados e ON e.id = p.empleado_id
      JOIN empresas emp ON emp.id = p.empresa_id
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
@@ -533,7 +537,7 @@ export const findAll = async ({ empresa_id, semana_inicio, estado, limit = 100, 
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
      LEFT JOIN salsas s ON s.id = pi.salsa_id
      ${where}
-     GROUP BY p.id, e.id, emp.id
+     GROUP BY p.id, se.id, e.id, emp.id
      ORDER BY p.created_at DESC
      LIMIT $${vals.length - 1} OFFSET $${vals.length}`,
     vals
@@ -745,7 +749,7 @@ export const validateItemForMenu = async (menuId, item, db = query, empresaId = 
 
 export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
   const r = await query(
-    `SELECT p.id, p.semana_inicio, p.estado, p.observaciones, p.created_at,
+    `SELECT p.id, se.fecha_inicio AS semana_inicio, p.estado, p.observaciones, p.created_at,
             p.empresa_id, ms.nombre AS menu_nombre, ms.fecha_fin,
             json_agg(
               json_build_object(
@@ -758,14 +762,15 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
               ) ORDER BY pi.dia
             ) FILTER (WHERE pi.id IS NOT NULL) AS items
      FROM pedidos p
+     JOIN semanas se ON se.id = p.semana_id
      LEFT JOIN menus_semanales ms ON ms.id = p.menu_semanal_id
      LEFT JOIN pedido_items pi ON pi.pedido_id = p.id
      LEFT JOIN platos pl ON pl.id = pi.plato_id
      LEFT JOIN guarniciones g ON g.id = pi.guarnicion_id
      LEFT JOIN salsas s ON s.id = pi.salsa_id
      WHERE p.empleado_id = $1
-     GROUP BY p.id, ms.id
-     ORDER BY p.semana_inicio DESC
+     GROUP BY p.id, se.id, ms.id
+     ORDER BY se.fecha_inicio DESC
      LIMIT $2`,
     [empleadoId, limit]
   );
@@ -774,10 +779,11 @@ export const findHistorialByEmpleado = async (empleadoId, limit = 16) => {
 
 export const findSugerenciasByEmpleado = async (empleadoId) => {
   const r = await query(
-    `SELECT id, empleado_id, empresa_id, semana_inicio, ideas, comentario, created_at, updated_at
-     FROM pedido_sugerencias
-     WHERE empleado_id = $1
-     ORDER BY semana_inicio DESC`,
+    `SELECT ps.id, ps.empleado_id, ps.empresa_id, se.fecha_inicio AS semana_inicio, ps.ideas, ps.comentario, ps.created_at, ps.updated_at
+     FROM pedido_sugerencias ps
+     JOIN semanas se ON se.id = ps.semana_id
+     WHERE ps.empleado_id = $1
+     ORDER BY se.fecha_inicio DESC`,
     [empleadoId]
   );
   return r.rows;
@@ -787,17 +793,18 @@ export const findSugerenciasAdmin = async ({ empresa_id, semana_inicio, limit = 
   const conds = [];
   const vals = [];
   if (empresa_id) { vals.push(empresa_id); conds.push(`ps.empresa_id = $${vals.length}`); }
-  if (semana_inicio) { vals.push(semana_inicio); conds.push(`ps.semana_inicio = $${vals.length}`); }
+  if (semana_inicio) { vals.push(semana_inicio); conds.push(`se.fecha_inicio = $${vals.length}`); }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   vals.push(limit, offset);
 
   const r = await query(
-    `SELECT ps.id, ps.empleado_id, ps.empresa_id, ps.semana_inicio,
+    `SELECT ps.id, ps.empleado_id, ps.empresa_id, se.fecha_inicio AS semana_inicio,
             ps.ideas, ps.comentario, ps.created_at, ps.updated_at,
             e.nombre AS empleado_nombre, e.apellido AS empleado_apellido, e.email,
             emp.nombre AS empresa_nombre
      FROM pedido_sugerencias ps
+     JOIN semanas se ON se.id = ps.semana_id
      JOIN empleados e ON e.id = ps.empleado_id
      JOIN empresas emp ON emp.id = ps.empresa_id
      ${where}
@@ -811,10 +818,11 @@ export const findSugerenciasAdmin = async ({ empresa_id, semana_inicio, limit = 
 export const findResumenSugerencias = async (semanaInicio) => {
   const r = await query(
     `SELECT valor AS nombre, COUNT(*)::int AS votos
-     FROM pedido_sugerencias,
-          jsonb_array_elements_text(ideas) AS valor
-     WHERE semana_inicio = $1
-       AND jsonb_array_length(ideas) > 0
+     FROM pedido_sugerencias ps
+     JOIN semanas se ON se.id = ps.semana_id,
+          jsonb_array_elements_text(ps.ideas) AS valor
+     WHERE se.fecha_inicio = $1
+       AND jsonb_array_length(ps.ideas) > 0
      GROUP BY valor
      ORDER BY votos DESC, valor`,
     [semanaInicio]
@@ -824,11 +832,12 @@ export const findResumenSugerencias = async (semanaInicio) => {
 
 export const findOpcionesSugerencia = async (semanaInicio, db = query) => {
   const r = await execute(db,
-    `SELECT pso.id, pso.semana_inicio, pso.plato_id, pso.orden,
+    `SELECT pso.id, se.fecha_inicio AS semana_inicio, pso.plato_id, pso.orden,
             p.nombre AS plato_nombre, p.descripcion, p.tags, p.tipo, p.foto_url
      FROM pedido_sugerencia_opciones pso
+     JOIN semanas se ON se.id = pso.semana_id
      JOIN platos p ON p.id = pso.plato_id
-     WHERE pso.semana_inicio = $1
+     WHERE se.fecha_inicio = $1
        AND pso.activo = TRUE
        AND p.activo = TRUE
      ORDER BY pso.orden ASC, p.nombre ASC`,
@@ -841,14 +850,15 @@ export const findOpcionesSugerenciaBySemanas = async (semanasInicio = [], db = q
   const semanas = [...new Set(semanasInicio.filter(Boolean))];
   if (semanas.length === 0) return [];
   const r = await execute(db,
-    `SELECT pso.id, pso.semana_inicio, pso.plato_id, pso.orden,
+    `SELECT pso.id, se.fecha_inicio AS semana_inicio, pso.plato_id, pso.orden,
             p.nombre AS plato_nombre, p.descripcion, p.tags, p.tipo, p.foto_url
      FROM pedido_sugerencia_opciones pso
+     JOIN semanas se ON se.id = pso.semana_id
      JOIN platos p ON p.id = pso.plato_id
-     WHERE pso.semana_inicio = ANY($1::date[])
+     WHERE se.fecha_inicio = ANY($1::date[])
        AND pso.activo = TRUE
        AND p.activo = TRUE
-     ORDER BY pso.semana_inicio ASC, pso.orden ASC, p.nombre ASC`,
+     ORDER BY se.fecha_inicio ASC, pso.orden ASC, p.nombre ASC`,
     [semanas]
   );
   return r.rows;
@@ -952,9 +962,10 @@ export const findItemConPedidoById = async (itemId, db = query) => {
     `SELECT pi.id, pi.pedido_id, pi.dia, pi.plato_id, pi.opcion, pi.guarnicion_id,
             COALESCE(pi.sin_pedido, false) AS sin_pedido,
             pi.estado::text AS estado, pi.estado_updated_at,
-            p.estado::text AS pedido_estado, p.semana_inicio, p.empleado_id, p.empresa_id
+            p.estado::text AS pedido_estado, se.fecha_inicio AS semana_inicio, p.empleado_id, p.empresa_id
      FROM pedido_items pi
      JOIN pedidos p ON p.id = pi.pedido_id
+     JOIN semanas se ON se.id = p.semana_id
      WHERE pi.id = $1`,
     [itemId]
   );
