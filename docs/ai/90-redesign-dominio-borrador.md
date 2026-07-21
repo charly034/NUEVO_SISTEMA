@@ -440,7 +440,16 @@ Chunk 2 (flip de lecturas) — **en progreso**. Técnica: reemplazar el read de 
 
 **Chunk 2 (flip de lecturas) — COMPLETO.** Todas las lecturas de `semana_inicio` (cocina, estadísticas, notificaciones, pedidos, finanzas) leen ahora vía `semana_id`. Los write/constraint (`ON CONFLICT (empleado_id, semana_inicio)`, INSERT, RETURNING y sus WHERE de targeting) permanecen sobre `semana_inicio` hasta S3/S4.
 
-**Pendiente S3**: `semana_id` NOT NULL + `UNIQUE(menus_semanales.semana_id)` + guardia en `createMenuSemanal` + swap del UNIQUE de `pedidos` a `(empleado_id, semana_id)` y de las 3 sugerencias. **S4**: drop `semana_inicio`/`fecha_inicio`/`fecha_fin` + retirar el puente auto-populate + código de app setea `semana_id` directo.
+### Implementación — S3 (✅ hecho, 2026-07-21)
+Migración `1719000086000_semana-id-constraints.js` (reversible, `down` verificado con rollback+re-apply):
+- **`semana_id` NOT NULL** en las 5 tablas ancladas (`menus_semanales`, `pedidos`, `pedido_sugerencias`, `sugerencias_empleados`, `pedido_sugerencia_opciones`) — backfill S1 + auto-populate S2.1 garantizan no-null.
+- **`UNIQUE(menus_semanales.semana_id)`** (1—1 duro semana↔menú), con **pre-flight** que RAISE listando los `semana_id` con >1 menú antes de aplicar (remediación D7).
+- **Swap de UNIQUE**: `pedidos`, `pedido_sugerencias`, `sugerencias_empleados` → `(empleado_id, semana_id)`; `pedido_sugerencia_opciones` → `(semana_id, plato_id)` (shape distinto). Paridad 1—1 garantiza que el swap no introduce duplicados.
+- **Código de app (mismo commit)**: `upsertPedido` y `upsertSugerencia` swappean `ON CONFLICT (empleado_id, semana_inicio)` → `(empleado_id, semana_id)`; el INSERT aún escribe `semana_inicio` y el trigger `set_semana_id` (BEFORE) deriva `semana_id` antes del árbitro del conflicto. **Guardia en `createMenuSemanal`** (`menus-semanales.service.js`): rechaza (409) un 2º menú para una semana ya usada, vía nuevo `repo.findBySemanaInicio` (antes solo `duplicarMenuSemanal` guardaba).
+- **Tests**: `test/semanas-constraints.db.test.js` (5/5) — schema NOT NULL + UNIQUE swappeados, enforce 1 pedido/semana + upsert ON CONFLICT, enforce `(semana_id, plato_id)`, guardia de `createMenuSemanal`.
+- **Fix de test-infra (consecuencia del UNIQUE)**: el seed histórico ocupa varias semanas reales; los fixtures de `pedidos` que crean menú para semanas temporales (pasada/actual) chocaban con el nuevo `UNIQUE(semana_id)`. Nuevo helper `liberarSemana(fechaInicio)` (cascade-delete del menú que ocupe esa semana; todas las FK a `menu_semanal_id` son `ON DELETE CASCADE`) llamado en `crearFixturePedido`. **Gate real = `npm test` (secuencial, `--test-concurrency=1`)**: 174/174. Nota: correr `node --test` sin `--test-concurrency=1` da falsos rojos por races entre files que comparten semana hardcodeada (`2026-08-10`) — usar siempre `npm test`.
+
+**Pendiente S4**: drop `semana_inicio`/`fecha_inicio`/`fecha_fin` + retirar el puente auto-populate + código de app setea `semana_id` directo (incluye flipear los INSERT/RETURNING que en S3 siguen escribiendo/leyendo `semana_inicio`, y reescribir los range-checks "¿menú vivo?" contra `semanas.fecha_fin`).
 
 ## GSTACK REVIEW REPORT
 

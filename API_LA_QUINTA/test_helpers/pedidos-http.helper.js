@@ -114,6 +114,23 @@ export async function limpiarDatosTest(prefijo) {
   await query('DELETE FROM salsas WHERE nombre LIKE $1', [`${prefijo}%`]);
 }
 
+// Libera la semana de `fechaInicio` borrando cualquier menú que la ocupe (seed
+// histórico o leak cross-file de otro test), en cascada (todas las FK a
+// menu_semanal_id son ON DELETE CASCADE; pedidos es SET NULL). Necesario desde S3:
+// UNIQUE(menus_semanales.semana_id) hace fatal cualquier 2º menú/semana, así que
+// un fixture que crea su menú para una semana ya ocupada choca. El test "posee" su
+// semana: la libera antes de crear su propio menú. Idempotente (si no hay menú, no
+// borra nada; si la semana ni existe en `semanas`, el subselect no matchea).
+export async function liberarSemana(fechaInicio) {
+  await query(
+    `DELETE FROM menus_semanales ms
+     USING semanas s
+     WHERE ms.semana_id = s.id
+       AND s.fecha_inicio = date_trunc('week', $1::date)::date`,
+    [fechaInicio],
+  );
+}
+
 function fechaISOHelper(fecha) {
   return [
     fecha.getFullYear(),
@@ -286,6 +303,9 @@ export async function crearFixturePedido({
     [platoConSalsaFija.id, salsa.id],
   );
 
+  // S3: garantizar que la semana esté libre antes de crear el menú del fixture
+  // (el seed histórico ocupa varias semanas reales, y el UNIQUE(semana_id) lo prohíbe).
+  await liberarSemana(semanaInicio);
   const menu = (await query(
     `INSERT INTO menus_semanales (
        nombre, fecha_inicio, fecha_fin, estado, fecha_limite_pedidos, publicado_at

@@ -36,6 +36,14 @@ export const getMenuSemanalById = async (id) => {
 };
 
 export const createMenuSemanal = async (data, admin_id = null, adminUser = null) => {
+  // Guardia S3 del 1-1 semana<->menu: rechazar un 2º menú para una semana ya usada.
+  // Sin esto, el UNIQUE(semana_id) chocaría en runtime por el path normal de creación
+  // con un error de constraint crudo en vez de un 409 claro. (duplicarMenuSemanal ya
+  // tenía su propia guardia; createMenuSemanal no la tenía.)
+  const existente = await repo.findBySemanaInicio(data.fecha_inicio);
+  if (existente) {
+    throw ApiError.conflict(`Ya existe un menú para la semana ${data.fecha_inicio}`);
+  }
   const menu = await repo.create({ ...data, admin_id });
   // Sembrar los fijos "recurrentes" del catalogo como filas por-semana
   // (teardown Fase C): garantiza el invariante "todo menu tiene sus fijos

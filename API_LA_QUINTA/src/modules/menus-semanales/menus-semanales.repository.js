@@ -149,6 +149,17 @@ export const findByIdWithDias = async (id) => {
   };
 };
 
+// Guardia S3 del 1-1 semana<->menu: ¿ya hay un menú para esta semana? Se resuelve
+// por fecha_inicio (== el lunes) porque el UNIQUE duro es sobre semana_id y ambos
+// están 1-1 en sync (auto-populate). Devuelve el menú existente o null.
+export const findBySemanaInicio = async (fechaInicio) => {
+  const result = await query(
+    'SELECT id, nombre, fecha_inicio FROM menus_semanales WHERE fecha_inicio = $1 LIMIT 1',
+    [fechaInicio]
+  );
+  return result.rows[0] || null;
+};
+
 export const create = async ({ nombre, fecha_inicio, fecha_fin, admin_id = null }) => {
   const result = await query(
     `INSERT INTO menus_semanales (nombre, fecha_inicio, fecha_fin, created_by_admin_id, updated_by_admin_id)

@@ -561,7 +561,10 @@ export const upsertPedido = async ({
        plan_incluye_postre, plan_incluye_bebida
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-     ON CONFLICT (empleado_id, semana_inicio)
+     -- S3: el invariante "1 pedido/semana" ahora es UNIQUE(empleado_id, semana_id).
+     -- El INSERT aun escribe semana_inicio; el trigger BEFORE set_semana_id deriva
+     -- semana_id antes del chequeo de arbitro (se setea semana_id directo en S4).
+     ON CONFLICT (empleado_id, semana_id)
      DO UPDATE SET menu_semanal_id = EXCLUDED.menu_semanal_id,
        observaciones = EXCLUDED.observaciones,
        plan_id = EXCLUDED.plan_id,
@@ -895,7 +898,9 @@ export const upsertSugerencia = async ({
        empleado_id, empresa_id, semana_inicio, ideas, comentario
      )
      VALUES ($1, $2, $3, $4::jsonb, $5)
-     ON CONFLICT (empleado_id, semana_inicio)
+     -- S3: UNIQUE swap a (empleado_id, semana_id); semana_id lo deriva el trigger
+     -- BEFORE set_semana_id desde semana_inicio (se setea directo en S4).
+     ON CONFLICT (empleado_id, semana_id)
      DO UPDATE SET
        empresa_id = EXCLUDED.empresa_id,
        ideas = EXCLUDED.ideas,
