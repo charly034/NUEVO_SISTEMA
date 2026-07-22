@@ -571,7 +571,7 @@ export const upsertPedido = async ({
        INSERT INTO semanas (fecha_inicio, fecha_fin)
        VALUES ($4, ($4::date + 6))
        ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW()
-       RETURNING id
+       RETURNING id, fecha_inicio
      ),
      ins AS (
        INSERT INTO pedidos (
@@ -596,11 +596,14 @@ export const upsertPedido = async ({
          plan_id, plan_codigo, plan_nombre, plan_gramaje_min, plan_gramaje_max,
          plan_incluye_postre, plan_incluye_bebida, created_at, updated_at
      )
+     -- JOIN a la CTE sem (no a la tabla base semanas): una CTE data-modifying no es
+     -- visible al escaneo de la tabla base en el mismo statement (snapshot pre-statement),
+     -- así que si la semana es nueva, JOIN semanas devolvería 0 filas.
      SELECT ins.id, ins.empleado_id, ins.empresa_id, ins.menu_semanal_id,
-            se.fecha_inicio AS semana_inicio, ins.estado, ins.observaciones,
+            sem.fecha_inicio AS semana_inicio, ins.estado, ins.observaciones,
             ins.plan_id, ins.plan_codigo, ins.plan_nombre, ins.plan_gramaje_min, ins.plan_gramaje_max,
             ins.plan_incluye_postre, ins.plan_incluye_bebida, ins.created_at, ins.updated_at
-     FROM ins JOIN semanas se ON se.id = ins.semana_id`,
+     FROM ins JOIN sem ON sem.id = ins.semana_id`,
     [
       empleado_id,
       empresa_id,
@@ -929,7 +932,7 @@ export const upsertSugerencia = async ({
     // (reemplaza el trigger retirado); SELECT final expone semana_inicio para el contrato.
     `WITH sem AS (
        INSERT INTO semanas (fecha_inicio, fecha_fin) VALUES ($3, ($3::date + 6))
-       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id
+       ON CONFLICT (fecha_inicio) DO UPDATE SET updated_at = NOW() RETURNING id, fecha_inicio
      ),
      ins AS (
        INSERT INTO pedido_sugerencias (empleado_id, empresa_id, semana_id, ideas, comentario)
@@ -942,9 +945,10 @@ export const upsertSugerencia = async ({
          updated_at = NOW()
        RETURNING id, empleado_id, empresa_id, semana_id, ideas, comentario, created_at, updated_at
      )
-     SELECT ins.id, ins.empleado_id, ins.empresa_id, se.fecha_inicio AS semana_inicio,
+     -- JOIN a la CTE sem (no a la tabla base): si la semana es nueva, la tabla base no la ve.
+     SELECT ins.id, ins.empleado_id, ins.empresa_id, sem.fecha_inicio AS semana_inicio,
             ins.ideas, ins.comentario, ins.created_at, ins.updated_at
-     FROM ins JOIN semanas se ON se.id = ins.semana_id`,
+     FROM ins JOIN sem ON sem.id = ins.semana_id`,
     [
       empleado_id,
       empresa_id,
